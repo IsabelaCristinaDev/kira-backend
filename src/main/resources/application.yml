@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: kira-backend
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5433/kira_db
+    username: kira_user
+    password: kira_pass
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    open-in-view: false
+
+server:
+  port: 8081
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+jwt:
+  secret: kira-super-secret-key-minimo-256-bits-desenvolvimento-local-ok
+  expiration: 86400000
