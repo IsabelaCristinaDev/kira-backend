@@ -8,65 +8,71 @@ import br.com.kira.kirabackend.dto.request.LoginRequest;
 import br.com.kira.kirabackend.dto.response.LoginResponse;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import br.com.kira.kirabackend.security.JwtTokenProvider;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
-@RequiredArgsConstructor
 public class AuthService {
 
-    private final UsuarioRepository usuarioRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final JwtTokenProvider jwtTokenProvider;
-    private final AuthenticationManager authenticationManager;
+    @Autowired
+    private UsuarioRepository usuarioRepository;
 
-    public LoginResponse login(LoginRequest request) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        request.email(),
-                        request.senha()
-                )
-        );
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
-        var usuario = usuarioRepository.findByEmail(request.email())
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
+    @Autowired
+    private AuthenticationManager authenticationManager;
+
+    public LoginResponse login(LoginRequest data) {
+        var usernamePassword = new UsernamePasswordAuthenticationToken(
+                data.email(), data.senha());
+        var auth = authenticationManager.authenticate(usernamePassword);
+
+        var usuario = usuarioRepository.findByEmail(data.email())
                 .orElseThrow();
 
         String tipoUsuario = usuario.getClass().getSimpleName().toUpperCase();
-        String token = jwtTokenProvider.gerarToken(usuario.getEmail(), tipoUsuario);
+        var token = jwtTokenProvider.gerarToken(
+                (UserDetails) auth.getPrincipal(), tipoUsuario);
 
         return new LoginResponse(token, tipoUsuario, usuario.getNome(), usuario.getEmail());
     }
-    public void registrarCliente(ClienteRegistroRequest request) {
-        if (usuarioRepository.existsByEmail(request.email())) {
+
+    public void registrarCliente(ClienteRegistroRequest data) {
+        if (usuarioRepository.existsByEmail(data.email())) {
             throw new RuntimeException("Email já cadastrado");
         }
 
         Cliente cliente = new Cliente();
-        cliente.setNome(request.nome());
-        cliente.setEmail(request.email());
-        cliente.setSenhaHash(passwordEncoder.encode(request.senha()));
-        cliente.setTelefone(request.telefone());
-        cliente.setCpf(request.cpf());
+        cliente.setNome(data.nome());
+        cliente.setEmail(data.email());
+        cliente.setSenhaHash(passwordEncoder.encode(data.senha()));
+        cliente.setTelefone(data.telefone());
+        cliente.setCpf(data.cpf());
 
         usuarioRepository.save(cliente);
     }
 
-    public void registrarEmpresa(EmpresaRegistroRequest request) {
-        if (usuarioRepository.existsByEmail(request.email())) {
+    public void registrarEmpresa(EmpresaRegistroRequest data) {
+        if (usuarioRepository.existsByEmail(data.email())) {
             throw new RuntimeException("Email já cadastrado");
         }
 
         Empresa empresa = new Empresa();
-        empresa.setNome(request.nome());
-        empresa.setEmail(request.email());
-        empresa.setSenhaHash(passwordEncoder.encode(request.senha()));
-        empresa.setTelefone(request.telefone());
-        empresa.setCnpj(request.cnpj());
-        empresa.setDescricao(request.descricao());
-        empresa.setEndereco(request.endereco());
+        empresa.setNome(data.nome());
+        empresa.setEmail(data.email());
+        empresa.setSenhaHash(passwordEncoder.encode(data.senha()));
+        empresa.setTelefone(data.telefone());
+        empresa.setCnpj(data.cnpj());
+        empresa.setDescricao(data.descricao());
+        empresa.setEndereco(data.endereco());
 
         usuarioRepository.save(empresa);
     }
