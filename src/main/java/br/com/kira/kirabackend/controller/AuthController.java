@@ -6,38 +6,33 @@ import br.com.kira.kirabackend.dto.request.LoginRequest;
 import br.com.kira.kirabackend.dto.response.LoginResponse;
 import br.com.kira.kirabackend.service.AuthService;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/auth")
-@RequiredArgsConstructor
 public class AuthController {
 
-    private final AuthService authService;
+    @Autowired
+    private AuthService authService;
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(
-            @Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.login(request));
+    public ResponseEntity<LoginResponse> login(@RequestBody @Valid LoginRequest data) {
+        var loginResponse = authService.login(data);
+        return ResponseEntity.ok(loginResponse);
     }
 
     @PostMapping("/registro/cliente")
-    public ResponseEntity<Void> registrarCliente(
-            @Valid @RequestBody ClienteRegistroRequest request) {
-        authService.registrarCliente(request);
+    public ResponseEntity registrarCliente(@RequestBody @Valid ClienteRegistroRequest data) { // <-- Mudei o nome aqui
+        authService.registrarCliente(data);
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     @PostMapping("/registro/empresa")
-    public ResponseEntity<Void> registrarEmpresa(
-            @Valid @RequestBody EmpresaRegistroRequest request) {
-        authService.registrarEmpresa(request);
+    public ResponseEntity registrarEmpresa(@RequestBody @Valid EmpresaRegistroRequest data) { // <-- Mudei o nome aqui
+        authService.registrarEmpresa(data);
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 }
