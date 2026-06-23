@@ -1,9 +1,8 @@
 package br.com.kira.kirabackend.domain.entity;
 
-import jakarta.persistence.Column;
+import br.com.kira.kirabackend.domain.enums.TipoEstabelecimento;
+import jakarta.persistence.*;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -17,9 +16,9 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor
 @AllArgsConstructor
 @SuperBuilder
-public class Empresa  extends Usuario {
+public class Empresa extends Usuario {
 
-    @Column(nullable= false, unique = true , length = 18 )
+    @Column(unique = true, length = 18)
     private String cnpj;
 
     @Column(columnDefinition = "TEXT")
@@ -27,5 +26,8 @@ public class Empresa  extends Usuario {
 
     @Column(length = 200)
     private String endereco;
-}
 
+    @Column(name = "tipo_estabelecimento", nullable = false, length = 20)
+    @Enumerated(EnumType.STRING)
+    private TipoEstabelecimento tipoEstabelecimento;
+}

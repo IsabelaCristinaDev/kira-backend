@@ -73,6 +73,7 @@ public class AuthService {
         empresa.setCnpj(data.cnpj());
         empresa.setDescricao(data.descricao());
         empresa.setEndereco(data.endereco());
+        empresa.setTipoEstabelecimento(data.tipoEstabelecimento());
 
         usuarioRepository.save(empresa);
     }
