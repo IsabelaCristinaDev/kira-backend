@@ -21,6 +21,9 @@ public class Empresa extends Usuario {
     @Column(unique = true, length = 18)
     private String cnpj;
 
+    @Column(unique = true, length = 14)
+    private String cpf;
+
     @Column(columnDefinition = "TEXT")
     private String descricao;
 
