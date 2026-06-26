@@ -71,6 +71,7 @@ public class AuthService {
         empresa.setSenhaHash(passwordEncoder.encode(data.senha()));
         empresa.setTelefone(data.telefone());
         empresa.setCnpj(data.cnpj());
+        empresa.setCpf(data.cpf());
         empresa.setDescricao(data.descricao());
         empresa.setEndereco(data.endereco());
         empresa.setTipoEstabelecimento(data.tipoEstabelecimento());

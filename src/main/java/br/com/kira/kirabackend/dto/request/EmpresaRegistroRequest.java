@@ -24,6 +24,8 @@ public record EmpresaRegistroRequest(
 
         String cnpj,
 
+        String cpf,
+
         String descricao,
 
         String endereco,
