@@ -1,6 +1,7 @@
 package br.com.kira.kirabackend.controller;
 
 import br.com.kira.kirabackend.dto.request.AgendamentoRequest;
+import br.com.kira.kirabackend.dto.request.ReagendamentoRequest;
 import br.com.kira.kirabackend.dto.response.AgendamentoResponse;
 import br.com.kira.kirabackend.service.AgendamentoService;
 import jakarta.validation.Valid;
@@ -50,5 +51,19 @@ public class AgendamentoController {
     public ResponseEntity<AgendamentoResponse> concluir(
             @PathVariable UUID id) {
         return ResponseEntity.ok(agendamentoService.concluir(id));
+    }
+
+    @PatchMapping("/{id}/reagendar/cliente")
+    public ResponseEntity<AgendamentoResponse> reagendarPeloCliente(
+            @PathVariable UUID id,
+            @RequestBody @Valid ReagendamentoRequest request) {
+        return ResponseEntity.ok(agendamentoService.reagendarPeloCliente(id, request));
+    }
+
+    @PatchMapping("/{id}/reagendar/empresa")
+    public ResponseEntity<AgendamentoResponse> reagendarPelaEmpresa(
+            @PathVariable UUID id,
+            @RequestBody @Valid ReagendamentoRequest request) {
+        return ResponseEntity.ok(agendamentoService.reagendarPelaEmpresa(id, request));
     }
 }
