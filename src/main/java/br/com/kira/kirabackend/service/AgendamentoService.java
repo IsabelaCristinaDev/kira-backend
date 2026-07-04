@@ -3,20 +3,22 @@ package br.com.kira.kirabackend.service;
 import br.com.kira.kirabackend.domain.entity.*;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import br.com.kira.kirabackend.dto.request.AgendamentoRequest;
+import br.com.kira.kirabackend.dto.request.ReagendamentoRequest;
 import br.com.kira.kirabackend.dto.response.AgendamentoResponse;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.FuncionariaRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
-import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
-@Transactional
+
 @Service
+@Transactional
 public class AgendamentoService {
 
     @Autowired
@@ -95,6 +97,46 @@ public class AgendamentoService {
                 .orElseThrow(() -> new RuntimeException("Agendamento não encontrado"));
 
         agendamento.setStatus(StatusAgendamento.CONCLUIDO);
+        return toResponse(agendamentoRepository.save(agendamento));
+    }
+
+    public AgendamentoResponse reagendarPeloCliente(UUID agendamentoId,
+                                                    ReagendamentoRequest request) {
+        Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
+                .orElseThrow(() -> new RuntimeException("Agendamento não encontrado"));
+
+        if (agendamento.getStatus() == StatusAgendamento.CANCELADO ||
+                agendamento.getStatus() == StatusAgendamento.CONCLUIDO) {
+            throw new RuntimeException("Não é possível reagendar este agendamento");
+        }
+
+        LocalDateTime novaDataHoraFim = request.novaDataHoraInicio()
+                .plusMinutes(agendamento.getServico().getDuracaoMinutos());
+
+        agendamento.setDataHoraInicio(request.novaDataHoraInicio());
+        agendamento.setDataHoraFim(novaDataHoraFim);
+        agendamento.setStatus(StatusAgendamento.REAGENDADO);
+
+        return toResponse(agendamentoRepository.save(agendamento));
+    }
+
+    public AgendamentoResponse reagendarPelaEmpresa(UUID agendamentoId,
+                                                    ReagendamentoRequest request) {
+        Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
+                .orElseThrow(() -> new RuntimeException("Agendamento não encontrado"));
+
+        if (agendamento.getStatus() == StatusAgendamento.CANCELADO ||
+                agendamento.getStatus() == StatusAgendamento.CONCLUIDO) {
+            throw new RuntimeException("Não é possível reagendar este agendamento");
+        }
+
+        LocalDateTime novaDataHoraFim = request.novaDataHoraInicio()
+                .plusMinutes(agendamento.getServico().getDuracaoMinutos());
+
+        agendamento.setDataHoraInicio(request.novaDataHoraInicio());
+        agendamento.setDataHoraFim(novaDataHoraFim);
+        agendamento.setStatus(StatusAgendamento.REAGENDADO);
+
         return toResponse(agendamentoRepository.save(agendamento));
     }
 
