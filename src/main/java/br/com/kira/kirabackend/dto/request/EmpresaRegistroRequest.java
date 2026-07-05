@@ -6,6 +6,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+import java.time.LocalDate;
+import java.util.List;
+
 public record EmpresaRegistroRequest(
 
         @NotBlank(message = "Nome é obrigatório")
@@ -28,7 +31,17 @@ public record EmpresaRegistroRequest(
 
         String descricao,
 
-        String endereco,
+        LocalDate dataNascimento,
+
+        EnderecoRequest endereco,
+
+        Double latitude,
+
+        Double longitude,
+
+        List<String> especialidades,
+
+        List<ServicoRegistroRequest> servicos,
 
         @NotNull(message = "Tipo de estabelecimento é obrigatório")
         TipoEstabelecimento tipoEstabelecimento

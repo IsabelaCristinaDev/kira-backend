@@ -9,6 +9,8 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
+import java.time.LocalDate;
+
 @Entity
 @Table(name = "empresa")
 @Getter
@@ -27,8 +29,18 @@ public class Empresa extends Usuario {
     @Column(columnDefinition = "TEXT")
     private String descricao;
 
-    @Column(length = 200)
-    private String endereco;
+    @Column(columnDefinition = "TEXT")
+    private String especialidades;
+
+    @Embedded
+    private Endereco endereco;
+
+    @Column(name = "data_nascimento")
+    private LocalDate dataNascimento;
+
+    private Double latitude;
+
+    private Double longitude;
 
     @Column(name = "tipo_estabelecimento", nullable = false, length = 20)
     @Enumerated(EnumType.STRING)
