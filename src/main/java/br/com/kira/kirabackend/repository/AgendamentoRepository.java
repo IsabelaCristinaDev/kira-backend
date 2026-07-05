@@ -24,4 +24,9 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID> 
             UUID funcionariaId,
             LocalDateTime inicio,
             LocalDateTime fim);
+
+    List<Agendamento> findByFuncionariaIdAndDataHoraInicioBetweenOrderByDataHoraInicio(
+            UUID funcionariaId,
+            LocalDateTime inicio,
+            LocalDateTime fim);
 }
