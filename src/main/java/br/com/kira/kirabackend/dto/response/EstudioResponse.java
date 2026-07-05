@@ -8,7 +8,7 @@ public record EstudioResponse(
         UUID id,
         String nome,
         String descricao,
-        String endereco,
+        EnderecoResponse endereco,
         String telefone,
         String fotoUrl,
         TipoEstabelecimento tipoEstabelecimento,

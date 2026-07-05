@@ -1,6 +1,7 @@
 package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.Empresa;
+import br.com.kira.kirabackend.dto.response.EnderecoResponse;
 import br.com.kira.kirabackend.dto.response.EstudioResponse;
 import br.com.kira.kirabackend.dto.response.FuncionariaResponse;
 import br.com.kira.kirabackend.dto.response.ServicoResponse;
@@ -88,7 +89,7 @@ public class EstudioService {
                 empresa.getId(),
                 empresa.getNome(),
                 empresa.getDescricao(),
-                empresa.getEndereco(),
+                EnderecoResponse.from(empresa.getEndereco()),
                 empresa.getTelefone(),
                 empresa.getFotoUrl(),
                 empresa.getTipoEstabelecimento(),
