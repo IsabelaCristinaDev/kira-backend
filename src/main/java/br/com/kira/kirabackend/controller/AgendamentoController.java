@@ -66,4 +66,10 @@ public class AgendamentoController {
             @RequestBody @Valid ReagendamentoRequest request) {
         return ResponseEntity.ok(agendamentoService.reagendarPelaEmpresa(id, request));
     }
+
+    @PatchMapping("/{id}/cancelar/empresa")
+    public ResponseEntity<AgendamentoResponse> cancelarPelaEmpresa(
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(agendamentoService.cancelarPelaEmpresa(id));
+    }
 }
