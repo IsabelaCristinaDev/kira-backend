@@ -1,5 +1,6 @@
 package br.com.kira.kirabackend.service;
 
+
 import br.com.kira.kirabackend.domain.entity.*;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import br.com.kira.kirabackend.dto.request.AgendamentoRequest;
@@ -94,6 +95,22 @@ public class AgendamentoService {
         return toResponse(agendamentoRepository.save(agendamento));
     }
 
+    public AgendamentoResponse cancelarPelaEmpresa(UUID agendamentoId) {
+        Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
+
+        if (agendamento.getStatus() == StatusAgendamento.CANCELADO) {
+            throw new RegraDeNegocioException("Agendamento já está cancelado");
+        }
+
+        if (agendamento.getStatus() == StatusAgendamento.CONCLUIDO) {
+            throw new RegraDeNegocioException("Não é possível cancelar um agendamento concluído");
+        }
+
+        agendamento.setStatus(StatusAgendamento.CANCELADO);
+        return toResponse(agendamentoRepository.save(agendamento));
+    }
+
     public AgendamentoResponse concluir(UUID agendamentoId) {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
@@ -124,11 +141,11 @@ public class AgendamentoService {
     public AgendamentoResponse reagendarPelaEmpresa(UUID agendamentoId,
                                                     ReagendamentoRequest request) {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
-                .orElseThrow(() -> new RuntimeException("Agendamento não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
 
         if (agendamento.getStatus() == StatusAgendamento.CANCELADO ||
                 agendamento.getStatus() == StatusAgendamento.CONCLUIDO) {
-            throw new RuntimeException("Não é possível reagendar este agendamento");
+            throw new RegraDeNegocioException("Não é possível reagendar este agendamento");
         }
 
         LocalDateTime novaDataHoraFim = request.novaDataHoraInicio()
