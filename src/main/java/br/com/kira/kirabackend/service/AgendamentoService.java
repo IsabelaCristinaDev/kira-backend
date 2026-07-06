@@ -5,6 +5,8 @@ import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import br.com.kira.kirabackend.dto.request.AgendamentoRequest;
 import br.com.kira.kirabackend.dto.request.ReagendamentoRequest;
 import br.com.kira.kirabackend.dto.response.AgendamentoResponse;
+import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
+import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.FuncionariaRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
@@ -35,18 +37,18 @@ public class AgendamentoService {
 
     public AgendamentoResponse criar(UUID clienteId, AgendamentoRequest request) {
         Cliente cliente = (Cliente) usuarioRepository.findById(clienteId)
-                .orElseThrow(() -> new RuntimeException("Cliente não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Cliente não encontrado"));
 
         Empresa empresa = (Empresa) usuarioRepository.findById(request.empresaId())
-                .orElseThrow(() -> new RuntimeException("Empresa não encontrada"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Empresa não encontrada"));
 
         Servico servico = servicoRepository.findById(request.servicoId())
-                .orElseThrow(() -> new RuntimeException("Serviço não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Serviço não encontrado"));
 
         Funcionaria funcionaria = null;
         if (request.funcionariaId() != null) {
             funcionaria = funcionariaRepository.findById(request.funcionariaId())
-                    .orElseThrow(() -> new RuntimeException("Funcionária não encontrada"));
+                    .orElseThrow(() -> new RecursoNaoEncontradoException("Funcionária não encontrada"));
         }
 
         LocalDateTime dataHoraFim = request.dataHoraInicio()
@@ -82,10 +84,10 @@ public class AgendamentoService {
 
     public AgendamentoResponse cancelarPeloCliente(UUID agendamentoId) {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
-                .orElseThrow(() -> new RuntimeException("Agendamento não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
 
         if (agendamento.getStatus() == StatusAgendamento.CANCELADO) {
-            throw new RuntimeException("Agendamento já está cancelado");
+            throw new RegraDeNegocioException("Agendamento já está cancelado");
         }
 
         agendamento.setStatus(StatusAgendamento.CANCELADO);
@@ -94,8 +96,7 @@ public class AgendamentoService {
 
     public AgendamentoResponse concluir(UUID agendamentoId) {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
-                .orElseThrow(() -> new RuntimeException("Agendamento não encontrado"));
-
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
         agendamento.setStatus(StatusAgendamento.CONCLUIDO);
         return toResponse(agendamentoRepository.save(agendamento));
     }
@@ -103,11 +104,11 @@ public class AgendamentoService {
     public AgendamentoResponse reagendarPeloCliente(UUID agendamentoId,
                                                     ReagendamentoRequest request) {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
-                .orElseThrow(() -> new RuntimeException("Agendamento não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
 
         if (agendamento.getStatus() == StatusAgendamento.CANCELADO ||
                 agendamento.getStatus() == StatusAgendamento.CONCLUIDO) {
-            throw new RuntimeException("Não é possível reagendar este agendamento");
+            throw new RegraDeNegocioException("Não é possível reagendar este agendamento");
         }
 
         LocalDateTime novaDataHoraFim = request.novaDataHoraInicio()

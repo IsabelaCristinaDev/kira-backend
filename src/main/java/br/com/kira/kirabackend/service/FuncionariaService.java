@@ -4,6 +4,7 @@ import br.com.kira.kirabackend.domain.entity.Empresa;
 import br.com.kira.kirabackend.domain.entity.Funcionaria;
 import br.com.kira.kirabackend.dto.request.FuncionariaRequest;
 import br.com.kira.kirabackend.dto.response.FuncionariaResponse;
+import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.repository.FuncionariaRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,7 +24,7 @@ public class FuncionariaService {
 
     public FuncionariaResponse cadastrar(UUID empresaId, FuncionariaRequest request) {
         Empresa empresa = (Empresa) usuarioRepository.findById(empresaId)
-                .orElseThrow(() -> new RuntimeException("Empresa não encontrada"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Empresa não encontrada"));
 
         Funcionaria funcionaria = new Funcionaria();
         funcionaria.setNome(request.nome());
@@ -45,7 +46,7 @@ public class FuncionariaService {
 
     public FuncionariaResponse atualizar(UUID id, FuncionariaRequest request) {
         Funcionaria funcionaria = funcionariaRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Funcionária não encontrada"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Funcionária não encontrada"));
 
         funcionaria.setNome(request.nome());
         funcionaria.setFotoUrl(request.fotoUrl());

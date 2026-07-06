@@ -6,6 +6,8 @@ import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import br.com.kira.kirabackend.domain.enums.TipoAvaliador;
 import br.com.kira.kirabackend.dto.request.AvaliacaoRequest;
 import br.com.kira.kirabackend.dto.response.AvaliacaoResponse;
+import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
+import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.AvaliacaoRepository;
 import jakarta.transaction.Transactional;
@@ -26,15 +28,15 @@ public class AvaliacaoService {
 
     public AvaliacaoResponse avaliarComoCliente(AvaliacaoRequest request) {
         Agendamento agendamento = agendamentoRepository.findById(request.agendamentoId())
-                .orElseThrow(() -> new RuntimeException("Agendamento não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
 
         if (agendamento.getStatus() != StatusAgendamento.CONCLUIDO) {
-            throw new RuntimeException("Só é possível avaliar agendamentos concluídos");
+            throw new RegraDeNegocioException("Só é possível avaliar agendamentos concluídos");
         }
 
         if (avaliacaoRepository.existsByAgendamentoIdAndTipoAvaliador(
                 request.agendamentoId(), TipoAvaliador.CLIENTE)) {
-            throw new RuntimeException("Você já avaliou este atendimento");
+            throw new RegraDeNegocioException("Você já avaliou este atendimento");
         }
 
         Avaliacao avaliacao = new Avaliacao();
@@ -50,15 +52,15 @@ public class AvaliacaoService {
 
     public AvaliacaoResponse avaliarComoEmpresa(AvaliacaoRequest request) {
         Agendamento agendamento = agendamentoRepository.findById(request.agendamentoId())
-                .orElseThrow(() -> new RuntimeException("Agendamento não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
 
         if (agendamento.getStatus() != StatusAgendamento.CONCLUIDO) {
-            throw new RuntimeException("Só é possível avaliar agendamentos concluídos");
+            throw new RegraDeNegocioException("Só é possível avaliar agendamentos concluídos");
         }
 
         if (avaliacaoRepository.existsByAgendamentoIdAndTipoAvaliador(
                 request.agendamentoId(), TipoAvaliador.EMPRESA)) {
-            throw new RuntimeException("Este atendimento já foi avaliado");
+            throw new RegraDeNegocioException("Este atendimento já foi avaliado");
         }
 
         Avaliacao avaliacao = new Avaliacao();
