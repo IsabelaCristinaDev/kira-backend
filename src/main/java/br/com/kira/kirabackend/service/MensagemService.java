@@ -5,6 +5,7 @@ import br.com.kira.kirabackend.domain.entity.Mensagem;
 import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.dto.request.MensagemRequest;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
+import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.MensagemRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
@@ -31,10 +32,11 @@ public class MensagemService {
     public MensagemResponse enviar(UUID remetenteId, MensagemRequest request) {
         Agendamento agendamento = agendamentoRepository
                 .findById(request.agendamentoId())
-                .orElseThrow(() -> new RuntimeException("Agendamento não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
 
         Usuario remetente = usuarioRepository.findById(remetenteId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
+
 
         Mensagem mensagem = new Mensagem();
         mensagem.setAgendamento(agendamento);
@@ -55,7 +57,7 @@ public class MensagemService {
 
     public void marcarComoLida(UUID mensagemId) {
         Mensagem mensagem = mensagemRepository.findById(mensagemId)
-                .orElseThrow(() -> new RuntimeException("Mensagem não encontrada"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Mensagem não encontrada"));
         mensagem.setLida(true);
         mensagemRepository.save(mensagem);
     }

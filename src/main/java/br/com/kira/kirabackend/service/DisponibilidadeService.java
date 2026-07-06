@@ -7,6 +7,8 @@ import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import br.com.kira.kirabackend.dto.request.DisponibilidadeRequest;
 import br.com.kira.kirabackend.dto.response.DisponibilidadeResponse;
 import br.com.kira.kirabackend.dto.response.SlotDisponivel;
+import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
+import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.DisponibilidadeEstudioRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
@@ -40,10 +42,9 @@ public class DisponibilidadeService {
 
     public DisponibilidadeResponse cadastrar(UUID empresaId, DisponibilidadeRequest request) {
         Empresa empresa = (Empresa) usuarioRepository.findById(empresaId)
-                .orElseThrow(() -> new RuntimeException("Empresa não encontrada"));
-
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Empresa não encontrada"));
         if (request.horaFim().isBefore(request.horaInicio())) {
-            throw new RuntimeException("Hora de fim deve ser após hora de início");
+            throw new RegraDeNegocioException("Hora de fim deve ser após hora de início");
         }
 
         DisponibilidadeEstudio disponibilidade = new DisponibilidadeEstudio();
@@ -69,14 +70,13 @@ public class DisponibilidadeService {
             LocalDate data) {
 
         var servico = servicoRepository.findById(servicoId)
-                .orElseThrow(() -> new RuntimeException("Serviço não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Serviço não encontrado"));
 
         DiaSemana diaSemana = DiaSemana.values()[data.getDayOfWeek().getValue() % 7];
 
         var disponibilidade = disponibilidadeRepository
                 .findByEmpresaIdAndDiaSemana(empresaId, diaSemana)
-                .orElseThrow(() -> new RuntimeException(
-                        "Empresa não atende neste dia da semana"));
+                .orElseThrow(() -> new RegraDeNegocioException("Empresa não atende neste dia da semana"));
 
         var agendamentosExistentes = agendamentoRepository
                 .findByFuncionariaIdAndDataHoraInicioBetween(

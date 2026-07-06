@@ -4,6 +4,7 @@ import br.com.kira.kirabackend.domain.entity.Empresa;
 import br.com.kira.kirabackend.domain.entity.Servico;
 import br.com.kira.kirabackend.dto.request.ServicoRequest;
 import br.com.kira.kirabackend.dto.response.ServicoResponse;
+import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,7 +24,7 @@ public class ServicoService {
 
     public ServicoResponse cadastrar(UUID empresaId, ServicoRequest request) {
         Empresa empresa = (Empresa) usuarioRepository.findById(empresaId)
-                .orElseThrow(() -> new RuntimeException("Empresa não encontrada"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Empresa não encontrada"));
 
         Servico servico = new Servico();
         servico.setNome(request.nome());
@@ -46,8 +47,7 @@ public class ServicoService {
 
     public ServicoResponse atualizar(UUID id, ServicoRequest request) {
         Servico servico = servicoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Serviço não encontrado"));
-
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Serviço não encontrado"));
         servico.setNome(request.nome());
         servico.setDescricao(request.descricao());
         servico.setDuracaoMinutos(request.duracaoMinutos());

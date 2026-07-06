@@ -9,6 +9,7 @@ import br.com.kira.kirabackend.dto.request.EmpresaRegistroRequest;
 import br.com.kira.kirabackend.dto.request.LoginRequest;
 import br.com.kira.kirabackend.dto.request.ServicoRegistroRequest;
 import br.com.kira.kirabackend.dto.response.LoginResponse;
+import br.com.kira.kirabackend.exception.EmailJaCadastradoException;
 import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import br.com.kira.kirabackend.security.JwtTokenProvider;
@@ -59,7 +60,7 @@ public class AuthService {
 
     public void registrarCliente(ClienteRegistroRequest data) {
         if (usuarioRepository.existsByEmail(data.email())) {
-            throw new RuntimeException("Email já cadastrado");
+            throw new EmailJaCadastradoException();
         }
 
         Cliente cliente = new Cliente();
@@ -91,7 +92,7 @@ public class AuthService {
     @Transactional
     public void registrarEmpresa(EmpresaRegistroRequest data) {
         if (usuarioRepository.existsByEmail(data.email())) {
-            throw new RuntimeException("Email já cadastrado");
+            throw new EmailJaCadastradoException();
         }
 
         Empresa empresa = new Empresa();

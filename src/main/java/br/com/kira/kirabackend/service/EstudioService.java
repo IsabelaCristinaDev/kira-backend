@@ -1,10 +1,12 @@
 package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.Empresa;
-import br.com.kira.kirabackend.dto.response.EnderecoResponse;
+import br.com.kira.kirabackend.domain.entity.Usuario;
+import br.com.kira.kirabackend.dto.response .EnderecoResponse;
 import br.com.kira.kirabackend.dto.response.EstudioResponse;
 import br.com.kira.kirabackend.dto.response.FuncionariaResponse;
 import br.com.kira.kirabackend.dto.response.ServicoResponse;
+import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.repository.AvaliacaoRepository;
 import br.com.kira.kirabackend.repository.FuncionariaRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
@@ -52,8 +54,14 @@ public class EstudioService {
     }
 
     public EstudioResponse buscarPorId(UUID id) {
-        Empresa empresa = (Empresa) usuarioRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Estúdio não encontrado"));
+        Usuario usuario = usuarioRepository.findById(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Estúdio não encontrado"));
+
+        if (!(usuario instanceof Empresa)) {
+            throw new RecursoNaoEncontradoException("Estúdio não encontrado");
+        }
+
+        Empresa empresa = (Empresa) usuario;
         return toResponse(empresa);
     }
 

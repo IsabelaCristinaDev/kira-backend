@@ -4,6 +4,8 @@ import br.com.kira.kirabackend.domain.entity.BloqueioHorario;
 import br.com.kira.kirabackend.domain.entity.Funcionaria;
 import br.com.kira.kirabackend.dto.request.BloqueioHorarioRequest;
 import br.com.kira.kirabackend.dto.response.BloqueioHorarioResponse;
+import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
+import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.BloqueioHorarioRepository;
 import br.com.kira.kirabackend.repository.FuncionariaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,10 +28,10 @@ public class BloqueioHorarioService {
     public BloqueioHorarioResponse cadastrar(UUID funcionariaId,
                                              BloqueioHorarioRequest request) {
         Funcionaria funcionaria = funcionariaRepository.findById(funcionariaId)
-                .orElseThrow(() -> new RuntimeException("Funcionária não encontrada"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Funcionária não encontrada"));
 
         if (request.dataHoraFim().isBefore(request.dataHoraInicio())) {
-            throw new RuntimeException("Data de fim deve ser após data de início");
+            throw new RegraDeNegocioException("Data de fim deve ser após data de início");
         }
 
         BloqueioHorario bloqueio = new BloqueioHorario();
@@ -51,7 +53,7 @@ public class BloqueioHorarioService {
 
     public void remover(UUID id) {
         bloqueioHorarioRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Bloqueio não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Bloqueio não encontrado"));
         bloqueioHorarioRepository.deleteById(id);
     }
 
