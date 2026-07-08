@@ -64,7 +64,7 @@ public class JwtTokenProvider {
     private Date gerarDataExpiracao() {
         return Date.from(
                 LocalDateTime.now()
-                        .plusHours(2)
+                        .plusHours(24)
                         .toInstant(ZoneOffset.of("-03:00"))
         );
     }
