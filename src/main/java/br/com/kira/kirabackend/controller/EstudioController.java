@@ -1,5 +1,5 @@
 package br.com.kira.kirabackend.controller;
-
+import br.com.kira.kirabackend.domain.enums.TipoEstabelecimento;
 import br.com.kira.kirabackend.dto.response.AvaliacaoResponse;
 import br.com.kira.kirabackend.dto.response.EstudioResponse;
 import br.com.kira.kirabackend.dto.response.FuncionariaResponse;
@@ -62,5 +62,17 @@ public class EstudioController {
     public ResponseEntity<Double> mediaAvaliacoes(
             @PathVariable UUID id) {
         return ResponseEntity.ok(avaliacaoService.mediaAvaliacaoEmpresa(id));
+    } // <-- A chave fechava aqui!
+
+    @GetMapping("/tipo")
+    public ResponseEntity<List<EstudioResponse>> buscarPorTipo(
+            @RequestParam TipoEstabelecimento tipo) {
+        return ResponseEntity.ok(estudioService.buscarPorTipo(tipo));
+    }
+
+    @GetMapping("/cidade")
+    public ResponseEntity<List<EstudioResponse>> buscarPorCidade(
+            @RequestParam String cidade) {
+        return ResponseEntity.ok(estudioService.buscarPorCidade(cidade));
     }
 }
