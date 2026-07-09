@@ -2,7 +2,8 @@ package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.Empresa;
 import br.com.kira.kirabackend.domain.entity.Usuario;
-import br.com.kira.kirabackend.dto.response .EnderecoResponse;
+import br.com.kira.kirabackend.domain.enums.TipoEstabelecimento;
+import br.com.kira.kirabackend.dto.response.EnderecoResponse;
 import br.com.kira.kirabackend.dto.response.EstudioResponse;
 import br.com.kira.kirabackend.dto.response.FuncionariaResponse;
 import br.com.kira.kirabackend.dto.response.ServicoResponse;
@@ -63,6 +64,29 @@ public class EstudioService {
 
         Empresa empresa = (Empresa) usuario;
         return toResponse(empresa);
+    }
+
+    public List<EstudioResponse> buscarPorTipo(TipoEstabelecimento tipo) {
+        return usuarioRepository.findAll()
+                .stream()
+                .filter(u -> u instanceof Empresa)
+                .map(u -> (Empresa) u)
+                .filter(e -> e.getTipoEstabelecimento() == tipo)
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public List<EstudioResponse> buscarPorCidade(String cidade) {
+        return usuarioRepository.findAll()
+                .stream()
+                .filter(u -> u instanceof Empresa)
+                .map(u -> (Empresa) u)
+                .filter(e -> e.getEndereco() != null
+                        && e.getEndereco().getCidade() != null
+                        && e.getEndereco().getCidade().toLowerCase()
+                        .contains(cidade.toLowerCase()))
+                .map(this::toResponse)
+                .toList();
     }
 
     public List<FuncionariaResponse> listarFuncionarias(UUID empresaId) {
