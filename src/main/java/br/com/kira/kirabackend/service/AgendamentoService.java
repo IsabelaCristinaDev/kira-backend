@@ -12,6 +12,8 @@ import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.FuncionariaRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
+import br.com.kira.kirabackend.service.strategy.CancelamentoClienteStrategy;
+import br.com.kira.kirabackend.service.strategy.CancelamentoEmpresaStrategy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +37,11 @@ public class AgendamentoService {
 
     @Autowired
     private FuncionariaRepository funcionariaRepository;
+    @Autowired
+    private CancelamentoClienteStrategy cancelamentoClienteStrategy;
+
+    @Autowired
+    private CancelamentoEmpresaStrategy cancelamentoEmpresaStrategy;
 
     public AgendamentoResponse criar(UUID clienteId, AgendamentoRequest request) {
         Cliente cliente = (Cliente) usuarioRepository.findById(clienteId)
@@ -87,9 +94,7 @@ public class AgendamentoService {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
 
-        if (agendamento.getStatus() == StatusAgendamento.CANCELADO) {
-            throw new RegraDeNegocioException("Agendamento já está cancelado");
-        }
+        cancelamentoClienteStrategy.validarCancelamento(agendamento);
 
         agendamento.setStatus(StatusAgendamento.CANCELADO);
         return toResponse(agendamentoRepository.save(agendamento));
@@ -99,18 +104,11 @@ public class AgendamentoService {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
 
-        if (agendamento.getStatus() == StatusAgendamento.CANCELADO) {
-            throw new RegraDeNegocioException("Agendamento já está cancelado");
-        }
-
-        if (agendamento.getStatus() == StatusAgendamento.CONCLUIDO) {
-            throw new RegraDeNegocioException("Não é possível cancelar um agendamento concluído");
-        }
+        cancelamentoEmpresaStrategy.validarCancelamento(agendamento);
 
         agendamento.setStatus(StatusAgendamento.CANCELADO);
         return toResponse(agendamentoRepository.save(agendamento));
     }
-
     public AgendamentoResponse concluir(UUID agendamentoId) {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
