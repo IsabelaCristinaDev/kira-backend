@@ -1,6 +1,5 @@
 package br.com.kira.kirabackend.service;
 
-
 import br.com.kira.kirabackend.domain.entity.*;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import br.com.kira.kirabackend.dto.request.AgendamentoRequest;
@@ -8,6 +7,9 @@ import br.com.kira.kirabackend.dto.request.ReagendamentoRequest;
 import br.com.kira.kirabackend.dto.response.AgendamentoResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
+import br.com.kira.kirabackend.observer.AgendamentoCanceladoEvent;
+import br.com.kira.kirabackend.observer.AgendamentoCriadoEvent;
+import br.com.kira.kirabackend.observer.AtendimentoConcluidoEvent;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.FuncionariaRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
@@ -15,6 +17,7 @@ import br.com.kira.kirabackend.repository.UsuarioRepository;
 import br.com.kira.kirabackend.service.strategy.CancelamentoClienteStrategy;
 import br.com.kira.kirabackend.service.strategy.CancelamentoEmpresaStrategy;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,11 +40,15 @@ public class AgendamentoService {
 
     @Autowired
     private FuncionariaRepository funcionariaRepository;
+
     @Autowired
     private CancelamentoClienteStrategy cancelamentoClienteStrategy;
 
     @Autowired
     private CancelamentoEmpresaStrategy cancelamentoEmpresaStrategy;
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     public AgendamentoResponse criar(UUID clienteId, AgendamentoRequest request) {
         Cliente cliente = (Cliente) usuarioRepository.findById(clienteId)
@@ -73,6 +80,7 @@ public class AgendamentoService {
         agendamento.setObservacoes(request.observacoes());
 
         Agendamento salvo = agendamentoRepository.save(agendamento);
+        eventPublisher.publishEvent(new AgendamentoCriadoEvent(this, salvo));
         return toResponse(salvo);
     }
 
@@ -97,7 +105,9 @@ public class AgendamentoService {
         cancelamentoClienteStrategy.validarCancelamento(agendamento);
 
         agendamento.setStatus(StatusAgendamento.CANCELADO);
-        return toResponse(agendamentoRepository.save(agendamento));
+        Agendamento salvo = agendamentoRepository.save(agendamento);
+        eventPublisher.publishEvent(new AgendamentoCanceladoEvent(this, salvo));
+        return toResponse(salvo);
     }
 
     public AgendamentoResponse cancelarPelaEmpresa(UUID agendamentoId) {
@@ -107,13 +117,19 @@ public class AgendamentoService {
         cancelamentoEmpresaStrategy.validarCancelamento(agendamento);
 
         agendamento.setStatus(StatusAgendamento.CANCELADO);
-        return toResponse(agendamentoRepository.save(agendamento));
+        Agendamento salvo = agendamentoRepository.save(agendamento);
+        eventPublisher.publishEvent(new AgendamentoCanceladoEvent(this, salvo));
+        return toResponse(salvo);
     }
+
     public AgendamentoResponse concluir(UUID agendamentoId) {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
+
         agendamento.setStatus(StatusAgendamento.CONCLUIDO);
-        return toResponse(agendamentoRepository.save(agendamento));
+        Agendamento salvo = agendamentoRepository.save(agendamento);
+        eventPublisher.publishEvent(new AtendimentoConcluidoEvent(this, salvo));
+        return toResponse(salvo);
     }
 
     public AgendamentoResponse reagendarPeloCliente(UUID agendamentoId,
