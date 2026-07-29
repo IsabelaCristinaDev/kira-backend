@@ -1,5 +1,6 @@
 package br.com.kira.kirabackend.domain.entity;
 
+import br.com.kira.kirabackend.util.KiraTimeZone;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -40,7 +41,7 @@ public class Mensagem {
 
     @PrePersist
     protected void aoPersistir() {
-        this.dataEnvio = LocalDateTime.now();
+        this.dataEnvio = LocalDateTime.now(KiraTimeZone.DEFAULT);
         if (this.lida == null) {
             this.lida = false;
         }

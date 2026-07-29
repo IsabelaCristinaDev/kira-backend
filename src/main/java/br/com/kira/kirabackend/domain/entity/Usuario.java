@@ -1,5 +1,6 @@
 package br.com.kira.kirabackend.domain.entity;
 
+import br.com.kira.kirabackend.util.KiraTimeZone;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -52,7 +53,7 @@ public abstract class Usuario implements UserDetails {
 
     @PrePersist
     protected void aoPersistir() {
-        this.dataCriacao = LocalDateTime.now();
+        this.dataCriacao = LocalDateTime.now(KiraTimeZone.DEFAULT);
         if (this.ativo == null) {
             this.ativo = true;
         }

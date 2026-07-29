@@ -1,6 +1,7 @@
 package br.com.kira.kirabackend.domain.entity;
 
 import br.com.kira.kirabackend.domain.enums.TipoAvaliador;
+import br.com.kira.kirabackend.util.KiraTimeZone;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -50,6 +51,6 @@ public class Avaliacao {
 
     @PrePersist
     protected void aoPersistir() {
-        this.dataCriacao = LocalDateTime.now();
+        this.dataCriacao = LocalDateTime.now(KiraTimeZone.DEFAULT);
     }
 }

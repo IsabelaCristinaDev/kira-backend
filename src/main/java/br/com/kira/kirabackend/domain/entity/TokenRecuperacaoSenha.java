@@ -1,5 +1,6 @@
 package br.com.kira.kirabackend.domain.entity;
 
+import br.com.kira.kirabackend.util.KiraTimeZone;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -35,6 +36,6 @@ public class TokenRecuperacaoSenha {
     private Boolean usado = false;
 
     public boolean isExpirado() {
-        return LocalDateTime.now().isAfter(dataExpiracao);
+        return LocalDateTime.now(KiraTimeZone.DEFAULT).isAfter(dataExpiracao);
     }
 }
