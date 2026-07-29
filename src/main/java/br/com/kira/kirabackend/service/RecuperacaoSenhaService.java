@@ -7,6 +7,7 @@ import br.com.kira.kirabackend.dto.request.RedefinicaoSenhaRequest;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.TokenRecuperacaoSenhaRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
+import br.com.kira.kirabackend.util.KiraTimeZone;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -46,7 +47,7 @@ public class RecuperacaoSenhaService {
         TokenRecuperacaoSenha tokenRecuperacao = new TokenRecuperacaoSenha();
         tokenRecuperacao.setToken(token);
         tokenRecuperacao.setUsuario(usuario);
-        tokenRecuperacao.setDataExpiracao(LocalDateTime.now().plusMinutes(30));
+        tokenRecuperacao.setDataExpiracao(LocalDateTime.now(KiraTimeZone.DEFAULT).plusMinutes(30));
         tokenRecuperacao.setUsado(false);
 
         tokenRepository.save(tokenRecuperacao);

@@ -2,6 +2,7 @@ package br.com.kira.kirabackend.domain.entity;
 
 import br.com.kira.kirabackend.domain.enums.FormaPagamento;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
+import br.com.kira.kirabackend.util.KiraTimeZone;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -61,7 +62,7 @@ public class Agendamento {
 
     @PrePersist
     protected void aoPersistir() {
-        this.dataCriacao = LocalDateTime.now();
+        this.dataCriacao = LocalDateTime.now(KiraTimeZone.DEFAULT);
         if (this.status == null) {
             this.status = StatusAgendamento.PENDENTE;
         }
