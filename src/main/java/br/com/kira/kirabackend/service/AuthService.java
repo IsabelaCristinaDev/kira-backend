@@ -3,17 +3,24 @@ package br.com.kira.kirabackend.service;
 import br.com.kira.kirabackend.domain.entity.Cliente;
 import br.com.kira.kirabackend.domain.entity.Empresa;
 import br.com.kira.kirabackend.domain.entity.Endereco;
+import br.com.kira.kirabackend.domain.entity.RefreshToken;
 import br.com.kira.kirabackend.domain.entity.Servico;
+import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.dto.request.ClienteRegistroRequest;
 import br.com.kira.kirabackend.dto.request.EmpresaRegistroRequest;
 import br.com.kira.kirabackend.dto.request.LoginRequest;
+import br.com.kira.kirabackend.dto.request.RefreshTokenRequest;
 import br.com.kira.kirabackend.dto.request.ServicoRegistroRequest;
 import br.com.kira.kirabackend.dto.response.LoginResponse;
 import br.com.kira.kirabackend.exception.EmailJaCadastradoException;
+import br.com.kira.kirabackend.exception.RegraDeNegocioException;
+import br.com.kira.kirabackend.repository.RefreshTokenRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import br.com.kira.kirabackend.security.JwtTokenProvider;
+import br.com.kira.kirabackend.util.KiraTimeZone;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -22,6 +29,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -35,6 +44,9 @@ public class AuthService {
     private ServicoRepository servicoRepository;
 
     @Autowired
+    private RefreshTokenRepository refreshTokenRepository;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     @Autowired
@@ -43,6 +55,10 @@ public class AuthService {
     @Autowired
     private AuthenticationManager authenticationManager;
 
+    @Value("${jwt.refresh-expiration}")
+    private long refreshExpiration;
+
+    @Transactional
     public LoginResponse login(LoginRequest data) {
         var usernamePassword = new UsernamePasswordAuthenticationToken(
                 data.email(), data.senha());
@@ -54,8 +70,51 @@ public class AuthService {
         String tipoUsuario = usuario.getClass().getSimpleName().toUpperCase();
         var token = jwtTokenProvider.gerarToken(
                 (UserDetails) auth.getPrincipal(), tipoUsuario);
+        var refreshToken = gerarERegistrarRefreshToken(usuario);
 
-        return new LoginResponse(token, tipoUsuario, usuario.getNome(), usuario.getEmail());
+        return new LoginResponse(token, refreshToken, tipoUsuario, usuario.getNome(), usuario.getEmail());
+    }
+
+    @Transactional
+    public LoginResponse refreshToken(RefreshTokenRequest data) {
+        var refreshTokenEntity = refreshTokenRepository.findByToken(data.refreshToken())
+                .orElseThrow(() -> new RegraDeNegocioException("Refresh token inválido"));
+
+        if (!refreshTokenEntity.isValido()) {
+            throw new RegraDeNegocioException("Refresh token inválido ou expirado");
+        }
+
+        Usuario usuario = refreshTokenEntity.getUsuario();
+        String tipoUsuario = usuario.getClass().getSimpleName().toUpperCase();
+        var novoToken = jwtTokenProvider.gerarToken(usuario, tipoUsuario);
+        var novoRefreshToken = gerarERegistrarRefreshToken(usuario);
+
+        return new LoginResponse(novoToken, novoRefreshToken, tipoUsuario, usuario.getNome(), usuario.getEmail());
+    }
+
+    @Transactional
+    public void logout(RefreshTokenRequest data) {
+        refreshTokenRepository.findByToken(data.refreshToken())
+                .ifPresent(refreshTokenEntity -> {
+                    refreshTokenEntity.setRevogado(true);
+                    refreshTokenRepository.save(refreshTokenEntity);
+                });
+    }
+
+    private String gerarERegistrarRefreshToken(Usuario usuario) {
+        refreshTokenRepository.deleteByUsuarioId(usuario.getId());
+
+        String token = UUID.randomUUID().toString();
+
+        RefreshToken refreshToken = new RefreshToken();
+        refreshToken.setToken(token);
+        refreshToken.setUsuario(usuario);
+        refreshToken.setDataExpiracao(LocalDateTime.now(KiraTimeZone.DEFAULT).plusSeconds(refreshExpiration / 1000));
+        refreshToken.setRevogado(false);
+
+        refreshTokenRepository.save(refreshToken);
+
+        return token;
     }
 
     public void registrarCliente(ClienteRegistroRequest data) {

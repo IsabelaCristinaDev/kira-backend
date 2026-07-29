@@ -38,3 +38,4 @@ management:
 jwt:
   secret: ${JWT_SECRET:REMOVIDO}
   expiration: 86400000
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
