@@ -9,8 +9,6 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.Date;
 
 @Component
@@ -62,10 +60,6 @@ public class JwtTokenProvider {
     }
 
     private Date gerarDataExpiracao() {
-        return Date.from(
-                LocalDateTime.now()
-                        .plusHours(24)
-                        .toInstant(ZoneOffset.of("-03:00"))
-        );
+        return new Date(System.currentTimeMillis() + expiration);
     }
 }
