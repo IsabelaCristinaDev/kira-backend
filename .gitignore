@@ -1,12 +1,12 @@
-
 target/
 *.class
 .env
+*.env
 application-secrets.yml
 application-dev.yml
+application-local.yml
 .idea/
 *.iml
-
 
 HELP.md
 target/
