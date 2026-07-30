@@ -26,31 +26,25 @@ import java.util.UUID;
 @SuperBuilder
 public abstract class Usuario implements UserDetails {
 
+    private static final String ROLE_USER = "ROLE_USER";
+
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-
     @Column(nullable = false, length = 150)
     private String nome;
-
     @Column(nullable = false, unique = true, length = 150)
     private String email;
-
     @Column(name = "senha_hash", nullable = false)
     private String senhaHash;
-
     @Column(length = 20)
     private String telefone;
-
     @Column(name = "foto_url")
     private String fotoUrl;
-
     @Column(nullable = false)
     private Boolean ativo = true;
-
     @Column(name = "data_criacao", nullable = false, updatable = false)
     private LocalDateTime dataCriacao;
-
     @PrePersist
     protected void aoPersistir() {
         this.dataCriacao = LocalDateTime.now(KiraTimeZone.DEFAULT);
@@ -58,48 +52,41 @@ public abstract class Usuario implements UserDetails {
             this.ativo = true;
         }
     }
-
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         String tipo = this.getClass().getSimpleName().toUpperCase();
         return switch (tipo) {
             case "ADMIN" -> List.of(
                     new SimpleGrantedAuthority("ROLE_ADMIN"),
-                    new SimpleGrantedAuthority("ROLE_USER")
+                    new SimpleGrantedAuthority(ROLE_USER)
             );
             case "EMPRESA" -> List.of(
                     new SimpleGrantedAuthority("ROLE_EMPRESA"),
-                    new SimpleGrantedAuthority("ROLE_USER")
+                    new SimpleGrantedAuthority(ROLE_USER)
             );
-            default -> List.of(new SimpleGrantedAuthority("ROLE_USER"));
+            default -> List.of(new SimpleGrantedAuthority(ROLE_USER));
         };
     }
-
     @Override
     public String getPassword() {
         return senhaHash;
     }
-
     @Override
     public String getUsername() {
         return email;
     }
-
     @Override
     public boolean isAccountNonExpired() {
         return true;
     }
-
     @Override
     public boolean isAccountNonLocked() {
         return true;
     }
-
     @Override
     public boolean isCredentialsNonExpired() {
         return true;
     }
-
     @Override
     public boolean isEnabled() {
         return ativo != null && ativo;

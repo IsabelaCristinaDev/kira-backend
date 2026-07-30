@@ -19,6 +19,7 @@ import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import br.com.kira.kirabackend.security.JwtTokenProvider;
 import br.com.kira.kirabackend.util.KiraTimeZone;
+import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -85,7 +86,7 @@ public class AuthService {
         }
 
         Usuario usuario = refreshTokenEntity.getUsuario();
-        String tipoUsuario = usuario.getClass().getSimpleName().toUpperCase();
+        String tipoUsuario = Hibernate.getClass(usuario).getSimpleName().toUpperCase();
         var novoToken = jwtTokenProvider.gerarToken(usuario, tipoUsuario);
         var novoRefreshToken = gerarERegistrarRefreshToken(usuario);
 
