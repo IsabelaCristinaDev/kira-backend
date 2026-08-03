@@ -4,7 +4,7 @@ import br.com.kira.kirabackend.dto.request.ServicoRequest;
 import br.com.kira.kirabackend.dto.response.ServicoResponse;
 import br.com.kira.kirabackend.service.ServicoService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -12,12 +12,13 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+@RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/empresas/{empresaId}/servicos")
 public class ServicoController {
 
-    @Autowired
-    private ServicoService servicoService;
+
+    private final ServicoService servicoService;
 
     @PostMapping
     public ResponseEntity<ServicoResponse> cadastrar(

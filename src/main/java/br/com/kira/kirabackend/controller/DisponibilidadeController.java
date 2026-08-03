@@ -5,7 +5,7 @@ import br.com.kira.kirabackend.dto.response.DisponibilidadeResponse;
 import br.com.kira.kirabackend.dto.response.SlotDisponivel;
 import br.com.kira.kirabackend.service.DisponibilidadeService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,12 +15,12 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+@RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/empresas/{empresaId}/disponibilidade")
 public class DisponibilidadeController {
 
-    @Autowired
-    private DisponibilidadeService disponibilidadeService;
+    private final DisponibilidadeService disponibilidadeService;
 
     @PostMapping
     public ResponseEntity<DisponibilidadeResponse> cadastrar(

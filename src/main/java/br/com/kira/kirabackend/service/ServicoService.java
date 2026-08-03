@@ -7,19 +7,17 @@ import br.com.kira.kirabackend.dto.response.ServicoResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
 
+@RequiredArgsConstructor
 @Service
 public class ServicoService {
 
-    @Autowired
     private ServicoRepository servicoRepository;
-
-    @Autowired
     private UsuarioRepository usuarioRepository;
 
     public ServicoResponse cadastrar(UUID empresaId, ServicoRequest request) {

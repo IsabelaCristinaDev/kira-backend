@@ -9,25 +9,21 @@ import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.MensagemRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
 
+@RequiredArgsConstructor
 @Service
 @Transactional
 public class MensagemService {
 
-    @Autowired
-    private MensagemRepository mensagemRepository;
-
-    @Autowired
-    private AgendamentoRepository agendamentoRepository;
-
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final MensagemRepository mensagemRepository;
+    private final AgendamentoRepository agendamentoRepository;
+    private final UsuarioRepository usuarioRepository;
 
     public MensagemResponse enviar(UUID remetenteId, MensagemRequest request) {
         Agendamento agendamento = agendamentoRepository

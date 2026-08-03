@@ -4,16 +4,17 @@ import br.com.kira.kirabackend.dto.request.RecuperacaoSenhaRequest;
 import br.com.kira.kirabackend.dto.request.RedefinicaoSenhaRequest;
 import br.com.kira.kirabackend.service.RecuperacaoSenhaService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+@RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/auth")
 public class RecuperacaoSenhaController {
 
-    @Autowired
-    private RecuperacaoSenhaService recuperacaoSenhaService;
+
+    private final RecuperacaoSenhaService recuperacaoSenhaService;
 
     @PostMapping("/recuperar-senha")
     public ResponseEntity<Void> solicitarRecuperacao(

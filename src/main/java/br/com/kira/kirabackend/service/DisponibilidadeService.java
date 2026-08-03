@@ -13,7 +13,7 @@ import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.DisponibilidadeEstudioRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,21 +24,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+@RequiredArgsConstructor
 @Service
 @Transactional
 public class DisponibilidadeService {
 
-    @Autowired
-    private DisponibilidadeEstudioRepository disponibilidadeRepository;
-
-    @Autowired
-    private AgendamentoRepository agendamentoRepository;
-
-    @Autowired
-    private ServicoRepository servicoRepository;
-
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final DisponibilidadeEstudioRepository disponibilidadeRepository;
+    private final AgendamentoRepository agendamentoRepository;
+    private final ServicoRepository servicoRepository;
+    private final UsuarioRepository usuarioRepository;
 
     public DisponibilidadeResponse cadastrar(UUID empresaId, DisponibilidadeRequest request) {
         Empresa empresa = (Empresa) usuarioRepository.findById(empresaId)

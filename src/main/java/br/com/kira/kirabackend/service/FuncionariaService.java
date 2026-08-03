@@ -7,20 +7,18 @@ import br.com.kira.kirabackend.dto.response.FuncionariaResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.repository.FuncionariaRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
 
+@RequiredArgsConstructor
 @Service
 public class FuncionariaService {
 
-    @Autowired
-    private FuncionariaRepository funcionariaRepository;
-
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final FuncionariaRepository funcionariaRepository;
+    private final UsuarioRepository usuarioRepository;
 
     public FuncionariaResponse cadastrar(UUID empresaId, FuncionariaRequest request) {
         Empresa empresa = (Empresa) usuarioRepository.findById(empresaId)

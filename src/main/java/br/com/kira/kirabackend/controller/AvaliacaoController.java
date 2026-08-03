@@ -4,7 +4,7 @@ import br.com.kira.kirabackend.dto.request.AvaliacaoRequest;
 import br.com.kira.kirabackend.dto.response.AvaliacaoResponse;
 import br.com.kira.kirabackend.service.AvaliacaoService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -12,12 +12,13 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+@RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/avaliacoes")
 public class AvaliacaoController {
 
-    @Autowired
-    private AvaliacaoService avaliacaoService;
+
+    private final AvaliacaoService avaliacaoService;
 
     @PostMapping("/cliente")
     public ResponseEntity<AvaliacaoResponse> avaliarComoCliente(

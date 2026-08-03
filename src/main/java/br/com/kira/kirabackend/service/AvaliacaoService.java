@@ -11,24 +11,26 @@ import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.AvaliacaoRepository;
 import jakarta.transaction.Transactional;
-import org.springframework.beans.factory.annotation.Autowired;
+
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
+
+@RequiredArgsConstructor
 @Transactional
 @Service
 public class AvaliacaoService {
 
-    @Autowired
-    private AvaliacaoRepository avaliacaoRepository;
+    private static final String AGENDAMENTO_NAO_ENCONTRADO = "Agendamento não encontrado";
 
-    @Autowired
-    private AgendamentoRepository agendamentoRepository;
+    private final AvaliacaoRepository avaliacaoRepository;
+    private final AgendamentoRepository agendamentoRepository;
 
     public AvaliacaoResponse avaliarComoCliente(AvaliacaoRequest request) {
         Agendamento agendamento = agendamentoRepository.findById(request.agendamentoId())
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
 
         if (agendamento.getStatus() != StatusAgendamento.CONCLUIDO) {
             throw new RegraDeNegocioException("Só é possível avaliar agendamentos concluídos");
@@ -52,7 +54,7 @@ public class AvaliacaoService {
 
     public AvaliacaoResponse avaliarComoEmpresa(AvaliacaoRequest request) {
         Agendamento agendamento = agendamentoRepository.findById(request.agendamentoId())
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
 
         if (agendamento.getStatus() != StatusAgendamento.CONCLUIDO) {
             throw new RegraDeNegocioException("Só é possível avaliar agendamentos concluídos");
