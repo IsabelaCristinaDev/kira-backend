@@ -4,7 +4,8 @@ import br.com.kira.kirabackend.dto.request.BloqueioHorarioRequest;
 import br.com.kira.kirabackend.dto.response.BloqueioHorarioResponse;
 import br.com.kira.kirabackend.service.BloqueioHorarioService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -12,12 +13,12 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
+@RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/funcionarias/{funcionariaId}/bloqueios")
 public class BloqueioHorarioController {
 
-    @Autowired
-    private BloqueioHorarioService bloqueioHorarioService;
+    private final BloqueioHorarioService bloqueioHorarioService;
 
     @PostMapping
     public ResponseEntity<BloqueioHorarioResponse> cadastrar(

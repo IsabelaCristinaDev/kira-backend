@@ -12,28 +12,22 @@ import br.com.kira.kirabackend.repository.AvaliacaoRepository;
 import br.com.kira.kirabackend.repository.FuncionariaRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
 
+@RequiredArgsConstructor
 @Service
 @Transactional
 public class EstudioService {
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
-
-    @Autowired
-    private AvaliacaoRepository avaliacaoRepository;
-
-    @Autowired
-    private FuncionariaRepository funcionariaRepository;
-
-    @Autowired
-    private ServicoRepository servicoRepository;
+    private final UsuarioRepository usuarioRepository;
+    private final AvaliacaoRepository avaliacaoRepository;
+    private final FuncionariaRepository funcionariaRepository;
+    private final ServicoRepository servicoRepository;
 
     public List<EstudioResponse> listarTodos() {
         return usuarioRepository.findAll()

@@ -6,22 +6,20 @@ import br.com.kira.kirabackend.dto.response.FuncionariaResponse;
 import br.com.kira.kirabackend.dto.response.ServicoResponse;
 import br.com.kira.kirabackend.service.AvaliacaoService;
 import br.com.kira.kirabackend.service.EstudioService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
 
+@RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/studios")
 public class EstudioController {
 
-    @Autowired
-    private EstudioService estudioService;
-
-    @Autowired
-    private AvaliacaoService avaliacaoService;
+    private final EstudioService estudioService;
+    private final AvaliacaoService avaliacaoService;
 
     @GetMapping
     public ResponseEntity<List<EstudioResponse>> listarTodos() {
@@ -62,7 +60,7 @@ public class EstudioController {
     public ResponseEntity<Double> mediaAvaliacoes(
             @PathVariable UUID id) {
         return ResponseEntity.ok(avaliacaoService.mediaAvaliacaoEmpresa(id));
-    } // <-- A chave fechava aqui!
+    }
 
     @GetMapping("/tipo")
     public ResponseEntity<List<EstudioResponse>> buscarPorTipo(

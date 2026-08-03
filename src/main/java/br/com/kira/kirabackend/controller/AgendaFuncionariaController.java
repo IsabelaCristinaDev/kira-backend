@@ -2,7 +2,7 @@ package br.com.kira.kirabackend.controller;
 
 import br.com.kira.kirabackend.dto.response.AgendamentoResponse;
 import br.com.kira.kirabackend.service.AgendaFuncionariaService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,10 +13,10 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/funcionarias/{funcionariaId}/agenda")
+@RequiredArgsConstructor
 public class AgendaFuncionariaController {
 
-    @Autowired
-    private AgendaFuncionariaService agendaFuncionariaService;
+    private final AgendaFuncionariaService agendaFuncionariaService;
 
     @GetMapping("/dia")
     public ResponseEntity<List<AgendamentoResponse>> agendaDiaria(

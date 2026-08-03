@@ -16,7 +16,7 @@ import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import br.com.kira.kirabackend.service.strategy.CancelamentoClienteStrategy;
 import br.com.kira.kirabackend.service.strategy.CancelamentoEmpresaStrategy;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,30 +25,20 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+@RequiredArgsConstructor
 @Service
 @Transactional
 public class AgendamentoService {
 
-    @Autowired
-    private AgendamentoRepository agendamentoRepository;
+    private static final String AGENDAMENTO_NAO_ENCONTRADO = "Agendamento não encontrado";
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
-
-    @Autowired
-    private ServicoRepository servicoRepository;
-
-    @Autowired
-    private FuncionariaRepository funcionariaRepository;
-
-    @Autowired
-    private CancelamentoClienteStrategy cancelamentoClienteStrategy;
-
-    @Autowired
-    private CancelamentoEmpresaStrategy cancelamentoEmpresaStrategy;
-
-    @Autowired
-    private ApplicationEventPublisher eventPublisher;
+    private final AgendamentoRepository agendamentoRepository;
+    private final UsuarioRepository usuarioRepository;
+    private final ServicoRepository servicoRepository;
+    private final FuncionariaRepository funcionariaRepository;
+    private final CancelamentoClienteStrategy cancelamentoClienteStrategy;
+    private final CancelamentoEmpresaStrategy cancelamentoEmpresaStrategy;
+    private final ApplicationEventPublisher eventPublisher;
 
     public AgendamentoResponse criar(UUID clienteId, AgendamentoRequest request) {
         Cliente cliente = (Cliente) usuarioRepository.findById(clienteId)
@@ -100,7 +90,7 @@ public class AgendamentoService {
 
     public AgendamentoResponse cancelarPeloCliente(UUID agendamentoId) {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
 
         cancelamentoClienteStrategy.validarCancelamento(agendamento);
 
@@ -112,7 +102,7 @@ public class AgendamentoService {
 
     public AgendamentoResponse cancelarPelaEmpresa(UUID agendamentoId) {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
 
         cancelamentoEmpresaStrategy.validarCancelamento(agendamento);
 
@@ -124,7 +114,7 @@ public class AgendamentoService {
 
     public AgendamentoResponse concluir(UUID agendamentoId) {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
 
         agendamento.setStatus(StatusAgendamento.CONCLUIDO);
         Agendamento salvo = agendamentoRepository.save(agendamento);
@@ -134,28 +124,17 @@ public class AgendamentoService {
 
     public AgendamentoResponse reagendarPeloCliente(UUID agendamentoId,
                                                     ReagendamentoRequest request) {
-        Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
-
-        if (agendamento.getStatus() == StatusAgendamento.CANCELADO ||
-                agendamento.getStatus() == StatusAgendamento.CONCLUIDO) {
-            throw new RegraDeNegocioException("Não é possível reagendar este agendamento");
-        }
-
-        LocalDateTime novaDataHoraFim = request.novaDataHoraInicio()
-                .plusMinutes(agendamento.getServico().getDuracaoMinutos());
-
-        agendamento.setDataHoraInicio(request.novaDataHoraInicio());
-        agendamento.setDataHoraFim(novaDataHoraFim);
-        agendamento.setStatus(StatusAgendamento.REAGENDADO);
-
-        return toResponse(agendamentoRepository.save(agendamento));
+        return reagendar(agendamentoId, request);
     }
 
     public AgendamentoResponse reagendarPelaEmpresa(UUID agendamentoId,
                                                     ReagendamentoRequest request) {
+        return reagendar(agendamentoId, request);
+    }
+
+    private AgendamentoResponse reagendar(UUID agendamentoId, ReagendamentoRequest request) {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
 
         if (agendamento.getStatus() == StatusAgendamento.CANCELADO ||
                 agendamento.getStatus() == StatusAgendamento.CONCLUIDO) {
@@ -173,22 +152,6 @@ public class AgendamentoService {
     }
 
     private AgendamentoResponse toResponse(Agendamento a) {
-        return new AgendamentoResponse(
-                a.getId(),
-                a.getCliente().getId(),
-                a.getCliente().getNome(),
-                a.getEmpresa().getId(),
-                a.getEmpresa().getNome(),
-                a.getFuncionaria() != null ? a.getFuncionaria().getId() : null,
-                a.getFuncionaria() != null ? a.getFuncionaria().getNome() : null,
-                a.getServico().getId(),
-                a.getServico().getNome(),
-                a.getServico().getDuracaoMinutos(),
-                a.getDataHoraInicio(),
-                a.getDataHoraFim(),
-                a.getStatus(),
-                a.getFormaPagamento(),
-                a.getObservacoes()
-        );
+        return AgendamentoResponse.from(a);
     }
 }

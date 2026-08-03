@@ -2,7 +2,7 @@ package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.dto.response.AgendamentoResponse;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -11,13 +11,12 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
-
+@RequiredArgsConstructor
 @Service
 @Transactional
 public class AgendaFuncionariaService {
 
-    @Autowired
-    private AgendamentoRepository agendamentoRepository;
+    private final AgendamentoRepository agendamentoRepository;
 
     public List<AgendamentoResponse> listarPorDia(UUID funcionariaId, LocalDate data) {
         LocalDateTime inicio = data.atStartOfDay();
@@ -27,23 +26,7 @@ public class AgendaFuncionariaService {
                 .findByFuncionariaIdAndDataHoraInicioBetweenOrderByDataHoraInicio(
                         funcionariaId, inicio, fim)
                 .stream()
-                .map(a -> new AgendamentoResponse(
-                        a.getId(),
-                        a.getCliente().getId(),
-                        a.getCliente().getNome(),
-                        a.getEmpresa().getId(),
-                        a.getEmpresa().getNome(),
-                        a.getFuncionaria() != null ? a.getFuncionaria().getId() : null,
-                        a.getFuncionaria() != null ? a.getFuncionaria().getNome() : null,
-                        a.getServico().getId(),
-                        a.getServico().getNome(),
-                        a.getServico().getDuracaoMinutos(),
-                        a.getDataHoraInicio(),
-                        a.getDataHoraFim(),
-                        a.getStatus(),
-                        a.getFormaPagamento(),
-                        a.getObservacoes()
-                ))
+                .map(AgendamentoResponse::from)
                 .toList();
     }
 
@@ -56,23 +39,7 @@ public class AgendaFuncionariaService {
                 .findByFuncionariaIdAndDataHoraInicioBetweenOrderByDataHoraInicio(
                         funcionariaId, inicio, fim)
                 .stream()
-                .map(a -> new AgendamentoResponse(
-                        a.getId(),
-                        a.getCliente().getId(),
-                        a.getCliente().getNome(),
-                        a.getEmpresa().getId(),
-                        a.getEmpresa().getNome(),
-                        a.getFuncionaria() != null ? a.getFuncionaria().getId() : null,
-                        a.getFuncionaria() != null ? a.getFuncionaria().getNome() : null,
-                        a.getServico().getId(),
-                        a.getServico().getNome(),
-                        a.getServico().getDuracaoMinutos(),
-                        a.getDataHoraInicio(),
-                        a.getDataHoraFim(),
-                        a.getStatus(),
-                        a.getFormaPagamento(),
-                        a.getObservacoes()
-                ))
+                .map(AgendamentoResponse::from)
                 .toList();
     }
 }

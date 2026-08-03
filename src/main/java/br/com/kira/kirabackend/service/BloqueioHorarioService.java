@@ -8,22 +8,24 @@ import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.BloqueioHorarioRepository;
 import br.com.kira.kirabackend.repository.FuncionariaRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
 
+@RequiredArgsConstructor
 @Service
 @Transactional
 public class BloqueioHorarioService {
 
-    @Autowired
-    private BloqueioHorarioRepository bloqueioHorarioRepository;
 
-    @Autowired
-    private FuncionariaRepository funcionariaRepository;
+    private final BloqueioHorarioRepository bloqueioHorarioRepository;
+
+
+    private final FuncionariaRepository funcionariaRepository;
 
     public BloqueioHorarioResponse cadastrar(UUID funcionariaId,
                                              BloqueioHorarioRequest request) {
