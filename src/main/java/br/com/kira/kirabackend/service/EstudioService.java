@@ -18,7 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
-
 @RequiredArgsConstructor
 @Service
 @Transactional
@@ -32,7 +31,7 @@ public class EstudioService {
     public List<EstudioResponse> listarTodos() {
         return usuarioRepository.findAll()
                 .stream()
-                .filter(u -> u instanceof Empresa)
+                .filter(Empresa.class::isInstance)
                 .map(u -> toResponse((Empresa) u))
                 .toList();
     }
@@ -40,7 +39,7 @@ public class EstudioService {
     public List<EstudioResponse> buscarPorNome(String nome) {
         return usuarioRepository.findAll()
                 .stream()
-                .filter(u -> u instanceof Empresa)
+                .filter(Empresa.class::isInstance)
                 .map(u -> (Empresa) u)
                 .filter(e -> e.getNome().toLowerCase()
                         .contains(nome.toLowerCase()))
@@ -63,7 +62,7 @@ public class EstudioService {
     public List<EstudioResponse> buscarPorTipo(TipoEstabelecimento tipo) {
         return usuarioRepository.findAll()
                 .stream()
-                .filter(u -> u instanceof Empresa)
+                .filter(Empresa.class::isInstance)
                 .map(u -> (Empresa) u)
                 .filter(e -> e.getTipoEstabelecimento() == tipo)
                 .map(this::toResponse)
@@ -73,7 +72,7 @@ public class EstudioService {
     public List<EstudioResponse> buscarPorCidade(String cidade) {
         return usuarioRepository.findAll()
                 .stream()
-                .filter(u -> u instanceof Empresa)
+                .filter(Empresa.class::isInstance)
                 .map(u -> (Empresa) u)
                 .filter(e -> e.getEndereco() != null
                         && e.getEndereco().getCidade() != null
@@ -121,5 +120,4 @@ public class EstudioService {
                 empresa.getTipoEstabelecimento(),
                 media
         );
-    }
-}
+    }}
