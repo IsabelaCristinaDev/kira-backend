@@ -5,7 +5,7 @@ import org.springframework.context.ApplicationEvent;
 
 public class AgendamentoCanceladoEvent extends ApplicationEvent {
 
-    private final Agendamento agendamento;
+    private final transient Agendamento agendamento;
 
     public AgendamentoCanceladoEvent(Object source, Agendamento agendamento) {
         super(source);
