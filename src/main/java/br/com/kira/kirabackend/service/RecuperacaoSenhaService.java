@@ -8,6 +8,7 @@ import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.TokenRecuperacaoSenhaRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import br.com.kira.kirabackend.util.KiraTimeZone;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -16,21 +17,15 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+@RequiredArgsConstructor
 @Service
 @Transactional
 public class RecuperacaoSenhaService {
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
-
-    @Autowired
-    private TokenRecuperacaoSenhaRepository tokenRepository;
-
-    @Autowired
-    private EmailService emailService;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    private final UsuarioRepository usuarioRepository;
+    private final TokenRecuperacaoSenhaRepository tokenRepository;
+    private final EmailService emailService;
+    private final PasswordEncoder passwordEncoder;
 
     public void solicitarRecuperacao(RecuperacaoSenhaRequest request) {
         var usuario = usuarioRepository.findByEmail(request.email())
@@ -64,7 +59,7 @@ public class RecuperacaoSenhaService {
             throw new RegraDeNegocioException("Token expirado");
         }
 
-        if (tokenRecuperacao.getUsado()) {
+        if (Boolean.TRUE.equals(tokenRecuperacao.getUsado())) {
             throw new RegraDeNegocioException("Token já utilizado");
         }
 
