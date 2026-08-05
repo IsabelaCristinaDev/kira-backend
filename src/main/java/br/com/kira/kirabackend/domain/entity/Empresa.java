@@ -33,7 +33,7 @@ public class Empresa extends Usuario {
     private String especialidades;
 
     @Embedded
-    private Endereco endereco;
+    private transient Endereco endereco;
 
     @Column(name = "data_nascimento")
     private LocalDate dataNascimento;
