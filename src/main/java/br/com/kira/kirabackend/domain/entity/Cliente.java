@@ -2,7 +2,6 @@ package br.com.kira.kirabackend.domain.entity;
 
 import br.com.kira.kirabackend.domain.enums.Genero;
 import jakarta.persistence.Column;
-import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -15,6 +14,7 @@ import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDate;
+
 @Entity
 @Table(name = "cliente")
 @Getter
@@ -22,13 +22,12 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @SuperBuilder
+public class Cliente extends Usuario {
 
-public class Cliente extends Usuario{
-
-    @Column(nullable=false, unique=true , length= 14)
+    @Column(nullable = false, unique = true, length = 14)
     private String cpf;
 
-    @Column(name="data_nascimento")
+    @Column(name = "data_nascimento")
     private LocalDate dataNascimento;
 
     @Enumerated(EnumType.STRING)
@@ -36,7 +35,7 @@ public class Cliente extends Usuario{
     private Genero genero;
 
     @Embedded
-    private Endereco endereco;
+    private transient Endereco endereco;
 
     private Double latitude;
 
