@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Date;
 
 @Component
@@ -29,8 +30,8 @@ public class JwtTokenProvider {
             return Jwts.builder()
                     .subject(userDetails.getUsername())
                     .claim("tipoUsuario", tipoUsuario)
-                    .issuedAt(new Date())
-                    .expiration(gerarDataExpiracao())
+                    .issuedAt(Date.from(Instant.now()))
+                    .expiration(Date.from(gerarInstanteExpiracao()))
                     .signWith(getSigningKey())
                     .compact();
         } catch (Exception e) {
@@ -45,7 +46,7 @@ public class JwtTokenProvider {
     public boolean tokenValido(String token) {
         try {
             var claims = extrairClaims(token);
-            return !claims.getExpiration().before(new Date());
+            return claims.getExpiration().toInstant().isAfter(Instant.now());
         } catch (Exception e) {
             return false;
         }
@@ -59,7 +60,7 @@ public class JwtTokenProvider {
                 .getPayload();
     }
 
-    private Date gerarDataExpiracao() {
-        return new Date(System.currentTimeMillis() + expiration);
+    private Instant gerarInstanteExpiracao() {
+        return Instant.now().plusMillis(expiration);
     }
 }
