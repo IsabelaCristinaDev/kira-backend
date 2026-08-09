@@ -2,6 +2,7 @@ package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.*;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
+import br.com.kira.kirabackend.domain.enums.TipoUsuario;
 import br.com.kira.kirabackend.dto.request.AgendamentoRequest;
 import br.com.kira.kirabackend.dto.request.ReagendamentoRequest;
 import br.com.kira.kirabackend.dto.response.AgendamentoResponse;
@@ -14,8 +15,7 @@ import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.FuncionariaRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
-import br.com.kira.kirabackend.service.strategy.CancelamentoClienteStrategy;
-import br.com.kira.kirabackend.service.strategy.CancelamentoEmpresaStrategy;
+import br.com.kira.kirabackend.service.strategy.CancelamentoStrategy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -36,9 +36,16 @@ public class AgendamentoService {
     private final UsuarioRepository usuarioRepository;
     private final ServicoRepository servicoRepository;
     private final FuncionariaRepository funcionariaRepository;
-    private final CancelamentoClienteStrategy cancelamentoClienteStrategy;
-    private final CancelamentoEmpresaStrategy cancelamentoEmpresaStrategy;
+    private final List<CancelamentoStrategy> cancelamentoStrategies;
     private final ApplicationEventPublisher eventPublisher;
+
+    private CancelamentoStrategy resolverEstrategiaCancelamento(TipoUsuario tipo) {
+        return cancelamentoStrategies.stream()
+                .filter(strategy -> strategy.getTipo() == tipo)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "Nenhuma estratégia de cancelamento encontrada para o tipo: " + tipo));
+    }
 
     public AgendamentoResponse criar(UUID clienteId, AgendamentoRequest request) {
         Cliente cliente = (Cliente) usuarioRepository.findById(clienteId)
@@ -92,7 +99,7 @@ public class AgendamentoService {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
 
-        cancelamentoClienteStrategy.validarCancelamento(agendamento);
+        resolverEstrategiaCancelamento(TipoUsuario.CLIENTE).validarCancelamento(agendamento);
 
         agendamento.setStatus(StatusAgendamento.CANCELADO);
         Agendamento salvo = agendamentoRepository.save(agendamento);
@@ -104,7 +111,7 @@ public class AgendamentoService {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
 
-        cancelamentoEmpresaStrategy.validarCancelamento(agendamento);
+        resolverEstrategiaCancelamento(TipoUsuario.EMPRESA).validarCancelamento(agendamento);
 
         agendamento.setStatus(StatusAgendamento.CANCELADO);
         Agendamento salvo = agendamentoRepository.save(agendamento);

@@ -1,7 +1,7 @@
 package br.com.kira.kirabackend.service.strategy;
 
 import br.com.kira.kirabackend.domain.entity.Agendamento;
-import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
+import br.com.kira.kirabackend.domain.enums.TipoUsuario;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.util.KiraTimeZone;
 import org.springframework.stereotype.Component;
@@ -12,14 +12,13 @@ import java.time.LocalDateTime;
 public class CancelamentoClienteStrategy implements CancelamentoStrategy {
 
     @Override
-    public void validarCancelamento(Agendamento agendamento) {
-        if (agendamento.getStatus() == StatusAgendamento.CANCELADO) {
-            throw new RegraDeNegocioException("Agendamento já está cancelado");
-        }
+    public TipoUsuario getTipo() {
+        return TipoUsuario.CLIENTE;
+    }
 
-        if (agendamento.getStatus() == StatusAgendamento.CONCLUIDO) {
-            throw new RegraDeNegocioException("Não é possível cancelar um agendamento concluído");
-        }
+    @Override
+    public void validarCancelamento(Agendamento agendamento) {
+        validarStatusCancelavel(agendamento);
 
         if (agendamento.getDataHoraInicio().isBefore(LocalDateTime.now(KiraTimeZone.DEFAULT).plusHours(2))) {
             throw new RegraDeNegocioException(
