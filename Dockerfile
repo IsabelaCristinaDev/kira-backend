@@ -7,6 +7,9 @@ RUN mvn clean package -DskipTests
 
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
+RUN addgroup -S kira && adduser -S kira -G kira
 COPY --from=build /app/target/*.jar app.jar
+RUN chown kira:kira app.jar
+USER kira
 EXPOSE 8081
 ENTRYPOINT ["java", "-jar", "app.jar"]

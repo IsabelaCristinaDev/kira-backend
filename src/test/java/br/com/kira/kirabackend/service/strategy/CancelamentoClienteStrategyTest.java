@@ -3,6 +3,7 @@ package br.com.kira.kirabackend.service.strategy;
 import br.com.kira.kirabackend.domain.entity.Agendamento;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
+import br.com.kira.kirabackend.util.KiraTimeZone;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,8 @@ class CancelamentoClienteStrategyTest {
 
     @BeforeEach
     void setUp() {
+
+
         strategy = new CancelamentoClienteStrategy();
     }
 
@@ -25,7 +28,7 @@ class CancelamentoClienteStrategyTest {
     void deveCancelarComAntecedenciaSuficiente() {
         Agendamento agendamento = new Agendamento();
         agendamento.setStatus(StatusAgendamento.PENDENTE);
-        agendamento.setDataHoraInicio(LocalDateTime.now().plusHours(3));
+        agendamento.setDataHoraInicio(LocalDateTime.now(KiraTimeZone.DEFAULT).plusHours(3));
 
         assertDoesNotThrow(() -> strategy.validarCancelamento(agendamento));
     }
@@ -35,7 +38,7 @@ class CancelamentoClienteStrategyTest {
     void naoDeveCancelarComAntecedenciaInsuficiente() {
         Agendamento agendamento = new Agendamento();
         agendamento.setStatus(StatusAgendamento.PENDENTE);
-        agendamento.setDataHoraInicio(LocalDateTime.now().plusHours(1));
+        agendamento.setDataHoraInicio(LocalDateTime.now(KiraTimeZone.DEFAULT).plusHours(1));
 
         assertThrows(RegraDeNegocioException.class,
                 () -> strategy.validarCancelamento(agendamento));
@@ -46,7 +49,7 @@ class CancelamentoClienteStrategyTest {
     void naoDeveCancelarAgendamentoJaCancelado() {
         Agendamento agendamento = new Agendamento();
         agendamento.setStatus(StatusAgendamento.CANCELADO);
-        agendamento.setDataHoraInicio(LocalDateTime.now().plusHours(5));
+        agendamento.setDataHoraInicio(LocalDateTime.now(KiraTimeZone.DEFAULT).plusHours(5));
 
         assertThrows(RegraDeNegocioException.class,
                 () -> strategy.validarCancelamento(agendamento));
@@ -57,7 +60,7 @@ class CancelamentoClienteStrategyTest {
     void naoDeveCancelarAgendamentoConcluido() {
         Agendamento agendamento = new Agendamento();
         agendamento.setStatus(StatusAgendamento.CONCLUIDO);
-        agendamento.setDataHoraInicio(LocalDateTime.now().plusHours(5));
+        agendamento.setDataHoraInicio(LocalDateTime.now(KiraTimeZone.DEFAULT).plusHours(5));
 
         assertThrows(RegraDeNegocioException.class,
                 () -> strategy.validarCancelamento(agendamento));
