@@ -60,11 +60,17 @@ public class Agendamento {
     @Column(name = "data_criacao", nullable = false, updatable = false)
     private LocalDateTime dataCriacao;
 
+    @Column(name = "lembrete_enviado", columnDefinition = "boolean not null default false")
+    private Boolean lembreteEnviado = false;
+
     @PrePersist
     protected void aoPersistir() {
         this.dataCriacao = LocalDateTime.now(KiraTimeZone.DEFAULT);
         if (this.status == null) {
             this.status = StatusAgendamento.PENDENTE;
+        }
+        if (this.lembreteEnviado == null) {
+            this.lembreteEnviado = false;
         }
     }
 }

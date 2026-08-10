@@ -29,4 +29,9 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID> 
             UUID funcionariaId,
             LocalDateTime inicio,
             LocalDateTime fim);
+
+    List<Agendamento> findByStatusNotInAndLembreteEnviadoFalseAndDataHoraInicioBetween(
+            List<StatusAgendamento> statusExcluidos,
+            LocalDateTime inicio,
+            LocalDateTime fim);
 }
