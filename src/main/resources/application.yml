@@ -39,3 +39,8 @@ jwt:
   secret: ${JWT_SECRET}
   expiration: 86400000
   refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+
+kira:
+  lembrete:
+    antecedencia-horas: ${LEMBRETE_ANTECEDENCIA_HORAS:24}
+    cron: ${LEMBRETE_CRON:0 0 * * * *}

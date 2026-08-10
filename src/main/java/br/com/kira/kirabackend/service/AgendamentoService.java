@@ -154,6 +154,7 @@ public class AgendamentoService {
         agendamento.setDataHoraInicio(request.novaDataHoraInicio());
         agendamento.setDataHoraFim(novaDataHoraFim);
         agendamento.setStatus(StatusAgendamento.REAGENDADO);
+        agendamento.setLembreteEnviado(false);
 
         return toResponse(agendamentoRepository.save(agendamento));
     }
