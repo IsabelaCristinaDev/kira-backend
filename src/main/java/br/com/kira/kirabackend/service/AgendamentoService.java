@@ -158,6 +158,14 @@ public class AgendamentoService {
 
         return toResponse(agendamentoRepository.save(agendamento));
     }
+    public List<AgendamentoResponse> historicoCliente(UUID clienteId) {
+        return agendamentoRepository
+                .findByClienteIdAndStatusOrderByDataHoraInicioDesc(
+                        clienteId, StatusAgendamento.CONCLUIDO)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
 
     private AgendamentoResponse toResponse(Agendamento a) {
         return AgendamentoResponse.from(a);

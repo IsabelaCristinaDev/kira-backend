@@ -44,3 +44,7 @@ kira:
   lembrete:
     antecedencia-horas: ${LEMBRETE_ANTECEDENCIA_HORAS:24}
     cron: ${LEMBRETE_CRON:0 0 * * * *}
+    retry:
+      max-tentativas: ${LEMBRETE_RETRY_MAX_TENTATIVAS:3}
+      delay-ms: ${LEMBRETE_RETRY_DELAY_MS:2000}
+      multiplicador: ${LEMBRETE_RETRY_MULTIPLICADOR:2}
