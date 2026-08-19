@@ -90,7 +90,8 @@ public class EstudioService {
                         f.getNome(),
                         f.getFotoUrl(),
                         f.getEspecialidades(),
-                        f.getAtivo()))
+                        f.getAtivo(),
+                        f.getComissaoPercentual()))
                 .toList();
     }
 

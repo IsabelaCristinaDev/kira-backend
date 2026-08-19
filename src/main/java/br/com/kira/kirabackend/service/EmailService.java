@@ -2,8 +2,11 @@ package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.Agendamento;
 import lombok.RequiredArgsConstructor;
+import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 
 import java.time.format.DateTimeFormatter;
@@ -33,6 +36,14 @@ public class EmailService {
         mailSender.send(message);
     }
 
+    @Retryable(
+            retryFor = MailException.class,
+            maxAttemptsExpression = "${kira.lembrete.retry.max-tentativas:3}",
+            backoff = @Backoff(
+                    delayExpression = "${kira.lembrete.retry.delay-ms:2000}",
+                    multiplierExpression = "${kira.lembrete.retry.multiplicador:2}"
+            )
+    )
     public void enviarLembreteAgendamento(String destinatario, Agendamento agendamento) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(destinatario);
@@ -44,6 +55,24 @@ public class EmailService {
                         "Local: " + agendamento.getEmpresa().getNome() + "\n" +
                         "Data e hora: " + agendamento.getDataHoraInicio().format(FORMATO_DATA_HORA) + "\n\n" +
                         "Caso não possa comparecer, cancele ou reagende com antecedência.\n\n" +
+                        "Equipe KIRA"
+        );
+        mailSender.send(message);
+
+    }
+
+    public void enviarEmailBoasVindas(String destinatario, String nome) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(destinatario);
+        message.setSubject("Bem-vindo ao KIRA! 🎉");
+        message.setText(
+                "Olá, " + nome + "!\n\n" +
+                        "Seja bem-vindo(a) ao KIRA — sua plataforma de agendamento de beleza!\n\n" +
+                        "Agora você pode:\n" +
+                        "- Encontrar profissionais perto de você\n" +
+                        "- Agendar serviços de beleza com facilidade\n" +
+                        "- Avaliar e ser avaliado(a)\n\n" +
+                        "Acesse agora e comece a usar!\n\n" +
                         "Equipe KIRA"
         );
         mailSender.send(message);

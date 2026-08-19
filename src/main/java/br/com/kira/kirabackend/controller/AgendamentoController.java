@@ -71,4 +71,9 @@ public class AgendamentoController {
             @PathVariable UUID id) {
         return ResponseEntity.ok(agendamentoService.cancelarPelaEmpresa(id));
     }
+    @GetMapping("/cliente/{clienteId}/historico")
+    public ResponseEntity<List<AgendamentoResponse>> historicoCliente(
+            @PathVariable UUID clienteId) {
+        return ResponseEntity.ok(agendamentoService.historicoCliente(clienteId));
+    }
 }

@@ -21,6 +21,7 @@ import br.com.kira.kirabackend.security.JwtTokenProvider;
 import br.com.kira.kirabackend.util.KiraTimeZone;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.Hibernate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -45,6 +46,8 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationManager authenticationManager;
+    private final EmailService emailService;
+
 
     @Value("${jwt.refresh-expiration}")
     private long refreshExpiration;
@@ -134,9 +137,11 @@ public class AuthService {
             endereco.setCidade(data.endereco().cidade());
             endereco.setEstado(data.endereco().estado());
             cliente.setEndereco(endereco);
-        }
 
+        }
         usuarioRepository.save(cliente);
+        emailService.enviarEmailBoasVindas(cliente.getEmail(), cliente.getNome());
+
     }
 
     @Transactional
@@ -175,6 +180,7 @@ public class AuthService {
         }
 
         usuarioRepository.save(empresa);
+        emailService.enviarEmailBoasVindas(empresa.getEmail(), empresa.getNome());
 
         if (data.servicos() != null) {
             for (ServicoRegistroRequest servicoData : data.servicos()) {

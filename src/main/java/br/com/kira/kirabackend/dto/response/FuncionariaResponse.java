@@ -1,5 +1,6 @@
 package br.com.kira.kirabackend.dto.response;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 public record FuncionariaResponse(
@@ -7,5 +8,6 @@ public record FuncionariaResponse(
         String nome,
         String fotoUrl,
         String especialidades,
-        Boolean ativo
+        Boolean ativo,
+        BigDecimal comissaoPercentual
 ) {}

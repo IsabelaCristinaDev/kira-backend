@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Entity
@@ -30,6 +31,9 @@ public class Funcionaria {
 
     @Column(nullable = false)
     private Boolean ativo = true;
+
+    @Column(name = "comissao_percentual", precision = 5, scale = 2)
+    private BigDecimal comissaoPercentual;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "empresa_id", nullable = false)

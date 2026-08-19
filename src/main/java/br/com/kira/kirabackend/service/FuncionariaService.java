@@ -49,6 +49,7 @@ public class FuncionariaService {
         funcionaria.setNome(request.nome());
         funcionaria.setFotoUrl(request.fotoUrl());
         funcionaria.setEspecialidades(request.especialidade());
+        funcionaria.setComissaoPercentual(request.comissaoPercentual());
 
         funcionariaRepository.save(funcionaria);
 
@@ -69,7 +70,8 @@ public class FuncionariaService {
                 funcionaria.getNome(),
                 funcionaria.getFotoUrl(),
                 funcionaria.getEspecialidades(),
-                funcionaria.getAtivo()
+                funcionaria.getAtivo(),
+                funcionaria.getComissaoPercentual()
         );
     }
 }
