@@ -37,7 +37,6 @@ public class AgendamentoEventListener {
     }
 
     @EventListener
-    @Async
     public void onAtendimentoConcluido(AtendimentoConcluidoEvent event) {
         var agendamento = event.getAgendamento();
         log.info("Atendimento concluído: {} - Cliente: {} - Empresa: {}",
