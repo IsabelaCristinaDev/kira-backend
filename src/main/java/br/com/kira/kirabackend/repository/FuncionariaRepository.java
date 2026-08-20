@@ -11,4 +11,6 @@ public interface FuncionariaRepository extends JpaRepository<Funcionaria, UUID> 
 
     List<Funcionaria> findByEmpresaIdAndAtivoTrue(UUID empresaId);
 
+    boolean existsByEmpresaIdAndNomeIgnoreCaseAndAtivoTrue(UUID empresaId, String nome);
+
 }

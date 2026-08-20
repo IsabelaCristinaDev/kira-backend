@@ -10,7 +10,7 @@ public record FuncionariaRequest(
 
     String nome,
     String fotoUrl,
-    String especialidade,
+    String especialidades,
     BigDecimal comissaoPercentual
 
 

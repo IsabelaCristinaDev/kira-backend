@@ -5,6 +5,7 @@ import br.com.kira.kirabackend.domain.entity.Funcionaria;
 import br.com.kira.kirabackend.dto.request.FuncionariaRequest;
 import br.com.kira.kirabackend.dto.response.FuncionariaResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
+import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.FuncionariaRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,10 +25,15 @@ public class FuncionariaService {
         Empresa empresa = (Empresa) usuarioRepository.findById(empresaId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Empresa não encontrada"));
 
+        if (funcionariaRepository.existsByEmpresaIdAndNomeIgnoreCaseAndAtivoTrue(empresaId, request.nome())) {
+            throw new RegraDeNegocioException("Já existe uma funcionária ativa com esse nome");
+        }
+
         Funcionaria funcionaria = new Funcionaria();
         funcionaria.setNome(request.nome());
         funcionaria.setFotoUrl(request.fotoUrl());
-        funcionaria.setEspecialidades(request.especialidade());
+        funcionaria.setEspecialidades(request.especialidades());
+        funcionaria.setComissaoPercentual(request.comissaoPercentual());
         funcionaria.setEmpresa(empresa);
 
         funcionariaRepository.save(funcionaria);
@@ -48,7 +54,7 @@ public class FuncionariaService {
 
         funcionaria.setNome(request.nome());
         funcionaria.setFotoUrl(request.fotoUrl());
-        funcionaria.setEspecialidades(request.especialidade());
+        funcionaria.setEspecialidades(request.especialidades());
         funcionaria.setComissaoPercentual(request.comissaoPercentual());
 
         funcionariaRepository.save(funcionaria);

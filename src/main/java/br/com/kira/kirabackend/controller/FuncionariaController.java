@@ -18,7 +18,6 @@ import java.util.UUID;
 
 public class FuncionariaController {
 
-
     private final FuncionariaService funcionariaService;
 
     @PostMapping
