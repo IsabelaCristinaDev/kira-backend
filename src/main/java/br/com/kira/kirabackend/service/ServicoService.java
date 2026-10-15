@@ -17,8 +17,8 @@ import java.util.UUID;
 @Service
 public class ServicoService {
 
-    private ServicoRepository servicoRepository;
-    private UsuarioRepository usuarioRepository;
+    private final ServicoRepository servicoRepository;
+    private final UsuarioRepository usuarioRepository;
 
     public ServicoResponse cadastrar(UUID empresaId, ServicoRequest request) {
         Empresa empresa = (Empresa) usuarioRepository.findById(empresaId)
@@ -57,7 +57,7 @@ public class ServicoService {
 
     public void desativar(UUID id) {
         Servico servico = servicoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Serviço não encontrado"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Serviço não encontrado"));
 
         servico.setAtivo(false);
         servicoRepository.save(servico);

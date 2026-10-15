@@ -64,7 +64,7 @@ public class FuncionariaService {
 
     public void desativar(UUID id) {
         Funcionaria funcionaria = funcionariaRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Funcionária não encontrada"));
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Funcionária não encontrada"));
 
         funcionaria.setAtivo(false);
         funcionariaRepository.save(funcionaria);

@@ -28,9 +28,13 @@ public class AvaliacaoService {
     private final AvaliacaoRepository avaliacaoRepository;
     private final AgendamentoRepository agendamentoRepository;
 
-    public AvaliacaoResponse avaliarComoCliente(AvaliacaoRequest request) {
+    public AvaliacaoResponse avaliarComoCliente(UUID clienteId, AvaliacaoRequest request) {
         Agendamento agendamento = agendamentoRepository.findById(request.agendamentoId())
                 .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
+
+        if (!agendamento.getCliente().getId().equals(clienteId)) {
+            throw new RegraDeNegocioException("Você não participou deste atendimento");
+        }
 
         if (agendamento.getStatus() != StatusAgendamento.CONCLUIDO) {
             throw new RegraDeNegocioException("Só é possível avaliar agendamentos concluídos");
@@ -52,9 +56,13 @@ public class AvaliacaoService {
         return toResponse(avaliacaoRepository.save(avaliacao));
     }
 
-    public AvaliacaoResponse avaliarComoEmpresa(AvaliacaoRequest request) {
+    public AvaliacaoResponse avaliarComoEmpresa(UUID empresaId, AvaliacaoRequest request) {
         Agendamento agendamento = agendamentoRepository.findById(request.agendamentoId())
                 .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
+
+        if (!agendamento.getEmpresa().getId().equals(empresaId)) {
+            throw new RegraDeNegocioException("Este atendimento não pertence ao seu estabelecimento");
+        }
 
         if (agendamento.getStatus() != StatusAgendamento.CONCLUIDO) {
             throw new RegraDeNegocioException("Só é possível avaliar agendamentos concluídos");

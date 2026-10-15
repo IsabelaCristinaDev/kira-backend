@@ -1,5 +1,6 @@
 package br.com.kira.kirabackend.controller;
 
+import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.dto.request.AvaliacaoRequest;
 import br.com.kira.kirabackend.dto.response.AvaliacaoResponse;
 import br.com.kira.kirabackend.service.AvaliacaoService;
@@ -7,6 +8,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,18 +24,20 @@ public class AvaliacaoController {
 
     @PostMapping("/cliente")
     public ResponseEntity<AvaliacaoResponse> avaliarComoCliente(
+            @AuthenticationPrincipal Usuario usuario,
             @RequestBody @Valid AvaliacaoRequest request) {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(avaliacaoService.avaliarComoCliente(request));
+                .body(avaliacaoService.avaliarComoCliente(usuario.getId(), request));
     }
 
     @PostMapping("/empresa")
     public ResponseEntity<AvaliacaoResponse> avaliarComoEmpresa(
+            @AuthenticationPrincipal Usuario usuario,
             @RequestBody @Valid AvaliacaoRequest request) {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(avaliacaoService.avaliarComoEmpresa(request));
+                .body(avaliacaoService.avaliarComoEmpresa(usuario.getId(), request));
     }
 
     @GetMapping("/empresa/{empresaId}")
