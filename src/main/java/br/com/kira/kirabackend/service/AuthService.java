@@ -66,7 +66,7 @@ public class AuthService {
                 (UserDetails) auth.getPrincipal(), tipoUsuario);
         var refreshToken = gerarERegistrarRefreshToken(usuario);
 
-        return new LoginResponse(token, refreshToken, tipoUsuario, usuario.getNome(), usuario.getEmail());
+        return new LoginResponse(token, refreshToken, tipoUsuario, usuario.getNome(), usuario.getEmail(), usuario.getId());
     }
 
     @Transactional
@@ -83,7 +83,7 @@ public class AuthService {
         var novoToken = jwtTokenProvider.gerarToken(usuario, tipoUsuario);
         var novoRefreshToken = gerarERegistrarRefreshToken(usuario);
 
-        return new LoginResponse(novoToken, novoRefreshToken, tipoUsuario, usuario.getNome(), usuario.getEmail());
+        return new LoginResponse(novoToken, novoRefreshToken, tipoUsuario, usuario.getNome(), usuario.getEmail(), usuario.getId());
     }
 
     @Transactional

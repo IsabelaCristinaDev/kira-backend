@@ -181,6 +181,7 @@ class AuthServiceTest {
             assertEquals("CLIENTE", response.tipo());
             assertEquals("Ana", response.nome());
             assertEquals("ana@teste.com", response.email());
+            assertEquals(cliente.getId(), response.id());
 
             ArgumentCaptor<UsernamePasswordAuthenticationToken> credenciais =
                     ArgumentCaptor.forClass(UsernamePasswordAuthenticationToken.class);
@@ -236,6 +237,7 @@ class AuthServiceTest {
 
             assertEquals("jwt-novo", response.token());
             assertEquals("CLIENTE", response.tipo());
+            assertEquals(cliente.getId(), response.id());
             assertNotEquals("refresh-antigo", response.refreshToken());
             verify(refreshTokenRepository).deleteByUsuarioId(cliente.getId());
         }
