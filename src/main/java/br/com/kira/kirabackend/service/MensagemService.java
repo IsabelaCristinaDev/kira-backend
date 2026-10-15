@@ -6,6 +6,7 @@ import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.dto.request.MensagemRequest;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
+import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.MensagemRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
@@ -32,6 +33,12 @@ public class MensagemService {
 
         Usuario remetente = usuarioRepository.findById(remetenteId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
+
+        boolean participa = remetenteId.equals(agendamento.getCliente().getId())
+                || remetenteId.equals(agendamento.getEmpresa().getId());
+        if (!participa) {
+            throw new RegraDeNegocioException("Você não participa deste agendamento");
+        }
 
 
         Mensagem mensagem = new Mensagem();
