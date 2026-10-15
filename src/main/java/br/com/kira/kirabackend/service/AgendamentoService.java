@@ -1,6 +1,7 @@
 package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.*;
+import br.com.kira.kirabackend.domain.enums.DiaSemana;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import br.com.kira.kirabackend.domain.enums.TipoUsuario;
 import br.com.kira.kirabackend.dto.request.AgendamentoRequest;
@@ -12,10 +13,12 @@ import br.com.kira.kirabackend.observer.AgendamentoCanceladoEvent;
 import br.com.kira.kirabackend.observer.AgendamentoCriadoEvent;
 import br.com.kira.kirabackend.observer.AtendimentoConcluidoEvent;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
+import br.com.kira.kirabackend.repository.DisponibilidadeEstudioRepository;
 import br.com.kira.kirabackend.repository.FuncionariaRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import br.com.kira.kirabackend.service.strategy.CancelamentoStrategy;
+import br.com.kira.kirabackend.util.KiraTimeZone;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -36,6 +39,7 @@ public class AgendamentoService {
     private final UsuarioRepository usuarioRepository;
     private final ServicoRepository servicoRepository;
     private final FuncionariaRepository funcionariaRepository;
+    private final DisponibilidadeEstudioRepository disponibilidadeRepository;
     private final List<CancelamentoStrategy> cancelamentoStrategies;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -57,6 +61,10 @@ public class AgendamentoService {
         Servico servico = servicoRepository.findById(request.servicoId())
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Serviço não encontrado"));
 
+        if (servico.getEmpresa() == null || !empresa.getId().equals(servico.getEmpresa().getId())) {
+            throw new RegraDeNegocioException("Serviço não pertence a este estabelecimento");
+        }
+
         Funcionaria funcionaria = null;
         if (request.funcionariaId() != null) {
             funcionaria = funcionariaRepository.findById(request.funcionariaId())
@@ -65,6 +73,10 @@ public class AgendamentoService {
 
         LocalDateTime dataHoraFim = request.dataHoraInicio()
                 .plusMinutes(servico.getDuracaoMinutos());
+
+        validarDataFutura(request.dataHoraInicio());
+        validarExpediente(empresa.getId(), request.dataHoraInicio(), dataHoraFim);
+        validarConflitoDeHorario(empresa.getId(), request.dataHoraInicio(), dataHoraFim, null);
 
         Agendamento agendamento = new Agendamento();
         agendamento.setCliente(cliente);
@@ -123,6 +135,11 @@ public class AgendamentoService {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
 
+        if (agendamento.getStatus() == StatusAgendamento.CANCELADO ||
+                agendamento.getStatus() == StatusAgendamento.CONCLUIDO) {
+            throw new RegraDeNegocioException("Não é possível concluir este agendamento");
+        }
+
         agendamento.setStatus(StatusAgendamento.CONCLUIDO);
         Agendamento salvo = agendamentoRepository.save(agendamento);
         eventPublisher.publishEvent(new AtendimentoConcluidoEvent(this, salvo));
@@ -151,6 +168,11 @@ public class AgendamentoService {
         LocalDateTime novaDataHoraFim = request.novaDataHoraInicio()
                 .plusMinutes(agendamento.getServico().getDuracaoMinutos());
 
+        validarDataFutura(request.novaDataHoraInicio());
+        validarExpediente(agendamento.getEmpresa().getId(), request.novaDataHoraInicio(), novaDataHoraFim);
+        validarConflitoDeHorario(agendamento.getEmpresa().getId(),
+                request.novaDataHoraInicio(), novaDataHoraFim, agendamento.getId());
+
         agendamento.setDataHoraInicio(request.novaDataHoraInicio());
         agendamento.setDataHoraFim(novaDataHoraFim);
         agendamento.setStatus(StatusAgendamento.REAGENDADO);
@@ -165,6 +187,50 @@ public class AgendamentoService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    private void validarDataFutura(LocalDateTime inicio) {
+        if (!inicio.isAfter(LocalDateTime.now(KiraTimeZone.DEFAULT))) {
+            throw new RegraDeNegocioException("Não é possível agendar para uma data no passado");
+        }
+    }
+
+    /**
+     * O atendimento precisa começar e terminar dentro do expediente cadastrado
+     * pelo estabelecimento para o dia da semana.
+     */
+    private void validarExpediente(UUID empresaId, LocalDateTime inicio, LocalDateTime fim) {
+        DiaSemana diaSemana = DiaSemana.values()[inicio.getDayOfWeek().getValue() % 7];
+
+        DisponibilidadeEstudio disponibilidade = disponibilidadeRepository
+                .findByEmpresaIdAndDiaSemana(empresaId, diaSemana)
+                .orElseThrow(() -> new RegraDeNegocioException("Empresa não atende neste dia da semana"));
+
+        LocalDateTime inicioExpediente = LocalDateTime.of(inicio.toLocalDate(), disponibilidade.getHoraInicio());
+        LocalDateTime fimExpediente = LocalDateTime.of(inicio.toLocalDate(), disponibilidade.getHoraFim());
+
+        if (inicio.isBefore(inicioExpediente) || fim.isAfter(fimExpediente)) {
+            throw new RegraDeNegocioException("Horário fora do expediente do estabelecimento");
+        }
+    }
+
+    /**
+     * Impede dois agendamentos no mesmo estabelecimento com horários sobrepostos.
+     * Agendamentos cancelados liberam o horário. No reagendamento, o próprio
+     * agendamento é desconsiderado.
+     */
+    private void validarConflitoDeHorario(UUID empresaId, LocalDateTime inicio,
+                                          LocalDateTime fim, UUID agendamentoIgnorado) {
+        boolean conflito = agendamentoRepository
+                .findByEmpresaIdAndStatusNotAndDataHoraInicioBeforeAndDataHoraFimAfter(
+                        empresaId, StatusAgendamento.CANCELADO, fim, inicio)
+                .stream()
+                .anyMatch(a -> !a.getId().equals(agendamentoIgnorado));
+
+        if (conflito) {
+            throw new RegraDeNegocioException(
+                    "Já existe um agendamento neste horário para este estabelecimento");
+        }
     }
 
     private AgendamentoResponse toResponse(Agendamento a) {
