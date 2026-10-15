@@ -43,3 +43,6 @@ build/
 .vscode/
 backup.sql
 backup_dados.sql
+# Dumps de banco (nunca versionar)
+*.sql
+*.dump
