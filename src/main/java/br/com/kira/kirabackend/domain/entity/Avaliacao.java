@@ -12,7 +12,10 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "avaliacao")
+// Cliente e empresa avaliam o mesmo atendimento uma única vez cada.
+@Table(name = "avaliacao", uniqueConstraints = @UniqueConstraint(
+        name = "uk_avaliacao_agendamento_tipo_avaliador",
+        columnNames = {"agendamento_id", "tipo_avaliador"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -23,8 +26,8 @@ public class Avaliacao {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "agendamento_id", nullable = false, unique = true)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "agendamento_id", nullable = false)
     private Agendamento agendamento;
 
     @ManyToOne(fetch = FetchType.LAZY)
