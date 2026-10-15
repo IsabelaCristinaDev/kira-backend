@@ -21,7 +21,6 @@ import br.com.kira.kirabackend.security.JwtTokenProvider;
 import br.com.kira.kirabackend.util.KiraTimeZone;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.Hibernate;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -31,6 +30,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -194,19 +194,49 @@ public class AuthService {
         }
     }
 
+    /**
+     * Converte o preço digitado no cadastro ("R$ 50", "45,00", "1.234,56", "50.00").
+     * Com vírgula, segue o formato brasileiro: ponto separa milhar e vírgula separa centavos.
+     * Sem vírgula, um único ponto é decimal e vários pontos são separadores de milhar.
+     */
     private BigDecimal parsePreco(String bruto) {
         if (bruto == null || bruto.isBlank()) return BigDecimal.ZERO;
-        String normalizado = bruto.replaceAll("[^0-9,.]", "").replace(",", ".");
+        String numeros = bruto.replaceAll("[^0-9,.]", "");
+
+        String normalizado;
+        if (numeros.contains(",")) {
+            normalizado = numeros.replace(".", "").replace(",", ".");
+        } else if (numeros.indexOf('.') != numeros.lastIndexOf('.')) {
+            normalizado = numeros.replace(".", "");
+        } else {
+            normalizado = numeros;
+        }
+
         try {
-            return new BigDecimal(normalizado);
+            return new BigDecimal(normalizado).setScale(2, RoundingMode.HALF_UP);
         } catch (NumberFormatException e) {
             return BigDecimal.ZERO;
         }
     }
 
+    private static final Pattern DURACAO_COM_HORAS =
+            Pattern.compile("(\\d+)\\s*h(?:oras?)?\\s*(?:(\\d+)\\s*(?:min(?:utos?)?)?)?", Pattern.CASE_INSENSITIVE);
+    private static final Pattern NUMERO = Pattern.compile("\\d+");
+
+    /**
+     * Converte a duração digitada no cadastro para minutos:
+     * "45 min" = 45, "1h" = 60, "1h30" = 90, "2 horas" = 120.
+     */
     private Integer parseDuracaoMinutos(String bruto) {
         if (bruto == null) return 0;
-        Matcher matcher = Pattern.compile("\\d+").matcher(bruto);
-        return matcher.find() ? Integer.parseInt(matcher.group()) : 0;
+
+        Matcher horas = DURACAO_COM_HORAS.matcher(bruto);
+        if (horas.find()) {
+            int minutos = horas.group(2) != null ? Integer.parseInt(horas.group(2)) : 0;
+            return Integer.parseInt(horas.group(1)) * 60 + minutos;
+        }
+
+        Matcher numero = NUMERO.matcher(bruto);
+        return numero.find() ? Integer.parseInt(numero.group()) : 0;
     }
 }
