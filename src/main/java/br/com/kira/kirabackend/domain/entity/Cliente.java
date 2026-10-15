@@ -35,7 +35,7 @@ public class Cliente extends Usuario {
     private Genero genero;
 
     @Embedded
-    private transient Endereco endereco;
+    private Endereco endereco;
 
     private Double latitude;
 

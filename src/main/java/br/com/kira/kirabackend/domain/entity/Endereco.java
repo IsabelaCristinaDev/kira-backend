@@ -7,12 +7,14 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.io.Serializable;
+
 @Embeddable
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class Endereco {
+public class Endereco implements Serializable {
 
     @Column(name = "endereco_cep", length = 8)
     private String cep;

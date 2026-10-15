@@ -1,12 +1,15 @@
 package br.com.kira.kirabackend.controller;
 
+import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.dto.request.MensagemRequest;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
+import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.service.MensagemService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,7 +26,11 @@ public class MensagemController {
     @PostMapping("/remetente/{remetenteId}")
     public ResponseEntity<MensagemResponse> enviar(
             @PathVariable UUID remetenteId,
+            @AuthenticationPrincipal Usuario usuario,
             @RequestBody @Valid MensagemRequest request) {
+        if (!usuario.getId().equals(remetenteId)) {
+            throw new RegraDeNegocioException("Você só pode enviar mensagens em seu próprio nome");
+        }
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(mensagemService.enviar(remetenteId, request));
