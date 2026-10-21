@@ -1,6 +1,7 @@
 package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.Agendamento;
+import br.com.kira.kirabackend.observer.DenunciaRiscoImediatoEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
@@ -59,6 +60,60 @@ public class EmailService {
         );
         mailSender.send(message);
 
+    }
+
+    @Retryable(
+            retryFor = MailException.class,
+            maxAttemptsExpression = "${kira.lembrete.retry.max-tentativas:3}",
+            backoff = @Backoff(
+                    delayExpression = "${kira.lembrete.retry.delay-ms:2000}",
+                    multiplierExpression = "${kira.lembrete.retry.multiplicador:2}"
+            )
+    )
+    public void enviarAlertaRiscoImediato(String destinatario, DenunciaRiscoImediatoEvent denuncia) {
+        String telefone = denuncia.telefoneDenunciante() != null ? denuncia.telefoneDenunciante() : "não informado";
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(destinatario);
+        message.setSubject("KIRA — URGENTE: denúncia de risco imediato");
+        message.setText(
+                "Uma denúncia de risco imediato acabou de ser registrada.\n\n" +
+                        "Denúncia: " + denuncia.denunciaId() + "\n" +
+                        "Motivo: " + denuncia.motivo() + "\n" +
+                        "Registrada em: " + denuncia.dataCriacao().format(FORMATO_DATA_HORA) + "\n" +
+                        "Denunciante: " + denuncia.nomeDenunciante() + " (telefone: " + telefone + ")\n" +
+                        "Perfil denunciado: " + denuncia.nomeDenunciado() + "\n\n" +
+                        (denuncia.perfilSuspenso()
+                                ? "O perfil denunciado foi suspenso preventivamente. "
+                                : "O perfil denunciado NÃO foi suspenso automaticamente (fora de um atendimento em andamento). ") +
+                        "Analise a denúncia no painel administrativo o quanto antes.\n\n" +
+                        "Equipe KIRA"
+        );
+        mailSender.send(message);
+    }
+
+    @Retryable(
+            retryFor = MailException.class,
+            maxAttemptsExpression = "${kira.lembrete.retry.max-tentativas:3}",
+            backoff = @Backoff(
+                    delayExpression = "${kira.lembrete.retry.delay-ms:2000}",
+                    multiplierExpression = "${kira.lembrete.retry.multiplicador:2}"
+            )
+    )
+    public void enviarAvisoSuspensaoPreventiva(String destinatario, String nome) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(destinatario);
+        message.setSubject("KIRA — Sua conta foi suspensa preventivamente");
+        message.setText(
+                "Olá, " + nome + ".\n\n" +
+                        "Sua conta KIRA foi suspensa de forma preventiva após um relato de segurança " +
+                        "registrado durante um atendimento.\n\n" +
+                        "Esta suspensão é temporária e NÃO é uma decisão final: a equipe KIRA está analisando " +
+                        "o caso. Se o relato não se confirmar, " +
+                        "sua conta será reativada automaticamente.\n\n" +
+                        "Enquanto a análise estiver em andamento, não será possível acessar a conta.\n\n" +
+                        "Equipe KIRA"
+        );
+        mailSender.send(message);
     }
 
     public void enviarEmailBoasVindas(String destinatario, String nome) {

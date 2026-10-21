@@ -37,6 +37,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (token != null && jwtTokenProvider.tokenValido(token)) {
             var email = jwtTokenProvider.extrairEmail(token);
             UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+            // Perfil suspenso (ativo = false) perde o acesso na hora, sem esperar o token expirar.
+            if (!userDetails.isEnabled()) {
+                filterChain.doFilter(request, response);
+                return;
+            }
             var authentication = new UsernamePasswordAuthenticationToken(
                     userDetails, null, userDetails.getAuthorities());
             SecurityContextHolder.getContext().setAuthentication(authentication);
