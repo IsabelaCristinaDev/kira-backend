@@ -167,8 +167,10 @@ class RecuperacaoSenhaServiceTest {
         void tokenInvalido() {
             when(tokenRepository.findByToken("nao-existe")).thenReturn(Optional.empty());
 
+            RedefinicaoSenhaRequest req = new RedefinicaoSenhaRequest("nao-existe", "novaSenha123");
+
             RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
-                    () -> service.redefinirSenha(new RedefinicaoSenhaRequest("nao-existe", "novaSenha123")));
+                    () -> service.redefinirSenha(req));
 
             assertEquals("Token inválido", ex.getMessage());
             assertNadaAlterado();
@@ -180,8 +182,10 @@ class RecuperacaoSenhaServiceTest {
             TokenRecuperacaoSenha token = token(agora().minus(Duration.ofSeconds(1)), false);
             when(tokenRepository.findByToken("token-123")).thenReturn(Optional.of(token));
 
+            RedefinicaoSenhaRequest req = new RedefinicaoSenhaRequest("token-123", "novaSenha123");
+
             RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
-                    () -> service.redefinirSenha(new RedefinicaoSenhaRequest("token-123", "novaSenha123")));
+                    () -> service.redefinirSenha(req));
 
             assertEquals("Token expirado", ex.getMessage());
             assertFalse(token.getUsado());
@@ -194,8 +198,10 @@ class RecuperacaoSenhaServiceTest {
             TokenRecuperacaoSenha token = token(agora().plusMinutes(10), true);
             when(tokenRepository.findByToken("token-123")).thenReturn(Optional.of(token));
 
+            RedefinicaoSenhaRequest req = new RedefinicaoSenhaRequest("token-123", "novaSenha123");
+
             RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
-                    () -> service.redefinirSenha(new RedefinicaoSenhaRequest("token-123", "novaSenha123")));
+                    () -> service.redefinirSenha(req));
 
             assertEquals("Token já utilizado", ex.getMessage());
             assertNadaAlterado();
