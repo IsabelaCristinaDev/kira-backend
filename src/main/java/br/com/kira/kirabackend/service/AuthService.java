@@ -230,13 +230,17 @@ public class AuthService {
     private Integer parseDuracaoMinutos(String bruto) {
         if (bruto == null) return 0;
 
-        Matcher horas = DURACAO_COM_HORAS.matcher(bruto);
-        if (horas.find()) {
-            int minutos = horas.group(2) != null ? Integer.parseInt(horas.group(2)) : 0;
-            return Integer.parseInt(horas.group(1)) * 60 + minutos;
-        }
+        try {
+            Matcher horas = DURACAO_COM_HORAS.matcher(bruto);
+            if (horas.find()) {
+                int minutos = horas.group(2) != null ? Integer.parseInt(horas.group(2)) : 0;
+                return Math.addExact(Math.multiplyExact(Integer.parseInt(horas.group(1)), 60), minutos);
+            }
 
-        Matcher numero = NUMERO.matcher(bruto);
-        return numero.find() ? Integer.parseInt(numero.group()) : 0;
+            Matcher numero = NUMERO.matcher(bruto);
+            return numero.find() ? Integer.parseInt(numero.group()) : 0;
+        } catch (NumberFormatException | ArithmeticException e) {
+            return 0;
+        }
     }
 }
