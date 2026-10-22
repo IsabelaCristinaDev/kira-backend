@@ -220,7 +220,7 @@ public class AuthService {
     }
 
     private static final Pattern DURACAO_COM_HORAS =
-            Pattern.compile("(\\d+)\\s*h(?:oras?)?\\s*(?:(\\d+)\\s*(?:min(?:utos?)?)?)?", Pattern.CASE_INSENSITIVE);
+            Pattern.compile("(?<!\\d)(\\d++)\\s*+h(?:oras?)?\\s*+(?:(\\d++)\\s*+(?:min(?:utos?)?)?)?", Pattern.CASE_INSENSITIVE);
     private static final Pattern NUMERO = Pattern.compile("\\d+");
 
     /**
