@@ -2,7 +2,7 @@ package br.com.kira.kirabackend.controller;
 
 import br.com.kira.kirabackend.domain.entity.ComissaoAgendamento;
 import br.com.kira.kirabackend.service.ComissaoService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,10 +12,10 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/comissoes")
+@RequiredArgsConstructor
 public class ComissaoController {
 
-    @Autowired
-    private ComissaoService comissaoService;
+    private final ComissaoService comissaoService;
 
     @GetMapping("/funcionaria/{funcionariaId}")
     public ResponseEntity<List<ComissaoAgendamento>> listarPorFuncionaria(
