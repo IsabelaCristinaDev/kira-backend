@@ -73,9 +73,11 @@ class ServicoServiceTest {
     void empresaInexistente() {
         when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.empty());
 
+        UUID empresaId = empresa.getId();
+        ServicoRequest req = new ServicoRequest("Corte", null, 30, new BigDecimal("40"));
+
         assertThrows(RecursoNaoEncontradoException.class,
-                () -> service.cadastrar(empresa.getId(),
-                        new ServicoRequest("Corte", null, 30, new BigDecimal("40"))));
+                () -> service.cadastrar(empresaId, req));
         verify(servicoRepository, never()).save(any());
     }
 
@@ -114,8 +116,10 @@ class ServicoServiceTest {
         UUID id = UUID.randomUUID();
         when(servicoRepository.findById(id)).thenReturn(Optional.empty());
 
+        ServicoRequest req = new ServicoRequest("Corte", null, 30, new BigDecimal("40"));
+
         assertThrows(RecursoNaoEncontradoException.class,
-                () -> service.atualizar(id, new ServicoRequest("Corte", null, 30, new BigDecimal("40"))));
+                () -> service.atualizar(id, req));
         verify(servicoRepository, never()).save(any());
     }
 }

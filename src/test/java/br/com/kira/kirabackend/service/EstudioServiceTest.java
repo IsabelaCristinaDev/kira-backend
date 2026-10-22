@@ -152,8 +152,10 @@ class EstudioServiceTest {
     void buscarClienteComoEstudioDa404() {
         when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
 
+        UUID clienteId = cliente.getId();
+
         RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
-                () -> service.buscarPorId(cliente.getId()));
+                () -> service.buscarPorId(clienteId));
         assertEquals("Estúdio não encontrado", ex.getMessage());
     }
 
