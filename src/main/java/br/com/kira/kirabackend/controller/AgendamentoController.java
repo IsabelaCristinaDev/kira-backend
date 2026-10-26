@@ -24,28 +24,32 @@ public class AgendamentoController {
     @PostMapping("/cliente/{clienteId}")
     public ResponseEntity<AgendamentoResponse> criar(
             @PathVariable UUID clienteId,
+            @AuthenticationPrincipal Usuario usuario,
             @RequestBody @Valid AgendamentoRequest request) {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(agendamentoService.criar(clienteId, request));
+                .body(agendamentoService.criar(clienteId, usuario.getId(), request));
     }
 
     @GetMapping("/cliente/{clienteId}")
     public ResponseEntity<List<AgendamentoResponse>> listarPorCliente(
-            @PathVariable UUID clienteId) {
-        return ResponseEntity.ok(agendamentoService.listarPorCliente(clienteId));
+            @PathVariable UUID clienteId,
+            @AuthenticationPrincipal Usuario usuario) {
+        return ResponseEntity.ok(agendamentoService.listarPorCliente(clienteId, usuario.getId()));
     }
 
     @GetMapping("/empresa/{empresaId}")
     public ResponseEntity<List<AgendamentoResponse>> listarPorEmpresa(
-            @PathVariable UUID empresaId) {
-        return ResponseEntity.ok(agendamentoService.listarPorEmpresa(empresaId));
+            @PathVariable UUID empresaId,
+            @AuthenticationPrincipal Usuario usuario) {
+        return ResponseEntity.ok(agendamentoService.listarPorEmpresa(empresaId, usuario.getId()));
     }
 
     @PatchMapping("/{id}/cancelar")
     public ResponseEntity<AgendamentoResponse> cancelar(
-            @PathVariable UUID id) {
-        return ResponseEntity.ok(agendamentoService.cancelarPeloCliente(id));
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Usuario usuario) {
+        return ResponseEntity.ok(agendamentoService.cancelarPeloCliente(id, usuario.getId()));
     }
 
     @PatchMapping("/{id}/concluir")
@@ -58,15 +62,17 @@ public class AgendamentoController {
     @PatchMapping("/{id}/reagendar/cliente")
     public ResponseEntity<AgendamentoResponse> reagendarPeloCliente(
             @PathVariable UUID id,
+            @AuthenticationPrincipal Usuario usuario,
             @RequestBody @Valid ReagendamentoRequest request) {
-        return ResponseEntity.ok(agendamentoService.reagendarPeloCliente(id, request));
+        return ResponseEntity.ok(agendamentoService.reagendarPeloCliente(id, usuario.getId(), request));
     }
 
     @PatchMapping("/{id}/reagendar/empresa")
     public ResponseEntity<AgendamentoResponse> reagendarPelaEmpresa(
             @PathVariable UUID id,
+            @AuthenticationPrincipal Usuario usuario,
             @RequestBody @Valid ReagendamentoRequest request) {
-        return ResponseEntity.ok(agendamentoService.reagendarPelaEmpresa(id, request));
+        return ResponseEntity.ok(agendamentoService.reagendarPelaEmpresa(id, usuario.getId(), request));
     }
 
     @PatchMapping("/{id}/cancelar/empresa")
@@ -77,7 +83,8 @@ public class AgendamentoController {
     }
     @GetMapping("/cliente/{clienteId}/historico")
     public ResponseEntity<List<AgendamentoResponse>> historicoCliente(
-            @PathVariable UUID clienteId) {
-        return ResponseEntity.ok(agendamentoService.historicoCliente(clienteId));
+            @PathVariable UUID clienteId,
+            @AuthenticationPrincipal Usuario usuario) {
+        return ResponseEntity.ok(agendamentoService.historicoCliente(clienteId, usuario.getId()));
     }
 }

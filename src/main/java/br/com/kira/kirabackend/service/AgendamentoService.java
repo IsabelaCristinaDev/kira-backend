@@ -34,6 +34,7 @@ import java.util.UUID;
 public class AgendamentoService {
 
     private static final String AGENDAMENTO_NAO_ENCONTRADO = "Agendamento não encontrado";
+    private static final String SO_OS_SEUS_AGENDAMENTOS = "Você só pode ver os seus próprios agendamentos";
 
     private final AgendamentoRepository agendamentoRepository;
     private final UsuarioRepository usuarioRepository;
@@ -51,7 +52,8 @@ public class AgendamentoService {
                         "Nenhuma estratégia de cancelamento encontrada para o tipo: " + tipo));
     }
 
-    public AgendamentoResponse criar(UUID clienteId, AgendamentoRequest request) {
+    public AgendamentoResponse criar(UUID clienteId, UUID usuarioId, AgendamentoRequest request) {
+        exigirProprioUsuario(clienteId, usuarioId, "Você só pode agendar em seu próprio nome");
         Cliente cliente = (Cliente) usuarioRepository.findById(clienteId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Cliente não encontrado"));
 
@@ -93,23 +95,26 @@ public class AgendamentoService {
         return toResponse(salvo);
     }
 
-    public List<AgendamentoResponse> listarPorCliente(UUID clienteId) {
+    public List<AgendamentoResponse> listarPorCliente(UUID clienteId, UUID usuarioId) {
+        exigirProprioUsuario(clienteId, usuarioId, SO_OS_SEUS_AGENDAMENTOS);
         return agendamentoRepository.findByClienteId(clienteId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
     }
 
-    public List<AgendamentoResponse> listarPorEmpresa(UUID empresaId) {
+    public List<AgendamentoResponse> listarPorEmpresa(UUID empresaId, UUID usuarioId) {
+        exigirProprioUsuario(empresaId, usuarioId, SO_OS_SEUS_AGENDAMENTOS);
         return agendamentoRepository.findByEmpresaId(empresaId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
     }
 
-    public AgendamentoResponse cancelarPeloCliente(UUID agendamentoId) {
+    public AgendamentoResponse cancelarPeloCliente(UUID agendamentoId, UUID clienteId) {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
+        validarClienteDoAgendamento(agendamento, clienteId);
 
         resolverEstrategiaCancelamento(TipoUsuario.CLIENTE).validarCancelamento(agendamento);
 
@@ -155,20 +160,40 @@ public class AgendamentoService {
         }
     }
 
-    public AgendamentoResponse reagendarPeloCliente(UUID agendamentoId,
-                                                    ReagendamentoRequest request) {
-        return reagendar(agendamentoId, request);
+    /** Só a cliente do atendimento pode cancelá-lo ou reagendá-lo como cliente. */
+    private static void validarClienteDoAgendamento(Agendamento agendamento, UUID clienteId) {
+        if (!agendamento.getCliente().getId().equals(clienteId)) {
+            throw new RegraDeNegocioException("Você não participou deste atendimento");
+        }
     }
 
-    public AgendamentoResponse reagendarPelaEmpresa(UUID agendamentoId,
-                                                    ReagendamentoRequest request) {
-        return reagendar(agendamentoId, request);
+    /** O id da rota precisa ser o do usuário logado. */
+    private static void exigirProprioUsuario(UUID idDaRota, UUID usuarioId, String mensagem) {
+        if (!idDaRota.equals(usuarioId)) {
+            throw new RegraDeNegocioException(mensagem);
+        }
     }
 
-    private AgendamentoResponse reagendar(UUID agendamentoId, ReagendamentoRequest request) {
-        Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
+    public AgendamentoResponse reagendarPeloCliente(UUID agendamentoId, UUID clienteId,
+                                                    ReagendamentoRequest request) {
+        Agendamento agendamento = buscarAgendamento(agendamentoId);
+        validarClienteDoAgendamento(agendamento, clienteId);
+        return reagendar(agendamento, request);
+    }
+
+    public AgendamentoResponse reagendarPelaEmpresa(UUID agendamentoId, UUID empresaId,
+                                                    ReagendamentoRequest request) {
+        Agendamento agendamento = buscarAgendamento(agendamentoId);
+        validarEmpresaDoAgendamento(agendamento, empresaId);
+        return reagendar(agendamento, request);
+    }
+
+    private Agendamento buscarAgendamento(UUID agendamentoId) {
+        return agendamentoRepository.findById(agendamentoId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
+    }
 
+    private AgendamentoResponse reagendar(Agendamento agendamento, ReagendamentoRequest request) {
         if (agendamento.getStatus() == StatusAgendamento.CANCELADO ||
                 agendamento.getStatus() == StatusAgendamento.CONCLUIDO) {
             throw new RegraDeNegocioException("Não é possível reagendar este agendamento");
@@ -189,7 +214,8 @@ public class AgendamentoService {
 
         return toResponse(agendamentoRepository.save(agendamento));
     }
-    public List<AgendamentoResponse> historicoCliente(UUID clienteId) {
+    public List<AgendamentoResponse> historicoCliente(UUID clienteId, UUID usuarioId) {
+        exigirProprioUsuario(clienteId, usuarioId, SO_OS_SEUS_AGENDAMENTOS);
         return agendamentoRepository
                 .findByClienteIdAndStatusOrderByDataHoraInicioDesc(
                         clienteId, StatusAgendamento.CONCLUIDO)
