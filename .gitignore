@@ -46,3 +46,6 @@ backup_dados.sql
 # Dumps de banco (nunca versionar)
 *.sql
 *.dump
+
+# Configuracao local do Claude Code
+.claude/
