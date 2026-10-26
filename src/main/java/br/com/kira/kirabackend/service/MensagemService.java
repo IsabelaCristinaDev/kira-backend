@@ -34,12 +34,7 @@ public class MensagemService {
         Usuario remetente = usuarioRepository.findById(remetenteId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
 
-        boolean participa = remetenteId.equals(agendamento.getCliente().getId())
-                || remetenteId.equals(agendamento.getEmpresa().getId());
-        if (!participa) {
-            throw new RegraDeNegocioException("Você não participa deste agendamento");
-        }
-
+        validarParticipante(agendamento, remetenteId);
 
         Mensagem mensagem = new Mensagem();
         mensagem.setAgendamento(agendamento);
@@ -50,7 +45,11 @@ public class MensagemService {
         return toResponse(salva);
     }
 
-    public List<MensagemResponse> listarConversa(UUID agendamentoId) {
+    public List<MensagemResponse> listarConversa(UUID agendamentoId, UUID usuarioId) {
+        Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
+        validarParticipante(agendamento, usuarioId);
+
         return mensagemRepository
                 .findByAgendamentoIdOrderByDataEnvioAsc(agendamentoId)
                 .stream()
@@ -58,11 +57,24 @@ public class MensagemService {
                 .toList();
     }
 
-    public void marcarComoLida(UUID mensagemId) {
+    public void marcarComoLida(UUID mensagemId, UUID usuarioId) {
         Mensagem mensagem = mensagemRepository.findById(mensagemId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Mensagem não encontrada"));
+        validarParticipante(mensagem.getAgendamento(), usuarioId);
+        if (mensagem.getRemetente().getId().equals(usuarioId)) {
+            throw new RegraDeNegocioException("Só quem recebeu a mensagem pode marcá-la como lida");
+        }
         mensagem.setLida(true);
         mensagemRepository.save(mensagem);
+    }
+
+    /** Só a cliente e a empresa do agendamento podem ver e usar a conversa. */
+    private static void validarParticipante(Agendamento agendamento, UUID usuarioId) {
+        boolean participa = usuarioId.equals(agendamento.getCliente().getId())
+                || usuarioId.equals(agendamento.getEmpresa().getId());
+        if (!participa) {
+            throw new RegraDeNegocioException("Você não participa deste agendamento");
+        }
     }
 
     private MensagemResponse toResponse(Mensagem m) {
@@ -76,4 +88,4 @@ public class MensagemService {
                 m.getDataEnvio()
         );
     }
-}
+}
