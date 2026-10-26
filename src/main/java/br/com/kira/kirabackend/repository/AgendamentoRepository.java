@@ -48,4 +48,10 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID> 
             StatusAgendamento statusIgnorado,
             LocalDateTime fim,
             LocalDateTime inicio);
+
+    List<Agendamento> findByEmpresaIdAndStatusAndDataHoraInicioBetween(
+            UUID empresaId,
+            StatusAgendamento status,
+            LocalDateTime inicio,
+            LocalDateTime fim);
 }
