@@ -38,4 +38,14 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID> 
             List<StatusAgendamento> statusExcluidos,
             LocalDateTime inicio,
             LocalDateTime fim);
+
+    /**
+     * Agendamentos da empresa que se sobrepõem ao intervalo [inicio, fim),
+     * ignorando o status informado (normalmente CANCELADO).
+     */
+    List<Agendamento> findByEmpresaIdAndStatusNotAndDataHoraInicioBeforeAndDataHoraFimAfter(
+            UUID empresaId,
+            StatusAgendamento statusIgnorado,
+            LocalDateTime fim,
+            LocalDateTime inicio);
 }

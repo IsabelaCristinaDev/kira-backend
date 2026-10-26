@@ -19,7 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -37,7 +36,7 @@ public class DisponibilidadeService {
     public DisponibilidadeResponse cadastrar(UUID empresaId, DisponibilidadeRequest request) {
         Empresa empresa = (Empresa) usuarioRepository.findById(empresaId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Empresa não encontrada"));
-        if (request.horaFim().isBefore(request.horaInicio())) {
+        if (!request.horaFim().isAfter(request.horaInicio())) {
             throw new RegraDeNegocioException("Hora de fim deve ser após hora de início");
         }
 
@@ -73,23 +72,26 @@ public class DisponibilidadeService {
                 .orElseThrow(() -> new RegraDeNegocioException("Empresa não atende neste dia da semana"));
 
         var agendamentosExistentes = agendamentoRepository
-                .findByFuncionariaIdAndDataHoraInicioBetween(
-                        null,
-                        data.atStartOfDay(),
-                        data.atTime(LocalTime.MAX))
-                .stream()
-                .filter(a -> a.getEmpresa().getId().equals(empresaId))
-                .filter(a -> a.getStatus() != StatusAgendamento.CANCELADO)
-                .toList();
+                .findByEmpresaIdAndStatusNotAndDataHoraInicioBeforeAndDataHoraFimAfter(
+                        empresaId,
+                        StatusAgendamento.CANCELADO,
+                        data.plusDays(1).atStartOfDay(),
+                        data.atStartOfDay());
 
-        int duracaoMinutos = servico.getDuracaoMinutos();
+        Integer duracaoMinutos = servico.getDuracaoMinutos();
+        if (duracaoMinutos == null || duracaoMinutos <= 0) {
+            throw new RegraDeNegocioException("Serviço com duração inválida");
+        }
+
         List<SlotDisponivel> slots = new ArrayList<>();
 
-        LocalTime cursor = disponibilidade.getHoraInicio();
-        LocalTime fim = disponibilidade.getHoraFim();
+        // LocalDateTime (e não LocalTime) para não "dar a volta" na meia-noite
+        // e entrar em loop infinito em expedientes que terminam tarde.
+        LocalDateTime cursor = LocalDateTime.of(data, disponibilidade.getHoraInicio());
+        LocalDateTime fimExpediente = LocalDateTime.of(data, disponibilidade.getHoraFim());
 
-        while (!cursor.plusMinutes(duracaoMinutos).isAfter(fim)) {
-            LocalDateTime slotInicio = LocalDateTime.of(data, cursor);
+        while (!cursor.plusMinutes(duracaoMinutos).isAfter(fimExpediente)) {
+            LocalDateTime slotInicio = cursor;
             LocalDateTime slotFim = slotInicio.plusMinutes(duracaoMinutos);
 
             boolean ocupado = agendamentosExistentes.stream()
@@ -101,7 +103,7 @@ public class DisponibilidadeService {
                 slots.add(new SlotDisponivel(slotInicio, slotFim));
             }
 
-            cursor = cursor.plusMinutes(duracaoMinutos);
+            cursor = slotFim;
         }
 
         return slots;
