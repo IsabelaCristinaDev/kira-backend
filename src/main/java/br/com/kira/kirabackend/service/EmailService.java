@@ -3,6 +3,7 @@ package br.com.kira.kirabackend.service;
 import br.com.kira.kirabackend.domain.entity.Agendamento;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -23,20 +24,34 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
+    // Endereço do app web: o link de redefinição de senha abre a tela de nova senha
+    @Value("${kira.frontend-url}")
+    private String frontendUrl;
+
+    // Assíncrono e tolerante a falha: a resposta da API é a mesma exista o e-mail ou não,
+    // sem esperar o SMTP nem devolver erro quando ele falha.
+    @Async
     public void enviarEmailRecuperacaoSenha(String destinatario, String token) {
+        String link = frontendUrl.replaceAll("/+$", "") + "/redefinir-senha?token=" + token;
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(destinatario);
         message.setSubject("KIRA — Recuperação de Senha");
         message.setText(
                 "Olá!\n\n" +
                         "Recebemos uma solicitação para redefinir a senha da sua conta KIRA.\n\n" +
-                        "Use o token abaixo para redefinir sua senha:\n\n" +
+                        "Abra o link abaixo para criar uma nova senha:\n\n" +
+                        link + "\n\n" +
+                        "Se o link não abrir, use este código na tela de nova senha:\n\n" +
                         token + "\n\n" +
-                        "Este token expira em 30 minutos.\n\n" +
+                        "O link e o código expiram em 30 minutos.\n\n" +
                         "Se você não solicitou a recuperação de senha, ignore este email.\n\n" +
                         "Equipe KIRA"
         );
-        mailSender.send(message);
+        try {
+            mailSender.send(message);
+        } catch (MailException e) {
+            log.warn("Falha ao enviar e-mail de recuperação de senha para {}: {}", destinatario, e.getMessage());
+        }
     }
 
     @Retryable(
