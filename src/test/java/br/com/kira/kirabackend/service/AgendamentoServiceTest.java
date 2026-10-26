@@ -461,6 +461,43 @@ class AgendamentoServiceTest {
         }
 
         @Test
+        @DisplayName("Cliente não remarca com menos de 2 horas de antecedência")
+        void clienteNaoRemarcaEmCimaDaHora() {
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.CONFIRMADO);
+            LocalDateTime daquiAUmaHora = LocalDateTime.now(KiraTimeZone.DEFAULT).plusHours(1);
+            agendamento.setDataHoraInicio(daquiAUmaHora);
+            UUID agendamentoId = agendamento.getId();
+            UUID clienteId = cliente.getId();
+            var request = new ReagendamentoRequest(inicioValido.withHour(14), null);
+            when(agendamentoRepository.findById(agendamentoId)).thenReturn(Optional.of(agendamento));
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> service.reagendarPeloCliente(agendamentoId, clienteId, request));
+
+            assertEquals("Remarcação pelo cliente deve ser feita com no mínimo 2 horas de antecedência",
+                    ex.getMessage());
+            assertEquals(daquiAUmaHora, agendamento.getDataHoraInicio());
+            verify(agendamentoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("A empresa pode remarcar mesmo em cima da hora")
+        void empresaRemarcaEmCimaDaHora() {
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.CONFIRMADO);
+            agendamento.setDataHoraInicio(LocalDateTime.now(KiraTimeZone.DEFAULT).plusHours(1));
+            LocalDateTime novoInicio = inicioValido.withHour(14);
+            when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+            mockarExpedientePadrao();
+            mockarAgendamentosNoIntervalo(List.of());
+            mockarSaveDevolvendoArgumento();
+
+            service.reagendarPelaEmpresa(agendamento.getId(), empresa.getId(),
+                    new ReagendamentoRequest(novoInicio, null));
+
+            assertEquals(novoInicio, agendamento.getDataHoraInicio());
+        }
+
+        @Test
         @DisplayName("Reagendar não acusa conflito com o próprio agendamento")
         void deveIgnorarOProprioAgendamentoNoConflito() {
             Agendamento agendamento = agendamentoExistente(StatusAgendamento.PENDENTE);

@@ -17,6 +17,7 @@ import br.com.kira.kirabackend.repository.DisponibilidadeEstudioRepository;
 import br.com.kira.kirabackend.repository.FuncionariaRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
+import br.com.kira.kirabackend.service.strategy.CancelamentoClienteStrategy;
 import br.com.kira.kirabackend.service.strategy.CancelamentoStrategy;
 import br.com.kira.kirabackend.util.KiraTimeZone;
 import lombok.RequiredArgsConstructor;
@@ -178,6 +179,12 @@ public class AgendamentoService {
                                                     ReagendamentoRequest request) {
         Agendamento agendamento = buscarAgendamento(agendamentoId);
         validarClienteDoAgendamento(agendamento, clienteId);
+        // Mesmo prazo do cancelamento: sem isso, remarcar em cima da hora liberaria a vaga sem antecedência
+        if (agendamento.getDataHoraInicio().isBefore(LocalDateTime.now(KiraTimeZone.DEFAULT)
+                .plusHours(CancelamentoClienteStrategy.ANTECEDENCIA_MINIMA_HORAS))) {
+            throw new RegraDeNegocioException("Remarcação pelo cliente deve ser feita com no mínimo "
+                    + CancelamentoClienteStrategy.ANTECEDENCIA_MINIMA_HORAS + " horas de antecedência");
+        }
         return reagendar(agendamento, request);
     }
 
