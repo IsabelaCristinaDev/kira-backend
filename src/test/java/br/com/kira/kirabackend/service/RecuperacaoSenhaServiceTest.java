@@ -90,7 +90,7 @@ class RecuperacaoSenhaServiceTest {
         @Test
         @DisplayName("E-mail inexistente não dá erro nem envia nada, para não revelar quais e-mails estão cadastrados")
         void emailInexistenteNaoRevelaNada() {
-            when(usuarioRepository.findByEmail("ninguem@teste.com")).thenReturn(Optional.empty());
+            when(usuarioRepository.findByEmailIgnoreCase("ninguem@teste.com")).thenReturn(Optional.empty());
 
             assertDoesNotThrow(() -> service.solicitarRecuperacao(new RecuperacaoSenhaRequest("ninguem@teste.com")));
 
@@ -100,7 +100,7 @@ class RecuperacaoSenhaServiceTest {
         @Test
         @DisplayName("Gera token válido por 30 minutos, apaga os anteriores e envia o e-mail")
         void geraTokenApagaAnterioresEEnviaEmail() {
-            when(usuarioRepository.findByEmail("ana@teste.com")).thenReturn(Optional.of(usuario));
+            when(usuarioRepository.findByEmailIgnoreCase("ana@teste.com")).thenReturn(Optional.of(usuario));
             LocalDateTime antes = agora();
 
             service.solicitarRecuperacao(new RecuperacaoSenhaRequest("ana@teste.com"));
@@ -128,7 +128,7 @@ class RecuperacaoSenhaServiceTest {
         @Test
         @DisplayName("Cada solicitação gera um token diferente")
         void cadaSolicitacaoGeraTokenDiferente() {
-            when(usuarioRepository.findByEmail("ana@teste.com")).thenReturn(Optional.of(usuario));
+            when(usuarioRepository.findByEmailIgnoreCase("ana@teste.com")).thenReturn(Optional.of(usuario));
 
             service.solicitarRecuperacao(new RecuperacaoSenhaRequest("ana@teste.com"));
             service.solicitarRecuperacao(new RecuperacaoSenhaRequest("ana@teste.com"));
