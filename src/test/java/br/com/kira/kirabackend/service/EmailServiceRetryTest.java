@@ -32,7 +32,7 @@ import static org.mockito.Mockito.verify;
                 "kira.lembrete.retry.multiplicador=1"
         }
 )
-class EmailServiceRetryTest {
+class  EmailServiceRetryTest {
 
     @Configuration
     @EnableRetry
@@ -81,8 +81,9 @@ class EmailServiceRetryTest {
     void deveEsgotarTentativasEPropagarExcecao() {
         doThrow(new MailSendException("falha persistente")).when(mailSender).send(any(SimpleMailMessage.class));
 
+        var agendamento = novoAgendamento();
         assertThrows(MailSendException.class,
-                () -> emailService.enviarLembreteAgendamento("cliente@teste.com", novoAgendamento()));
+                () -> emailService.enviarLembreteAgendamento("cliente@teste.com", agendamento));
 
         verify(mailSender, times(3)).send(any(SimpleMailMessage.class));
     }
