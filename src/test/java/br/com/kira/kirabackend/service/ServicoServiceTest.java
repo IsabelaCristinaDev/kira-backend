@@ -85,9 +85,10 @@ class ServicoServiceTest {
         Servico servico = new Servico();
         servico.setId(UUID.randomUUID());
         servico.setAtivo(true);
+        servico.setEmpresa(empresa);
         when(servicoRepository.findById(servico.getId())).thenReturn(Optional.of(servico));
 
-        service.desativar(servico.getId());
+        service.desativar(empresa.getId(), servico.getId());
 
         assertFalse(servico.getAtivo());
         verify(servicoRepository).save(servico);
@@ -101,8 +102,9 @@ class ServicoServiceTest {
         UUID id = UUID.randomUUID();
         when(servicoRepository.findById(id)).thenReturn(Optional.empty());
 
+        UUID empresaId = empresa.getId();
         RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
-                () -> service.desativar(id));
+                () -> service.desativar(empresaId, id));
 
         assertEquals("Serviço não encontrado", ex.getMessage());
         verify(servicoRepository, never()).save(any());
@@ -114,8 +116,29 @@ class ServicoServiceTest {
         UUID id = UUID.randomUUID();
         when(servicoRepository.findById(id)).thenReturn(Optional.empty());
 
-        assertThrows(RecursoNaoEncontradoException.class,
-                () -> service.atualizar(id, new ServicoRequest("Corte", null, 30, new BigDecimal("40"))));
+        UUID empresaId = empresa.getId();
+        ServicoRequest request = new ServicoRequest("Corte", null, 30, new BigDecimal("40"));
+        assertThrows(RecursoNaoEncontradoException.class, () -> service.atualizar(empresaId, id, request));
+        verify(servicoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Serviço de outra empresa não é alterado nem desativado pela rota desta")
+    void naoMexeEmServicoDeOutraEmpresa() {
+        Empresa outra = new Empresa();
+        outra.setId(UUID.randomUUID());
+        Servico servico = new Servico();
+        servico.setId(UUID.randomUUID());
+        servico.setAtivo(true);
+        servico.setEmpresa(outra);
+        UUID servicoId = servico.getId();
+        UUID empresaId = empresa.getId();
+        ServicoRequest request = new ServicoRequest("Corte", null, 30, new BigDecimal("40"));
+        when(servicoRepository.findById(servicoId)).thenReturn(Optional.of(servico));
+
+        assertThrows(RecursoNaoEncontradoException.class, () -> service.atualizar(empresaId, servicoId, request));
+        assertThrows(RecursoNaoEncontradoException.class, () -> service.desativar(empresaId, servicoId));
+        assertTrue(servico.getAtivo());
         verify(servicoRepository, never()).save(any());
     }
 }
