@@ -119,9 +119,10 @@ public class AgendamentoService {
         return toResponse(salvo);
     }
 
-    public AgendamentoResponse cancelarPelaEmpresa(UUID agendamentoId) {
+    public AgendamentoResponse cancelarPelaEmpresa(UUID agendamentoId, UUID empresaId) {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
+        validarEmpresaDoAgendamento(agendamento, empresaId);
 
         resolverEstrategiaCancelamento(TipoUsuario.EMPRESA).validarCancelamento(agendamento);
 
@@ -131,9 +132,10 @@ public class AgendamentoService {
         return toResponse(salvo);
     }
 
-    public AgendamentoResponse concluir(UUID agendamentoId) {
+    public AgendamentoResponse concluir(UUID agendamentoId, UUID empresaId) {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
+        validarEmpresaDoAgendamento(agendamento, empresaId);
 
         if (agendamento.getStatus() == StatusAgendamento.CANCELADO ||
                 agendamento.getStatus() == StatusAgendamento.CONCLUIDO) {
@@ -144,6 +146,13 @@ public class AgendamentoService {
         Agendamento salvo = agendamentoRepository.save(agendamento);
         eventPublisher.publishEvent(new AtendimentoConcluidoEvent(this, salvo));
         return toResponse(salvo);
+    }
+
+    /** Só a empresa dona do atendimento pode concluí-lo ou cancelá-lo como empresa. */
+    private static void validarEmpresaDoAgendamento(Agendamento agendamento, UUID empresaId) {
+        if (!agendamento.getEmpresa().getId().equals(empresaId)) {
+            throw new RegraDeNegocioException("Este atendimento não pertence ao seu estabelecimento");
+        }
     }
 
     public AgendamentoResponse reagendarPeloCliente(UUID agendamentoId,

@@ -380,7 +380,7 @@ class AgendamentoServiceTest {
             when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
             mockarSaveDevolvendoArgumento();
 
-            AgendamentoResponse response = service.concluir(agendamento.getId());
+            AgendamentoResponse response = service.concluir(agendamento.getId(), empresa.getId());
 
             assertEquals(StatusAgendamento.CONCLUIDO, response.status());
             assertEquals(StatusAgendamento.CONCLUIDO, agendamento.getStatus());
@@ -399,7 +399,7 @@ class AgendamentoServiceTest {
             Agendamento agendamento = agendamentoExistente(status);
             when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
 
-            assertThrows(RegraDeNegocioException.class, () -> service.concluir(agendamento.getId()));
+            assertThrows(RegraDeNegocioException.class, () -> service.concluir(agendamento.getId(), empresa.getId()));
 
             assertEquals(status, agendamento.getStatus());
             verify(agendamentoRepository, never()).save(any());
@@ -412,7 +412,24 @@ class AgendamentoServiceTest {
             UUID id = UUID.randomUUID();
             when(agendamentoRepository.findById(id)).thenReturn(Optional.empty());
 
-            assertThrows(RecursoNaoEncontradoException.class, () -> service.concluir(id));
+            assertThrows(RecursoNaoEncontradoException.class, () -> service.concluir(id, empresa.getId()));
+        }
+
+        @Test
+        @DisplayName("Outra empresa não pode concluir o atendimento")
+        void outraEmpresaNaoPodeConcluir() {
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.CONFIRMADO);
+            UUID agendamentoId = agendamento.getId();
+            UUID outraEmpresa = UUID.randomUUID();
+            when(agendamentoRepository.findById(agendamentoId)).thenReturn(Optional.of(agendamento));
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> service.concluir(agendamentoId, outraEmpresa));
+
+            assertEquals("Este atendimento não pertence ao seu estabelecimento", ex.getMessage());
+            assertEquals(StatusAgendamento.CONFIRMADO, agendamento.getStatus());
+            verify(agendamentoRepository, never()).save(any());
+            verifyNoInteractions(eventPublisher);
         }
     }
 
@@ -529,7 +546,7 @@ class AgendamentoServiceTest {
             when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
             mockarSaveDevolvendoArgumento();
 
-            AgendamentoResponse response = service.cancelarPelaEmpresa(agendamento.getId());
+            AgendamentoResponse response = service.cancelarPelaEmpresa(agendamento.getId(), empresa.getId());
 
             verify(cancelamentoEmpresaStrategy).validarCancelamento(agendamento);
             verify(cancelamentoClienteStrategy, never()).validarCancelamento(any());
@@ -549,6 +566,23 @@ class AgendamentoServiceTest {
                     () -> service.cancelarPeloCliente(agendamento.getId()));
 
             assertEquals(StatusAgendamento.PENDENTE, agendamento.getStatus());
+            verify(agendamentoRepository, never()).save(any());
+            verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        @DisplayName("Outra empresa não pode cancelar o atendimento como empresa")
+        void outraEmpresaNaoPodeCancelar() {
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.PENDENTE);
+            UUID agendamentoId = agendamento.getId();
+            UUID outraEmpresa = UUID.randomUUID();
+            when(agendamentoRepository.findById(agendamentoId)).thenReturn(Optional.of(agendamento));
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> service.cancelarPelaEmpresa(agendamentoId, outraEmpresa));
+
+            assertEquals("Este atendimento não pertence ao seu estabelecimento", ex.getMessage());
+            verify(cancelamentoEmpresaStrategy, never()).validarCancelamento(any());
             verify(agendamentoRepository, never()).save(any());
             verifyNoInteractions(eventPublisher);
         }
