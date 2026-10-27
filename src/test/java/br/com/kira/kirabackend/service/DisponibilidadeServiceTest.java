@@ -43,6 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -342,6 +343,105 @@ class DisponibilidadeServiceTest {
             assertThrows(RecursoNaoEncontradoException.class,
                     () -> service.cadastrar(empresaId, req));
             verify(disponibilidadeRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Dia que já tem expediente é atualizado, sem criar outro registro")
+        void diaExistenteEhAtualizado() {
+            DisponibilidadeEstudio existente = new DisponibilidadeEstudio();
+            existente.setId(UUID.randomUUID());
+            existente.setEmpresa(empresa);
+            existente.setDiaSemana(DiaSemana.TERCA);
+            existente.setHoraInicio(hora(8, 0));
+            existente.setHoraFim(hora(12, 0));
+            when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+            when(disponibilidadeRepository.findByEmpresaIdAndDiaSemana(empresa.getId(), DiaSemana.TERCA))
+                    .thenReturn(Optional.of(existente));
+            when(disponibilidadeRepository.save(existente)).thenReturn(existente);
+
+            DisponibilidadeResponse response = service.cadastrar(empresa.getId(),
+                    new DisponibilidadeRequest(DiaSemana.TERCA, hora(9, 0), hora(18, 0)));
+
+            assertEquals(existente.getId(), response.id());
+            assertEquals(hora(9, 0), response.horaInicio());
+            assertEquals(hora(18, 0), response.horaFim());
+        }
+    }
+
+    // ---------- substituirSemana ----------
+
+    @Nested
+    @DisplayName("substituirSemana")
+    class SubstituirSemana {
+
+        private List<DisponibilidadeResponse> substituir(DisponibilidadeRequest... dias) {
+            return service.substituirSemana(empresa.getId(), empresa.getId(), List.of(dias));
+        }
+
+        @Test
+        @DisplayName("Apaga a semana antiga e grava os dias enviados, em ordem de dia")
+        void deveTrocarASemana() {
+            DisponibilidadeEstudio antiga = new DisponibilidadeEstudio();
+            when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+            when(disponibilidadeRepository.findByEmpresaId(empresa.getId())).thenReturn(List.of(antiga));
+            when(disponibilidadeRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+            List<DisponibilidadeResponse> semana = substituir(
+                    new DisponibilidadeRequest(DiaSemana.SEXTA, hora(9, 0), hora(18, 0)),
+                    new DisponibilidadeRequest(DiaSemana.SEGUNDA, hora(10, 0), hora(16, 0)));
+
+            assertEquals(List.of(DiaSemana.SEGUNDA, DiaSemana.SEXTA),
+                    semana.stream().map(DisponibilidadeResponse::diaSemana).toList());
+            var ordem = inOrder(disponibilidadeRepository);
+            ordem.verify(disponibilidadeRepository).deleteAll(List.of(antiga));
+            ordem.verify(disponibilidadeRepository).flush();
+            ordem.verify(disponibilidadeRepository).saveAll(any());
+        }
+
+        @Test
+        @DisplayName("Lista vazia fecha todos os dias")
+        void listaVaziaFechaTudo() {
+            when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+            when(disponibilidadeRepository.findByEmpresaId(empresa.getId())).thenReturn(List.of());
+            when(disponibilidadeRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+            assertTrue(substituir().isEmpty());
+            verify(disponibilidadeRepository).deleteAll(List.of());
+        }
+
+        @Test
+        @DisplayName("Outro usuário não pode alterar o horário da empresa")
+        void outroUsuarioNaoPodeAlterar() {
+            UUID outroUsuario = UUID.randomUUID();
+            List<DisponibilidadeRequest> dias = List.of();
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> service.substituirSemana(empresa.getId(), outroUsuario, dias));
+            assertEquals("Você só pode alterar o horário do seu estabelecimento", ex.getMessage());
+            verify(disponibilidadeRepository, never()).saveAll(any());
+        }
+
+        @Test
+        @DisplayName("Dia repetido dá erro e não apaga nada")
+        void diaRepetidoDaErro() {
+            when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+            var segunda = new DisponibilidadeRequest(DiaSemana.SEGUNDA, hora(9, 0), hora(12, 0));
+            var segundaTarde = new DisponibilidadeRequest(DiaSemana.SEGUNDA, hora(14, 0), hora(18, 0));
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> substituir(segunda, segundaTarde));
+            assertEquals("Dia da semana repetido: SEGUNDA", ex.getMessage());
+            verify(disponibilidadeRepository, never()).deleteAll(any());
+        }
+
+        @Test
+        @DisplayName("Fim antes do início dá erro e não apaga nada")
+        void fimAntesDoInicioDaErro() {
+            when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+            var invertido = new DisponibilidadeRequest(DiaSemana.SEGUNDA, hora(18, 0), hora(9, 0));
+
+            assertThrows(RegraDeNegocioException.class, () -> substituir(invertido));
+            verify(disponibilidadeRepository, never()).deleteAll(any());
         }
     }
 }

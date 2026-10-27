@@ -20,7 +20,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @RequiredArgsConstructor
@@ -33,14 +36,17 @@ public class DisponibilidadeService {
     private final ServicoRepository servicoRepository;
     private final UsuarioRepository usuarioRepository;
 
+    /**
+     * Cadastra o expediente de um dia. Se o dia já tiver expediente, ele é atualizado:
+     * o cálculo de horários livres espera no máximo um registro por dia.
+     */
     public DisponibilidadeResponse cadastrar(UUID empresaId, DisponibilidadeRequest request) {
-        Empresa empresa = (Empresa) usuarioRepository.findById(empresaId)
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Empresa não encontrada"));
-        if (!request.horaFim().isAfter(request.horaInicio())) {
-            throw new RegraDeNegocioException("Hora de fim deve ser após hora de início");
-        }
+        Empresa empresa = buscarEmpresa(empresaId);
+        validarHorario(request);
 
-        DisponibilidadeEstudio disponibilidade = new DisponibilidadeEstudio();
+        DisponibilidadeEstudio disponibilidade = disponibilidadeRepository
+                .findByEmpresaIdAndDiaSemana(empresaId, request.diaSemana())
+                .orElseGet(DisponibilidadeEstudio::new);
         disponibilidade.setEmpresa(empresa);
         disponibilidade.setDiaSemana(request.diaSemana());
         disponibilidade.setHoraInicio(request.horaInicio());
@@ -50,11 +56,65 @@ public class DisponibilidadeService {
         return toResponse(salva);
     }
 
+    /**
+     * Troca o horário de funcionamento da semana inteira. Dia fora da lista fica fechado.
+     * Só a própria empresa pode alterar o seu horário.
+     */
+    public List<DisponibilidadeResponse> substituirSemana(
+            UUID empresaId,
+            UUID usuarioId,
+            List<DisponibilidadeRequest> dias) {
+
+        if (!empresaId.equals(usuarioId)) {
+            throw new RegraDeNegocioException("Você só pode alterar o horário do seu estabelecimento");
+        }
+        Empresa empresa = buscarEmpresa(empresaId);
+
+        Set<DiaSemana> vistos = EnumSet.noneOf(DiaSemana.class);
+        for (DisponibilidadeRequest dia : dias) {
+            validarHorario(dia);
+            if (!vistos.add(dia.diaSemana())) {
+                throw new RegraDeNegocioException("Dia da semana repetido: " + dia.diaSemana());
+            }
+        }
+
+        disponibilidadeRepository.deleteAll(disponibilidadeRepository.findByEmpresaId(empresaId));
+        // Apaga antes de inserir: sem o flush o Hibernate faria os inserts primeiro
+        disponibilidadeRepository.flush();
+
+        List<DisponibilidadeEstudio> novos = dias.stream().map(dia -> {
+            DisponibilidadeEstudio disponibilidade = new DisponibilidadeEstudio();
+            disponibilidade.setEmpresa(empresa);
+            disponibilidade.setDiaSemana(dia.diaSemana());
+            disponibilidade.setHoraInicio(dia.horaInicio());
+            disponibilidade.setHoraFim(dia.horaFim());
+            return disponibilidade;
+        }).toList();
+
+        return disponibilidadeRepository.saveAll(novos)
+                .stream()
+                .sorted(Comparator.comparing(DisponibilidadeEstudio::getDiaSemana))
+                .map(this::toResponse)
+                .toList();
+    }
+
     public List<DisponibilidadeResponse> listarPorEmpresa(UUID empresaId) {
         return disponibilidadeRepository.findByEmpresaId(empresaId)
                 .stream()
+                .sorted(Comparator.comparing(DisponibilidadeEstudio::getDiaSemana))
                 .map(this::toResponse)
                 .toList();
+    }
+
+    private Empresa buscarEmpresa(UUID empresaId) {
+        return (Empresa) usuarioRepository.findById(empresaId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Empresa não encontrada"));
+    }
+
+    private static void validarHorario(DisponibilidadeRequest request) {
+        if (!request.horaFim().isAfter(request.horaInicio())) {
+            throw new RegraDeNegocioException("Hora de fim deve ser após hora de início");
+        }
     }
 
     public List<SlotDisponivel> calcularSlotsDisponiveis(
