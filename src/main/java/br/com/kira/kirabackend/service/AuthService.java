@@ -12,6 +12,7 @@ import br.com.kira.kirabackend.dto.request.LoginRequest;
 import br.com.kira.kirabackend.dto.request.RefreshTokenRequest;
 import br.com.kira.kirabackend.dto.request.ServicoRegistroRequest;
 import br.com.kira.kirabackend.dto.response.LoginResponse;
+import br.com.kira.kirabackend.exception.DocumentoJaCadastradoException;
 import br.com.kira.kirabackend.exception.EmailJaCadastradoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.RefreshTokenRepository;
@@ -32,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -58,7 +60,7 @@ public class AuthService {
                 data.email(), data.senha());
         var auth = authenticationManager.authenticate(usernamePassword);
 
-        var usuario = usuarioRepository.findByEmail(data.email())
+        var usuario = usuarioRepository.findByEmailIgnoreCase(data.email())
                 .orElseThrow();
 
         String tipoUsuario = usuario.getClass().getSimpleName().toUpperCase();
@@ -112,13 +114,17 @@ public class AuthService {
     }
 
     public void registrarCliente(ClienteRegistroRequest data) {
-        if (usuarioRepository.existsByEmail(data.email())) {
+        String email = normalizarEmail(data.email());
+        if (usuarioRepository.existsByEmailIgnoreCase(email)) {
             throw new EmailJaCadastradoException();
+        }
+        if (usuarioRepository.existsClienteByCpf(data.cpf())) {
+            throw new DocumentoJaCadastradoException("CPF já cadastrado");
         }
 
         Cliente cliente = new Cliente();
         cliente.setNome(data.nome());
-        cliente.setEmail(data.email());
+        cliente.setEmail(email);
         cliente.setSenhaHash(passwordEncoder.encode(data.senha()));
         cliente.setTelefone(data.telefone());
         cliente.setCpf(data.cpf());
@@ -146,17 +152,28 @@ public class AuthService {
 
     @Transactional
     public void registrarEmpresa(EmpresaRegistroRequest data) {
-        if (usuarioRepository.existsByEmail(data.email())) {
+        String email = normalizarEmail(data.email());
+        // CNPJ e CPF são opcionais; texto vazio vira null para não colidir na restrição unique do banco
+        String cnpj = vazioParaNulo(data.cnpj());
+        String cpf = vazioParaNulo(data.cpf());
+
+        if (usuarioRepository.existsByEmailIgnoreCase(email)) {
             throw new EmailJaCadastradoException();
+        }
+        if (cnpj != null && usuarioRepository.existsEmpresaByCnpj(cnpj)) {
+            throw new DocumentoJaCadastradoException("CNPJ já cadastrado");
+        }
+        if (cpf != null && usuarioRepository.existsEmpresaByCpf(cpf)) {
+            throw new DocumentoJaCadastradoException("CPF já cadastrado");
         }
 
         Empresa empresa = new Empresa();
         empresa.setNome(data.nome());
-        empresa.setEmail(data.email());
+        empresa.setEmail(email);
         empresa.setSenhaHash(passwordEncoder.encode(data.senha()));
         empresa.setTelefone(data.telefone());
-        empresa.setCnpj(data.cnpj());
-        empresa.setCpf(data.cpf());
+        empresa.setCnpj(cnpj);
+        empresa.setCpf(cpf);
         empresa.setDescricao(data.descricao());
         empresa.setDataNascimento(data.dataNascimento());
         empresa.setLatitude(data.latitude());
@@ -192,6 +209,14 @@ public class AuthService {
                 servicoRepository.save(servico);
             }
         }
+    }
+
+    private static String normalizarEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static String vazioParaNulo(String valor) {
+        return valor == null || valor.isBlank() ? null : valor.trim();
     }
 
     /**

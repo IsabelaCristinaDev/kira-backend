@@ -73,6 +73,20 @@ public class GlobalExceptionHandler {
                         null));
     }
 
+    @ExceptionHandler(DocumentoJaCadastradoException.class)
+    public ResponseEntity<ErroResponse> handleDocumentoJaCadastrado(
+            DocumentoJaCadastradoException ex,
+            HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErroResponse(
+                        LocalDateTime.now(KiraTimeZone.DEFAULT),
+                        409,
+                        "DOCUMENTO_JA_CADASTRADO",
+                        ex.getMessage(),
+                        request.getRequestURI(),
+                        null));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErroResponse> handleValidacao(
             MethodArgumentNotValidException ex,

@@ -47,6 +47,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/avaliacoes/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/empresas/**").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers(
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**"
+                        ).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/admin/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/auth/recuperar-senha").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/redefinir-senha").permitAll()

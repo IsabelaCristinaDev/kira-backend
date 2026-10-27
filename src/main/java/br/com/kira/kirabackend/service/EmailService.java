@@ -2,15 +2,18 @@ package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.Agendamento;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.format.DateTimeFormatter;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EmailService {
@@ -61,6 +64,9 @@ public class EmailService {
 
     }
 
+    // Assíncrono e tolerante a falha: o cadastro não deve travar nem falhar
+    // por indisponibilidade do servidor SMTP.
+    @Async
     public void enviarEmailBoasVindas(String destinatario, String nome) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(destinatario);
@@ -75,6 +81,10 @@ public class EmailService {
                         "Acesse agora e comece a usar!\n\n" +
                         "Equipe KIRA"
         );
-        mailSender.send(message);
+        try {
+            mailSender.send(message);
+        } catch (MailException e) {
+            log.warn("Falha ao enviar e-mail de boas-vindas para {}: {}", destinatario, e.getMessage());
+        }
     }
 }

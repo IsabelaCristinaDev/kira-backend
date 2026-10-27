@@ -28,7 +28,7 @@ public class RecuperacaoSenhaService {
     private final PasswordEncoder passwordEncoder;
 
     public void solicitarRecuperacao(RecuperacaoSenhaRequest request) {
-        var usuario = usuarioRepository.findByEmail(request.email())
+        var usuario = usuarioRepository.findByEmailIgnoreCase(request.email())
                 .orElse(null);
 
         if (usuario == null) {
