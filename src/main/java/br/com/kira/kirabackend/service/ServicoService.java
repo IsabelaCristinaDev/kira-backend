@@ -43,9 +43,8 @@ public class ServicoService {
                 .toList();
     }
 
-    public ServicoResponse atualizar(UUID id, ServicoRequest request) {
-        Servico servico = servicoRepository.findById(id)
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Serviço não encontrado"));
+    public ServicoResponse atualizar(UUID empresaId, UUID id, ServicoRequest request) {
+        Servico servico = buscarDaEmpresa(empresaId, id);
         servico.setNome(request.nome());
         servico.setDescricao(request.descricao());
         servico.setDuracaoMinutos(request.duracaoMinutos());
@@ -55,12 +54,18 @@ public class ServicoService {
         return toResponse(salvo);
     }
 
-    public void desativar(UUID id) {
-        Servico servico = servicoRepository.findById(id)
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Serviço não encontrado"));
+    public void desativar(UUID empresaId, UUID id) {
+        Servico servico = buscarDaEmpresa(empresaId, id);
 
         servico.setAtivo(false);
         servicoRepository.save(servico);
+    }
+
+    /** Serviço de outra empresa é tratado como inexistente na rota desta empresa. */
+    private Servico buscarDaEmpresa(UUID empresaId, UUID id) {
+        return servicoRepository.findById(id)
+                .filter(s -> s.getEmpresa() != null && empresaId.equals(s.getEmpresa().getId()))
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Serviço não encontrado"));
     }
 
     private ServicoResponse toResponse(Servico servico) {

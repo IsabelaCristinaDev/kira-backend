@@ -182,44 +182,97 @@ class MensagemServiceTest {
 
     // ---------- listar conversa ----------
 
-    @Test
-    @DisplayName("Listar conversa devolve as mensagens do agendamento na ordem de envio")
-    void listarConversa() {
-        LocalDateTime agora = LocalDateTime.of(2026, 10, 15, 14, 0);
-        when(mensagemRepository.findByAgendamentoIdOrderByDataEnvioAsc(agendamento.getId()))
-                .thenReturn(List.of(
-                        mensagem(cliente, "Oi, tudo bem?", agora),
-                        mensagem(empresa, "Tudo! Como posso ajudar?", agora.plusMinutes(2))));
+    @Nested
+    @DisplayName("listarConversa")
+    class ListarConversa {
 
-        List<MensagemResponse> conversa = service.listarConversa(agendamento.getId());
+        @BeforeEach
+        void mockarAgendamento() {
+            when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+        }
 
-        assertEquals(List.of("Oi, tudo bem?", "Tudo! Como posso ajudar?"),
-                conversa.stream().map(MensagemResponse::conteudo).toList());
-        assertEquals(List.of("Ana", "Estúdio Kira"),
-                conversa.stream().map(MensagemResponse::nomeRemetente).toList());
-        assertTrue(conversa.stream().allMatch(m -> m.agendamentoId().equals(agendamento.getId())));
+        @Test
+        @DisplayName("Cliente do agendamento vê as mensagens na ordem de envio")
+        void listarConversa() {
+            LocalDateTime agora = LocalDateTime.of(2026, 10, 15, 14, 0);
+            when(mensagemRepository.findByAgendamentoIdOrderByDataEnvioAsc(agendamento.getId()))
+                    .thenReturn(List.of(
+                            mensagem(cliente, "Oi, tudo bem?", agora),
+                            mensagem(empresa, "Tudo! Como posso ajudar?", agora.plusMinutes(2))));
+
+            List<MensagemResponse> conversa = service.listarConversa(agendamento.getId(), cliente.getId());
+
+            assertEquals(List.of("Oi, tudo bem?", "Tudo! Como posso ajudar?"),
+                    conversa.stream().map(MensagemResponse::conteudo).toList());
+            assertEquals(List.of("Ana", "Estúdio Kira"),
+                    conversa.stream().map(MensagemResponse::nomeRemetente).toList());
+            assertTrue(conversa.stream().allMatch(m -> m.agendamentoId().equals(agendamento.getId())));
+        }
+
+        @Test
+        @DisplayName("Empresa do agendamento também vê a conversa")
+        void empresaVeConversa() {
+            when(mensagemRepository.findByAgendamentoIdOrderByDataEnvioAsc(agendamento.getId())).thenReturn(List.of());
+
+            assertTrue(service.listarConversa(agendamento.getId(), empresa.getId()).isEmpty());
+        }
+
+        @Test
+        @DisplayName("Quem não participa do agendamento não vê a conversa")
+        void usuarioDeForaNaoVe() {
+            UUID outroUsuario = UUID.randomUUID();
+
+            assertThrows(RegraDeNegocioException.class,
+                    () -> service.listarConversa(agendamento.getId(), outroUsuario));
+            verify(mensagemRepository, never()).findByAgendamentoIdOrderByDataEnvioAsc(any());
+        }
     }
 
     @Test
-    @DisplayName("Conversa sem mensagens devolve lista vazia")
-    void listarConversaVazia() {
-        when(mensagemRepository.findByAgendamentoIdOrderByDataEnvioAsc(agendamento.getId())).thenReturn(List.of());
+    @DisplayName("Listar conversa de agendamento inexistente dá 404")
+    void listarConversaAgendamentoInexistente() {
+        when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.empty());
 
-        assertTrue(service.listarConversa(agendamento.getId()).isEmpty());
+        assertThrows(RecursoNaoEncontradoException.class,
+                () -> service.listarConversa(agendamento.getId(), cliente.getId()));
     }
 
     // ---------- marcar como lida ----------
 
     @Test
-    @DisplayName("Marcar mensagem como lida muda o status e salva")
+    @DisplayName("Destinatária marca a mensagem como lida")
     void marcarComoLida() {
         Mensagem mensagem = mensagem(cliente, "Oi", LocalDateTime.now());
         when(mensagemRepository.findById(mensagem.getId())).thenReturn(Optional.of(mensagem));
 
-        service.marcarComoLida(mensagem.getId());
+        service.marcarComoLida(mensagem.getId(), empresa.getId());
 
         assertTrue(mensagem.getLida());
         verify(mensagemRepository).save(mensagem);
+    }
+
+    @Test
+    @DisplayName("Quem enviou não pode marcar a própria mensagem como lida")
+    void remetenteNaoMarcaComoLida() {
+        Mensagem mensagem = mensagem(cliente, "Oi", LocalDateTime.now());
+        when(mensagemRepository.findById(mensagem.getId())).thenReturn(Optional.of(mensagem));
+
+        assertThrows(RegraDeNegocioException.class,
+                () -> service.marcarComoLida(mensagem.getId(), cliente.getId()));
+        assertFalse(mensagem.getLida());
+        verify(mensagemRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Quem não participa do agendamento não marca mensagem como lida")
+    void usuarioDeForaNaoMarcaComoLida() {
+        Mensagem mensagem = mensagem(cliente, "Oi", LocalDateTime.now());
+        when(mensagemRepository.findById(mensagem.getId())).thenReturn(Optional.of(mensagem));
+
+        assertThrows(RegraDeNegocioException.class,
+                () -> service.marcarComoLida(mensagem.getId(), UUID.randomUUID()));
+        assertFalse(mensagem.getLida());
+        verify(mensagemRepository, never()).save(any());
     }
 
     @Test
@@ -228,7 +281,7 @@ class MensagemServiceTest {
         UUID id = UUID.randomUUID();
         when(mensagemRepository.findById(id)).thenReturn(Optional.empty());
 
-        assertThrows(RecursoNaoEncontradoException.class, () -> service.marcarComoLida(id));
+        assertThrows(RecursoNaoEncontradoException.class, () -> service.marcarComoLida(id, cliente.getId()));
         verify(mensagemRepository, never()).save(any());
     }
 }

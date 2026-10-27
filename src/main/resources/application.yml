@@ -44,6 +44,8 @@ jwt:
   refresh-expiration: ${JWT_REFRESH_EXPIRATION}
 
 kira:
+  # Endereço do app web, usado no link do e-mail de recuperação de senha
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
   lembrete:
     antecedencia-horas: ${LEMBRETE_ANTECEDENCIA_HORAS:24}
     cron: ${LEMBRETE_CRON:0 0 * * * *}

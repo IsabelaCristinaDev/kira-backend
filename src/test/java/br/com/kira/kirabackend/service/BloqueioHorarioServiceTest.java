@@ -98,9 +98,11 @@ class BloqueioHorarioServiceTest {
     @DisplayName("Remover um bloqueio existente apaga o registro")
     void removerBloqueioExistente() {
         UUID id = UUID.randomUUID();
-        when(bloqueioHorarioRepository.findById(id)).thenReturn(Optional.of(new BloqueioHorario()));
+        BloqueioHorario bloqueio = new BloqueioHorario();
+        bloqueio.setFuncionaria(funcionaria);
+        when(bloqueioHorarioRepository.findById(id)).thenReturn(Optional.of(bloqueio));
 
-        service.remover(id);
+        service.remover(funcionaria.getId(), id);
 
         verify(bloqueioHorarioRepository).deleteById(id);
     }
@@ -111,10 +113,26 @@ class BloqueioHorarioServiceTest {
         UUID id = UUID.randomUUID();
         when(bloqueioHorarioRepository.findById(id)).thenReturn(Optional.empty());
 
+        UUID funcionariaId = funcionaria.getId();
         RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
-                () -> service.remover(id));
+                () -> service.remover(funcionariaId, id));
 
         assertEquals("Bloqueio não encontrado", ex.getMessage());
+        verify(bloqueioHorarioRepository, never()).deleteById(any());
+    }
+
+    @Test
+    @DisplayName("Bloqueio de outra funcionária não é removido pela rota desta")
+    void naoRemoveBloqueioDeOutraFuncionaria() {
+        UUID id = UUID.randomUUID();
+        Funcionaria outra = new Funcionaria();
+        outra.setId(UUID.randomUUID());
+        BloqueioHorario bloqueio = new BloqueioHorario();
+        bloqueio.setFuncionaria(outra);
+        when(bloqueioHorarioRepository.findById(id)).thenReturn(Optional.of(bloqueio));
+        UUID funcionariaId = funcionaria.getId();
+
+        assertThrows(RecursoNaoEncontradoException.class, () -> service.remover(funcionariaId, id));
         verify(bloqueioHorarioRepository, never()).deleteById(any());
     }
 }

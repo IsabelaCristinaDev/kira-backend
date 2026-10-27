@@ -48,9 +48,8 @@ public class FuncionariaService {
                 .toList();
     }
 
-    public FuncionariaResponse atualizar(UUID id, FuncionariaRequest request) {
-        Funcionaria funcionaria = funcionariaRepository.findById(id)
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Funcionária não encontrada"));
+    public FuncionariaResponse atualizar(UUID empresaId, UUID id, FuncionariaRequest request) {
+        Funcionaria funcionaria = buscarDaEmpresa(empresaId, id);
 
         funcionaria.setNome(request.nome());
         funcionaria.setFotoUrl(request.fotoUrl());
@@ -62,12 +61,18 @@ public class FuncionariaService {
         return toResponse(funcionaria);
     }
 
-    public void desativar(UUID id) {
-        Funcionaria funcionaria = funcionariaRepository.findById(id)
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Funcionária não encontrada"));
+    public void desativar(UUID empresaId, UUID id) {
+        Funcionaria funcionaria = buscarDaEmpresa(empresaId, id);
 
         funcionaria.setAtivo(false);
         funcionariaRepository.save(funcionaria);
+    }
+
+    /** Funcionária de outra empresa é tratada como inexistente na rota desta empresa. */
+    private Funcionaria buscarDaEmpresa(UUID empresaId, UUID id) {
+        return funcionariaRepository.findById(id)
+                .filter(f -> f.getEmpresa() != null && empresaId.equals(f.getEmpresa().getId()))
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Funcionária não encontrada"));
     }
 
     private FuncionariaResponse toResponse(Funcionaria funcionaria) {

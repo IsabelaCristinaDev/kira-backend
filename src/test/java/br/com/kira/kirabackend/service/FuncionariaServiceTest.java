@@ -109,9 +109,10 @@ class FuncionariaServiceTest {
         Funcionaria funcionaria = new Funcionaria();
         funcionaria.setId(UUID.randomUUID());
         funcionaria.setAtivo(true);
+        funcionaria.setEmpresa(empresa);
         when(funcionariaRepository.findById(funcionaria.getId())).thenReturn(Optional.of(funcionaria));
 
-        service.desativar(funcionaria.getId());
+        service.desativar(empresa.getId(), funcionaria.getId());
 
         assertFalse(funcionaria.getAtivo());
         verify(funcionariaRepository).save(funcionaria);
@@ -125,10 +126,32 @@ class FuncionariaServiceTest {
         UUID id = UUID.randomUUID();
         when(funcionariaRepository.findById(id)).thenReturn(Optional.empty());
 
+        UUID empresaId = empresa.getId();
         RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
-                () -> service.desativar(id));
+                () -> service.desativar(empresaId, id));
 
         assertEquals("Funcionária não encontrada", ex.getMessage());
+        verify(funcionariaRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Funcionária de outra empresa não é alterada nem desativada pela rota desta")
+    void naoMexeEmFuncionariaDeOutraEmpresa() {
+        Empresa outra = new Empresa();
+        outra.setId(UUID.randomUUID());
+        Funcionaria funcionaria = new Funcionaria();
+        funcionaria.setId(UUID.randomUUID());
+        funcionaria.setAtivo(true);
+        funcionaria.setEmpresa(outra);
+        UUID funcionariaId = funcionaria.getId();
+        UUID empresaId = empresa.getId();
+        FuncionariaRequest request = request("Bia");
+        when(funcionariaRepository.findById(funcionariaId)).thenReturn(Optional.of(funcionaria));
+
+        assertThrows(RecursoNaoEncontradoException.class,
+                () -> service.atualizar(empresaId, funcionariaId, request));
+        assertThrows(RecursoNaoEncontradoException.class, () -> service.desativar(empresaId, funcionariaId));
+        assertTrue(funcionaria.getAtivo());
         verify(funcionariaRepository, never()).save(any());
     }
 }

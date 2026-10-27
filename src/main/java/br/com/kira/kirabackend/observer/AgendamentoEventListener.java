@@ -5,7 +5,6 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.event.EventListener;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -16,8 +15,9 @@ public class AgendamentoEventListener {
 
     private final ComissaoService comissaoService;
 
+    // Síncronos de propósito: rodar em outra thread lendo cliente/empresa (lazy) usa a mesma sessão
+    // do Hibernate ao mesmo tempo que a requisição e quebra o cancelamento com erro 500.
     @EventListener
-    @Async
     public void onAgendamentoCriado(AgendamentoCriadoEvent event) {
         var agendamento = event.getAgendamento();
         log.info("Agendamento criado: {} - Cliente: {} - Empresa: {}",
@@ -27,7 +27,6 @@ public class AgendamentoEventListener {
     }
 
     @EventListener
-    @Async
     public void onAgendamentoCancelado(AgendamentoCanceladoEvent event) {
         var agendamento = event.getAgendamento();
         log.info("Agendamento cancelado: {} - Cliente: {} - Empresa: {}",

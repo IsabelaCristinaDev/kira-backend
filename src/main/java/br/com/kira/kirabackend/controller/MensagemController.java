@@ -38,14 +38,16 @@ public class MensagemController {
 
     @GetMapping("/agendamento/{agendamentoId}")
     public ResponseEntity<List<MensagemResponse>> listarConversa(
-            @PathVariable UUID agendamentoId) {
-        return ResponseEntity.ok(mensagemService.listarConversa(agendamentoId));
+            @PathVariable UUID agendamentoId,
+            @AuthenticationPrincipal Usuario usuario) {
+        return ResponseEntity.ok(mensagemService.listarConversa(agendamentoId, usuario.getId()));
     }
 
     @PatchMapping("/{id}/lida")
     public ResponseEntity<Void> marcarComoLida(
-            @PathVariable UUID id) {
-        mensagemService.marcarComoLida(id);
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Usuario usuario) {
+        mensagemService.marcarComoLida(id, usuario.getId());
         return ResponseEntity.noContent().build();
     }
-}
+}

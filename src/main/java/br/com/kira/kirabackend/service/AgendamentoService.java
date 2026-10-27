@@ -17,6 +17,7 @@ import br.com.kira.kirabackend.repository.DisponibilidadeEstudioRepository;
 import br.com.kira.kirabackend.repository.FuncionariaRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
+import br.com.kira.kirabackend.service.strategy.CancelamentoClienteStrategy;
 import br.com.kira.kirabackend.service.strategy.CancelamentoStrategy;
 import br.com.kira.kirabackend.util.KiraTimeZone;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,7 @@ import java.util.UUID;
 public class AgendamentoService {
 
     private static final String AGENDAMENTO_NAO_ENCONTRADO = "Agendamento não encontrado";
+    private static final String SO_OS_SEUS_AGENDAMENTOS = "Você só pode ver os seus próprios agendamentos";
 
     private final AgendamentoRepository agendamentoRepository;
     private final UsuarioRepository usuarioRepository;
@@ -51,7 +53,8 @@ public class AgendamentoService {
                         "Nenhuma estratégia de cancelamento encontrada para o tipo: " + tipo));
     }
 
-    public AgendamentoResponse criar(UUID clienteId, AgendamentoRequest request) {
+    public AgendamentoResponse criar(UUID clienteId, UUID usuarioId, AgendamentoRequest request) {
+        exigirProprioUsuario(clienteId, usuarioId, "Você só pode agendar em seu próprio nome");
         Cliente cliente = (Cliente) usuarioRepository.findById(clienteId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Cliente não encontrado"));
 
@@ -93,23 +96,26 @@ public class AgendamentoService {
         return toResponse(salvo);
     }
 
-    public List<AgendamentoResponse> listarPorCliente(UUID clienteId) {
+    public List<AgendamentoResponse> listarPorCliente(UUID clienteId, UUID usuarioId) {
+        exigirProprioUsuario(clienteId, usuarioId, SO_OS_SEUS_AGENDAMENTOS);
         return agendamentoRepository.findByClienteId(clienteId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
     }
 
-    public List<AgendamentoResponse> listarPorEmpresa(UUID empresaId) {
+    public List<AgendamentoResponse> listarPorEmpresa(UUID empresaId, UUID usuarioId) {
+        exigirProprioUsuario(empresaId, usuarioId, SO_OS_SEUS_AGENDAMENTOS);
         return agendamentoRepository.findByEmpresaId(empresaId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
     }
 
-    public AgendamentoResponse cancelarPeloCliente(UUID agendamentoId) {
+    public AgendamentoResponse cancelarPeloCliente(UUID agendamentoId, UUID clienteId) {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
+        validarClienteDoAgendamento(agendamento, clienteId);
 
         resolverEstrategiaCancelamento(TipoUsuario.CLIENTE).validarCancelamento(agendamento);
 
@@ -119,9 +125,10 @@ public class AgendamentoService {
         return toResponse(salvo);
     }
 
-    public AgendamentoResponse cancelarPelaEmpresa(UUID agendamentoId) {
+    public AgendamentoResponse cancelarPelaEmpresa(UUID agendamentoId, UUID empresaId) {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
+        validarEmpresaDoAgendamento(agendamento, empresaId);
 
         resolverEstrategiaCancelamento(TipoUsuario.EMPRESA).validarCancelamento(agendamento);
 
@@ -131,9 +138,10 @@ public class AgendamentoService {
         return toResponse(salvo);
     }
 
-    public AgendamentoResponse concluir(UUID agendamentoId) {
+    public AgendamentoResponse concluir(UUID agendamentoId, UUID empresaId) {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
+        validarEmpresaDoAgendamento(agendamento, empresaId);
 
         if (agendamento.getStatus() == StatusAgendamento.CANCELADO ||
                 agendamento.getStatus() == StatusAgendamento.CONCLUIDO) {
@@ -146,20 +154,53 @@ public class AgendamentoService {
         return toResponse(salvo);
     }
 
-    public AgendamentoResponse reagendarPeloCliente(UUID agendamentoId,
-                                                    ReagendamentoRequest request) {
-        return reagendar(agendamentoId, request);
+    /** Só a empresa dona do atendimento pode concluí-lo ou cancelá-lo como empresa. */
+    private static void validarEmpresaDoAgendamento(Agendamento agendamento, UUID empresaId) {
+        if (!agendamento.getEmpresa().getId().equals(empresaId)) {
+            throw new RegraDeNegocioException("Este atendimento não pertence ao seu estabelecimento");
+        }
     }
 
-    public AgendamentoResponse reagendarPelaEmpresa(UUID agendamentoId,
-                                                    ReagendamentoRequest request) {
-        return reagendar(agendamentoId, request);
+    /** Só a cliente do atendimento pode cancelá-lo ou reagendá-lo como cliente. */
+    private static void validarClienteDoAgendamento(Agendamento agendamento, UUID clienteId) {
+        if (!agendamento.getCliente().getId().equals(clienteId)) {
+            throw new RegraDeNegocioException("Você não participou deste atendimento");
+        }
     }
 
-    private AgendamentoResponse reagendar(UUID agendamentoId, ReagendamentoRequest request) {
-        Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
+    /** O id da rota precisa ser o do usuário logado. */
+    private static void exigirProprioUsuario(UUID idDaRota, UUID usuarioId, String mensagem) {
+        if (!idDaRota.equals(usuarioId)) {
+            throw new RegraDeNegocioException(mensagem);
+        }
+    }
+
+    public AgendamentoResponse reagendarPeloCliente(UUID agendamentoId, UUID clienteId,
+                                                    ReagendamentoRequest request) {
+        Agendamento agendamento = buscarAgendamento(agendamentoId);
+        validarClienteDoAgendamento(agendamento, clienteId);
+        // Mesmo prazo do cancelamento: sem isso, remarcar em cima da hora liberaria a vaga sem antecedência
+        if (agendamento.getDataHoraInicio().isBefore(LocalDateTime.now(KiraTimeZone.DEFAULT)
+                .plusHours(CancelamentoClienteStrategy.ANTECEDENCIA_MINIMA_HORAS))) {
+            throw new RegraDeNegocioException("Remarcação pelo cliente deve ser feita com no mínimo "
+                    + CancelamentoClienteStrategy.ANTECEDENCIA_MINIMA_HORAS + " horas de antecedência");
+        }
+        return reagendar(agendamento, request);
+    }
+
+    public AgendamentoResponse reagendarPelaEmpresa(UUID agendamentoId, UUID empresaId,
+                                                    ReagendamentoRequest request) {
+        Agendamento agendamento = buscarAgendamento(agendamentoId);
+        validarEmpresaDoAgendamento(agendamento, empresaId);
+        return reagendar(agendamento, request);
+    }
+
+    private Agendamento buscarAgendamento(UUID agendamentoId) {
+        return agendamentoRepository.findById(agendamentoId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
+    }
 
+    private AgendamentoResponse reagendar(Agendamento agendamento, ReagendamentoRequest request) {
         if (agendamento.getStatus() == StatusAgendamento.CANCELADO ||
                 agendamento.getStatus() == StatusAgendamento.CONCLUIDO) {
             throw new RegraDeNegocioException("Não é possível reagendar este agendamento");
@@ -180,7 +221,8 @@ public class AgendamentoService {
 
         return toResponse(agendamentoRepository.save(agendamento));
     }
-    public List<AgendamentoResponse> historicoCliente(UUID clienteId) {
+    public List<AgendamentoResponse> historicoCliente(UUID clienteId, UUID usuarioId) {
+        exigirProprioUsuario(clienteId, usuarioId, SO_OS_SEUS_AGENDAMENTOS);
         return agendamentoRepository
                 .findByClienteIdAndStatusOrderByDataHoraInicioDesc(
                         clienteId, StatusAgendamento.CONCLUIDO)

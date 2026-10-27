@@ -204,7 +204,7 @@ class AgendamentoServiceTest {
             mockarAgendamentosNoIntervalo(List.of());
             mockarSaveDevolvendoArgumento();
 
-            AgendamentoResponse response = service.criar(cliente.getId(), request(inicioValido));
+            AgendamentoResponse response = service.criar(cliente.getId(), cliente.getId(), request(inicioValido));
 
             ArgumentCaptor<Agendamento> captor = ArgumentCaptor.forClass(Agendamento.class);
             verify(agendamentoRepository).save(captor.capture());
@@ -236,7 +236,7 @@ class AgendamentoServiceTest {
             AgendamentoRequest req = request(inicioValido.plusMinutes(30));
 
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.criar(clienteId, req));
+                    () -> service.criar(clienteId, clienteId, req));
 
             verify(agendamentoRepository, never()).save(any());
             verifyNoInteractions(eventPublisher);
@@ -250,7 +250,7 @@ class AgendamentoServiceTest {
             mockarAgendamentosNoIntervalo(List.of());
             mockarSaveDevolvendoArgumento();
 
-            service.criar(cliente.getId(), request(inicioValido));
+            service.criar(cliente.getId(), cliente.getId(), request(inicioValido));
 
             verify(agendamentoRepository).findByEmpresaIdAndStatusNotAndDataHoraInicioBeforeAndDataHoraFimAfter(
                     empresa.getId(), StatusAgendamento.CANCELADO,
@@ -266,7 +266,7 @@ class AgendamentoServiceTest {
             AgendamentoRequest req = request(inicioValido);
 
             RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
-                    () -> service.criar(clienteId, req));
+                    () -> service.criar(clienteId, clienteId, req));
             assertEquals("Cliente não encontrado", ex.getMessage());
             verify(agendamentoRepository, never()).save(any());
         }
@@ -281,7 +281,7 @@ class AgendamentoServiceTest {
             AgendamentoRequest req = request(inicioValido);
 
             RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
-                    () -> service.criar(clienteId, req));
+                    () -> service.criar(clienteId, clienteId, req));
             assertEquals("Empresa não encontrada", ex.getMessage());
             verify(agendamentoRepository, never()).save(any());
         }
@@ -297,7 +297,7 @@ class AgendamentoServiceTest {
             AgendamentoRequest req = request(inicioValido);
 
             RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
-                    () -> service.criar(clienteId, req));
+                    () -> service.criar(clienteId, clienteId, req));
             assertEquals("Serviço não encontrado", ex.getMessage());
             verify(agendamentoRepository, never()).save(any());
         }
@@ -314,7 +314,7 @@ class AgendamentoServiceTest {
             AgendamentoRequest req = request(inicioValido);
 
             RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
-                    () -> service.criar(clienteId, req));
+                    () -> service.criar(clienteId, clienteId, req));
             assertEquals("Funcionária não encontrada", ex.getMessage());
             verify(agendamentoRepository, never()).save(any());
         }
@@ -334,7 +334,7 @@ class AgendamentoServiceTest {
             AgendamentoRequest req = request(inicioValido);
 
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.criar(clienteId, req));
+                    () -> service.criar(clienteId, clienteId, req));
             verify(agendamentoRepository, never()).save(any());
         }
 
@@ -348,7 +348,7 @@ class AgendamentoServiceTest {
             AgendamentoRequest req = request(ontem);
 
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.criar(clienteId, req));
+                    () -> service.criar(clienteId, clienteId, req));
             verify(agendamentoRepository, never()).save(any());
         }
 
@@ -362,7 +362,7 @@ class AgendamentoServiceTest {
             AgendamentoRequest req = request(inicioValido.withHour(8));
 
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.criar(clienteId, req));
+                    () -> service.criar(clienteId, clienteId, req));
             verify(agendamentoRepository, never()).save(any());
         }
 
@@ -377,7 +377,7 @@ class AgendamentoServiceTest {
             AgendamentoRequest req = request(inicioValido.withHour(17));
 
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.criar(clienteId, req));
+                    () -> service.criar(clienteId, clienteId, req));
             verify(agendamentoRepository, never()).save(any());
         }
 
@@ -392,7 +392,7 @@ class AgendamentoServiceTest {
             AgendamentoRequest req = request(inicioValido);
 
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.criar(clienteId, req));
+                    () -> service.criar(clienteId, clienteId, req));
             verify(agendamentoRepository, never()).save(any());
         }
     }
@@ -410,7 +410,7 @@ class AgendamentoServiceTest {
             when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
             mockarSaveDevolvendoArgumento();
 
-            AgendamentoResponse response = service.concluir(agendamento.getId());
+            AgendamentoResponse response = service.concluir(agendamento.getId(), empresa.getId());
 
             assertEquals(StatusAgendamento.CONCLUIDO, response.status());
             assertEquals(StatusAgendamento.CONCLUIDO, agendamento.getStatus());
@@ -430,8 +430,9 @@ class AgendamentoServiceTest {
             when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
 
             UUID agendamentoId = agendamento.getId();
+            UUID empresaId = empresa.getId();
 
-            assertThrows(RegraDeNegocioException.class, () -> service.concluir(agendamentoId));
+            assertThrows(RegraDeNegocioException.class, () -> service.concluir(agendamentoId, empresaId));
 
             assertEquals(status, agendamento.getStatus());
             verify(agendamentoRepository, never()).save(any());
@@ -444,7 +445,24 @@ class AgendamentoServiceTest {
             UUID id = UUID.randomUUID();
             when(agendamentoRepository.findById(id)).thenReturn(Optional.empty());
 
-            assertThrows(RecursoNaoEncontradoException.class, () -> service.concluir(id));
+            assertThrows(RecursoNaoEncontradoException.class, () -> service.concluir(id, empresa.getId()));
+        }
+
+        @Test
+        @DisplayName("Outra empresa não pode concluir o atendimento")
+        void outraEmpresaNaoPodeConcluir() {
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.CONFIRMADO);
+            UUID agendamentoId = agendamento.getId();
+            UUID outraEmpresa = UUID.randomUUID();
+            when(agendamentoRepository.findById(agendamentoId)).thenReturn(Optional.of(agendamento));
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> service.concluir(agendamentoId, outraEmpresa));
+
+            assertEquals("Este atendimento não pertence ao seu estabelecimento", ex.getMessage());
+            assertEquals(StatusAgendamento.CONFIRMADO, agendamento.getStatus());
+            verify(agendamentoRepository, never()).save(any());
+            verifyNoInteractions(eventPublisher);
         }
     }
 
@@ -464,7 +482,7 @@ class AgendamentoServiceTest {
             mockarAgendamentosNoIntervalo(List.of());
             mockarSaveDevolvendoArgumento();
 
-            AgendamentoResponse response = service.reagendarPeloCliente(agendamento.getId(),
+            AgendamentoResponse response = service.reagendarPeloCliente(agendamento.getId(), cliente.getId(),
                     new ReagendamentoRequest(novoInicio, "Imprevisto"));
 
             assertEquals(novoInicio, agendamento.getDataHoraInicio());
@@ -476,6 +494,43 @@ class AgendamentoServiceTest {
         }
 
         @Test
+        @DisplayName("Cliente não remarca com menos de 2 horas de antecedência")
+        void clienteNaoRemarcaEmCimaDaHora() {
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.CONFIRMADO);
+            LocalDateTime daquiAUmaHora = LocalDateTime.now(KiraTimeZone.DEFAULT).plusHours(1);
+            agendamento.setDataHoraInicio(daquiAUmaHora);
+            UUID agendamentoId = agendamento.getId();
+            UUID clienteId = cliente.getId();
+            var request = new ReagendamentoRequest(inicioValido.withHour(14), null);
+            when(agendamentoRepository.findById(agendamentoId)).thenReturn(Optional.of(agendamento));
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> service.reagendarPeloCliente(agendamentoId, clienteId, request));
+
+            assertEquals("Remarcação pelo cliente deve ser feita com no mínimo 2 horas de antecedência",
+                    ex.getMessage());
+            assertEquals(daquiAUmaHora, agendamento.getDataHoraInicio());
+            verify(agendamentoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("A empresa pode remarcar mesmo em cima da hora")
+        void empresaRemarcaEmCimaDaHora() {
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.CONFIRMADO);
+            agendamento.setDataHoraInicio(LocalDateTime.now(KiraTimeZone.DEFAULT).plusHours(1));
+            LocalDateTime novoInicio = inicioValido.withHour(14);
+            when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+            mockarExpedientePadrao();
+            mockarAgendamentosNoIntervalo(List.of());
+            mockarSaveDevolvendoArgumento();
+
+            service.reagendarPelaEmpresa(agendamento.getId(), empresa.getId(),
+                    new ReagendamentoRequest(novoInicio, null));
+
+            assertEquals(novoInicio, agendamento.getDataHoraInicio());
+        }
+
+        @Test
         @DisplayName("Reagendar não acusa conflito com o próprio agendamento")
         void deveIgnorarOProprioAgendamentoNoConflito() {
             Agendamento agendamento = agendamentoExistente(StatusAgendamento.PENDENTE);
@@ -484,7 +539,7 @@ class AgendamentoServiceTest {
             mockarAgendamentosNoIntervalo(List.of(agendamento));
             mockarSaveDevolvendoArgumento();
 
-            service.reagendarPelaEmpresa(agendamento.getId(),
+            service.reagendarPelaEmpresa(agendamento.getId(), empresa.getId(),
                     new ReagendamentoRequest(inicioValido.plusMinutes(30), null));
 
             assertEquals(StatusAgendamento.REAGENDADO, agendamento.getStatus());
@@ -500,10 +555,11 @@ class AgendamentoServiceTest {
             mockarAgendamentosNoIntervalo(List.of(outro));
 
             UUID agendamentoId = agendamento.getId();
+            UUID clienteId = cliente.getId();
             ReagendamentoRequest req = new ReagendamentoRequest(inicioValido.withHour(14), null);
 
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.reagendarPeloCliente(agendamentoId, req));
+                    () -> service.reagendarPeloCliente(agendamentoId, clienteId, req));
             verify(agendamentoRepository, never()).save(any());
         }
 
@@ -515,10 +571,11 @@ class AgendamentoServiceTest {
             when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
 
             UUID agendamentoId = agendamento.getId();
+            UUID clienteId = cliente.getId();
             ReagendamentoRequest req = new ReagendamentoRequest(inicioValido.withHour(14), null);
 
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.reagendarPeloCliente(agendamentoId, req));
+                    () -> service.reagendarPeloCliente(agendamentoId, clienteId, req));
 
             assertEquals(status, agendamento.getStatus());
             verify(agendamentoRepository, never()).save(any());
@@ -531,10 +588,11 @@ class AgendamentoServiceTest {
             when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
 
             UUID agendamentoId = agendamento.getId();
+            UUID clienteId = cliente.getId();
             ReagendamentoRequest req = new ReagendamentoRequest(LocalDateTime.now(KiraTimeZone.DEFAULT).minusHours(1), null);
 
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.reagendarPeloCliente(agendamentoId, req));
+                    () -> service.reagendarPeloCliente(agendamentoId, clienteId, req));
             verify(agendamentoRepository, never()).save(any());
         }
     }
@@ -552,7 +610,7 @@ class AgendamentoServiceTest {
             when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
             mockarSaveDevolvendoArgumento();
 
-            AgendamentoResponse response = service.cancelarPeloCliente(agendamento.getId());
+            AgendamentoResponse response = service.cancelarPeloCliente(agendamento.getId(), cliente.getId());
 
             verify(cancelamentoClienteStrategy).validarCancelamento(agendamento);
             verify(cancelamentoEmpresaStrategy, never()).validarCancelamento(any());
@@ -567,7 +625,7 @@ class AgendamentoServiceTest {
             when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
             mockarSaveDevolvendoArgumento();
 
-            AgendamentoResponse response = service.cancelarPelaEmpresa(agendamento.getId());
+            AgendamentoResponse response = service.cancelarPelaEmpresa(agendamento.getId(), empresa.getId());
 
             verify(cancelamentoEmpresaStrategy).validarCancelamento(agendamento);
             verify(cancelamentoClienteStrategy, never()).validarCancelamento(any());
@@ -584,11 +642,29 @@ class AgendamentoServiceTest {
                     .when(cancelamentoClienteStrategy).validarCancelamento(agendamento);
 
             UUID agendamentoId = agendamento.getId();
+            UUID clienteId = cliente.getId();
 
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.cancelarPeloCliente(agendamentoId));
+                    () -> service.cancelarPeloCliente(agendamentoId, clienteId));
 
             assertEquals(StatusAgendamento.PENDENTE, agendamento.getStatus());
+            verify(agendamentoRepository, never()).save(any());
+            verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        @DisplayName("Outra empresa não pode cancelar o atendimento como empresa")
+        void outraEmpresaNaoPodeCancelar() {
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.PENDENTE);
+            UUID agendamentoId = agendamento.getId();
+            UUID outraEmpresa = UUID.randomUUID();
+            when(agendamentoRepository.findById(agendamentoId)).thenReturn(Optional.of(agendamento));
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> service.cancelarPelaEmpresa(agendamentoId, outraEmpresa));
+
+            assertEquals("Este atendimento não pertence ao seu estabelecimento", ex.getMessage());
+            verify(cancelamentoEmpresaStrategy, never()).validarCancelamento(any());
             verify(agendamentoRepository, never()).save(any());
             verifyNoInteractions(eventPublisher);
         }
@@ -602,6 +678,72 @@ class AgendamentoServiceTest {
             AgendamentoCanceladoEvent cancelado =
                     assertInstanceOf(AgendamentoCanceladoEvent.class, evento.getValue());
             assertSame(agendamento, cancelado.getAgendamento());
+        }
+    }
+
+    // ---------- dono do recurso ----------
+
+    @Nested
+    @DisplayName("acesso só do próprio usuário")
+    class AcessoDoProprioUsuario {
+
+        private final UUID outroUsuario = UUID.randomUUID();
+
+        @Test
+        @DisplayName("Não agenda em nome de outra cliente")
+        void naoAgendaEmNomeDeOutraCliente() {
+            AgendamentoRequest request = request(inicioValido);
+            UUID clienteId = cliente.getId();
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> service.criar(clienteId, outroUsuario, request));
+
+            assertEquals("Você só pode agendar em seu próprio nome", ex.getMessage());
+            verify(agendamentoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Não lista os agendamentos de outra cliente nem de outra empresa")
+        void naoListaAgendamentosDeOutros() {
+            UUID clienteId = cliente.getId();
+            UUID empresaId = empresa.getId();
+
+            assertThrows(RegraDeNegocioException.class, () -> service.listarPorCliente(clienteId, outroUsuario));
+            assertThrows(RegraDeNegocioException.class, () -> service.listarPorEmpresa(empresaId, outroUsuario));
+            assertThrows(RegraDeNegocioException.class, () -> service.historicoCliente(clienteId, outroUsuario));
+            verifyNoInteractions(agendamentoRepository);
+        }
+
+        @Test
+        @DisplayName("Não cancela o agendamento de outra cliente")
+        void naoCancelaAgendamentoDeOutraCliente() {
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.PENDENTE);
+            UUID agendamentoId = agendamento.getId();
+            when(agendamentoRepository.findById(agendamentoId)).thenReturn(Optional.of(agendamento));
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> service.cancelarPeloCliente(agendamentoId, outroUsuario));
+
+            assertEquals("Você não participou deste atendimento", ex.getMessage());
+            assertEquals(StatusAgendamento.PENDENTE, agendamento.getStatus());
+            verify(cancelamentoClienteStrategy, never()).validarCancelamento(any());
+            verify(agendamentoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Não reagenda o agendamento de outra cliente nem de outra empresa")
+        void naoReagendaAgendamentoDeOutros() {
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.CONFIRMADO);
+            UUID agendamentoId = agendamento.getId();
+            var reagendamento = new ReagendamentoRequest(inicioValido.plusDays(1), null);
+            when(agendamentoRepository.findById(agendamentoId)).thenReturn(Optional.of(agendamento));
+
+            assertThrows(RegraDeNegocioException.class,
+                    () -> service.reagendarPeloCliente(agendamentoId, outroUsuario, reagendamento));
+            assertThrows(RegraDeNegocioException.class,
+                    () -> service.reagendarPelaEmpresa(agendamentoId, outroUsuario, reagendamento));
+            assertEquals(inicioValido, agendamento.getDataHoraInicio());
+            verify(agendamentoRepository, never()).save(any());
         }
     }
 }
