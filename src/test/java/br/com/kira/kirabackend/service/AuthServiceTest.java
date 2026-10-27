@@ -40,6 +40,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -55,6 +56,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -489,6 +491,25 @@ class AuthServiceTest {
         void duracaoVaziaViraZero(String bruto) {
             Servico servico = registrarEmpresaComUmServico("50", bruto);
 
+            assertEquals(0, servico.getDuracaoMinutos());
+        }
+
+        @ParameterizedTest(name = "\"{0}\" = 0 min")
+        @ValueSource(strings = {"99999999999", "99999999999h", "40000000h", "1h99999999999"})
+        @DisplayName("Duração com número grande demais vira zero em vez de estourar")
+        void duracaoGrandeDemaisViraZero(String bruto) {
+            Servico servico = registrarEmpresaComUmServico("50", bruto);
+
+            assertEquals(0, servico.getDuracaoMinutos());
+        }
+
+        @Test
+        @DisplayName("Duração gigante é processada rápido (sem backtracking na regex)")
+        void duracaoGiganteNaoTravaARegex() {
+            String bruto = "1".repeat(100_000);
+
+            Servico servico = assertTimeoutPreemptively(Duration.ofSeconds(1),
+                    () -> registrarEmpresaComUmServico("50", bruto));
             assertEquals(0, servico.getDuracaoMinutos());
         }
     }

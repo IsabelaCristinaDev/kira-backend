@@ -28,9 +28,13 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
+    @SuppressWarnings("java:S4502") // CSRF desligado de propósito: ver comentário no .csrf()
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                // CSRF protege autenticação via cookie; esta API é stateless e autentica
+                // exclusivamente via header "Authorization: Bearer", nunca por cookie,
+                // então não há vetor de CSRF a mitigar aqui.
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))

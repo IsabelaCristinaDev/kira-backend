@@ -3,7 +3,7 @@ package br.com.kira.kirabackend.service;
 import br.com.kira.kirabackend.domain.entity.Agendamento;
 import br.com.kira.kirabackend.domain.entity.ComissaoAgendamento;
 import br.com.kira.kirabackend.repository.ComissaoAgendamentoRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,10 +14,10 @@ import java.util.UUID;
 
 @Service
 @Transactional
+@RequiredArgsConstructor
 public class ComissaoService {
 
-    @Autowired
-    private ComissaoAgendamentoRepository comissaoRepository;
+    private final ComissaoAgendamentoRepository comissaoRepository;
 
     public void calcularERegistrarComissao(Agendamento agendamento) {
         if (agendamento.getFuncionaria() == null) return;
