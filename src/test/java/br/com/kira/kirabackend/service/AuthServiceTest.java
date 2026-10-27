@@ -248,8 +248,10 @@ class AuthServiceTest {
         void refreshInexistente() {
             when(refreshTokenRepository.findByToken("nao-existe")).thenReturn(Optional.empty());
 
+            RefreshTokenRequest req = new RefreshTokenRequest("nao-existe");
+
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.refreshToken(new RefreshTokenRequest("nao-existe")));
+                    () -> service.refreshToken(req));
             verifyNoInteractions(jwtTokenProvider);
         }
 
@@ -259,8 +261,10 @@ class AuthServiceTest {
             when(refreshTokenRepository.findByToken("refresh-antigo"))
                     .thenReturn(Optional.of(refreshToken(cliente(), agora().minusMinutes(1), false)));
 
+            RefreshTokenRequest req = new RefreshTokenRequest("refresh-antigo");
+
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.refreshToken(new RefreshTokenRequest("refresh-antigo")));
+                    () -> service.refreshToken(req));
             verifyNoInteractions(jwtTokenProvider);
             verify(refreshTokenRepository, never()).save(any());
         }
@@ -271,8 +275,10 @@ class AuthServiceTest {
             when(refreshTokenRepository.findByToken("refresh-antigo"))
                     .thenReturn(Optional.of(refreshToken(cliente(), agora().plusDays(1), true)));
 
+            RefreshTokenRequest req = new RefreshTokenRequest("refresh-antigo");
+
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.refreshToken(new RefreshTokenRequest("refresh-antigo")));
+                    () -> service.refreshToken(req));
             verifyNoInteractions(jwtTokenProvider);
             verify(refreshTokenRepository, never()).save(any());
         }
@@ -317,8 +323,10 @@ class AuthServiceTest {
         void clienteEmailRepetido() {
             when(usuarioRepository.existsByEmailIgnoreCase("ana@teste.com")).thenReturn(true);
 
+            ClienteRegistroRequest req = registroCliente();
+
             EmailJaCadastradoException ex = assertThrows(EmailJaCadastradoException.class,
-                    () -> service.registrarCliente(registroCliente()));
+                    () -> service.registrarCliente(req));
             assertEquals("Email já cadastrado", ex.getMessage());
             verify(usuarioRepository, never()).save(any());
             verifyNoInteractions(emailService);
@@ -329,8 +337,10 @@ class AuthServiceTest {
         void empresaEmailRepetido() {
             when(usuarioRepository.existsByEmailIgnoreCase("estudio@teste.com")).thenReturn(true);
 
+            EmpresaRegistroRequest req = registroEmpresa(null, null);
+
             assertThrows(EmailJaCadastradoException.class,
-                    () -> service.registrarEmpresa(registroEmpresa(null, null)));
+                    () -> service.registrarEmpresa(req));
             verify(usuarioRepository, never()).save(any());
             verifyNoInteractions(servicoRepository, emailService);
         }

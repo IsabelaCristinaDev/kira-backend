@@ -80,8 +80,11 @@ class FuncionariaServiceTest {
         when(funcionariaRepository.existsByEmpresaIdAndNomeIgnoreCaseAndAtivoTrue(empresa.getId(), "BIA"))
                 .thenReturn(true);
 
+        UUID empresaId = empresa.getId();
+        FuncionariaRequest req = request("BIA");
+
         RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
-                () -> service.cadastrar(empresa.getId(), request("BIA")));
+                () -> service.cadastrar(empresaId, req));
 
         assertEquals("Já existe uma funcionária ativa com esse nome", ex.getMessage());
         verify(funcionariaRepository, never()).save(any());
@@ -92,8 +95,11 @@ class FuncionariaServiceTest {
     void empresaInexistente() {
         when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.empty());
 
+        UUID empresaId = empresa.getId();
+        FuncionariaRequest req = request("Bia");
+
         assertThrows(RecursoNaoEncontradoException.class,
-                () -> service.cadastrar(empresa.getId(), request("Bia")));
+                () -> service.cadastrar(empresaId, req));
         verify(funcionariaRepository, never()).save(any());
     }
 

@@ -136,8 +136,11 @@ class AvaliacaoServiceTest {
             agendamento.setStatus(status);
             mockarAgendamento();
 
+            UUID clienteId = cliente.getId();
+            AvaliacaoRequest req = request(5);
+
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.avaliarComoCliente(cliente.getId(), request(5)));
+                    () -> service.avaliarComoCliente(clienteId, req));
             verify(avaliacaoRepository, never()).save(any());
         }
 
@@ -147,8 +150,11 @@ class AvaliacaoServiceTest {
             mockarAgendamento();
             mockarJaAvaliado(TipoAvaliador.CLIENTE, true);
 
+            UUID clienteId = cliente.getId();
+            AvaliacaoRequest req = request(5);
+
             RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
-                    () -> service.avaliarComoCliente(cliente.getId(), request(5)));
+                    () -> service.avaliarComoCliente(clienteId, req));
             assertEquals("Você já avaliou este atendimento", ex.getMessage());
             verify(avaliacaoRepository, never()).save(any());
         }
@@ -158,8 +164,11 @@ class AvaliacaoServiceTest {
         void clienteDeOutroAtendimentoNaoAvalia() {
             mockarAgendamento();
 
+            UUID idDeFora = UUID.randomUUID();
+            AvaliacaoRequest req = request(1);
+
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.avaliarComoCliente(UUID.randomUUID(), request(1)));
+                    () -> service.avaliarComoCliente(idDeFora, req));
             verify(avaliacaoRepository, never()).save(any());
         }
 
@@ -168,8 +177,11 @@ class AvaliacaoServiceTest {
         void agendamentoInexistente() {
             when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.empty());
 
+            UUID clienteId = cliente.getId();
+            AvaliacaoRequest req = request(5);
+
             assertThrows(RecursoNaoEncontradoException.class,
-                    () -> service.avaliarComoCliente(cliente.getId(), request(5)));
+                    () -> service.avaliarComoCliente(clienteId, req));
         }
     }
 
@@ -202,8 +214,11 @@ class AvaliacaoServiceTest {
             agendamento.setStatus(status);
             mockarAgendamento();
 
+            UUID empresaId = empresa.getId();
+            AvaliacaoRequest req = request(5);
+
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.avaliarComoEmpresa(empresa.getId(), request(5)));
+                    () -> service.avaliarComoEmpresa(empresaId, req));
             verify(avaliacaoRepository, never()).save(any());
         }
 
@@ -213,8 +228,11 @@ class AvaliacaoServiceTest {
             mockarAgendamento();
             mockarJaAvaliado(TipoAvaliador.EMPRESA, true);
 
+            UUID empresaId = empresa.getId();
+            AvaliacaoRequest req = request(5);
+
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.avaliarComoEmpresa(empresa.getId(), request(5)));
+                    () -> service.avaliarComoEmpresa(empresaId, req));
             verify(avaliacaoRepository, never()).save(any());
         }
 
@@ -223,8 +241,11 @@ class AvaliacaoServiceTest {
         void outraEmpresaNaoAvalia() {
             mockarAgendamento();
 
+            UUID idDeFora = UUID.randomUUID();
+            AvaliacaoRequest req = request(1);
+
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.avaliarComoEmpresa(UUID.randomUUID(), request(1)));
+                    () -> service.avaliarComoEmpresa(idDeFora, req));
             verify(avaliacaoRepository, never()).save(any());
         }
     }

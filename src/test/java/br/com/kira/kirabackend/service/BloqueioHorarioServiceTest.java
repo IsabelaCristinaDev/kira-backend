@@ -71,9 +71,11 @@ class BloqueioHorarioServiceTest {
     void fimAntesDoInicioDaErro() {
         when(funcionariaRepository.findById(funcionaria.getId())).thenReturn(Optional.of(funcionaria));
 
+        UUID funcionariaId = funcionaria.getId();
+        BloqueioHorarioRequest req = new BloqueioHorarioRequest(INICIO, INICIO.minusMinutes(1), null);
+
         RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
-                () -> service.cadastrar(funcionaria.getId(),
-                        new BloqueioHorarioRequest(INICIO, INICIO.minusMinutes(1), null)));
+                () -> service.cadastrar(funcionariaId, req));
 
         assertEquals("Data de fim deve ser após data de início", ex.getMessage());
         verify(bloqueioHorarioRepository, never()).save(any());
@@ -84,9 +86,11 @@ class BloqueioHorarioServiceTest {
     void funcionariaInexistente() {
         when(funcionariaRepository.findById(funcionaria.getId())).thenReturn(Optional.empty());
 
+        UUID funcionariaId = funcionaria.getId();
+        BloqueioHorarioRequest req = new BloqueioHorarioRequest(INICIO, INICIO.plusHours(1), null);
+
         assertThrows(RecursoNaoEncontradoException.class,
-                () -> service.cadastrar(funcionaria.getId(),
-                        new BloqueioHorarioRequest(INICIO, INICIO.plusHours(1), null)));
+                () -> service.cadastrar(funcionariaId, req));
         verify(bloqueioHorarioRepository, never()).save(any());
     }
 
