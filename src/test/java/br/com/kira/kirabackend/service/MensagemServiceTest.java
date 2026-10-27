@@ -132,9 +132,11 @@ class MensagemServiceTest {
             Cliente outroCliente = new Cliente();
             outroCliente.setId(UUID.randomUUID());
             mockarEnvio(outroCliente);
+            UUID remetenteId = outroCliente.getId();
+            MensagemRequest req = request("Oi");
 
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.enviar(outroCliente.getId(), request("Oi")));
+                    () -> service.enviar(remetenteId, req));
             verify(mensagemRepository, never()).save(any());
         }
 
@@ -144,9 +146,11 @@ class MensagemServiceTest {
             Empresa outraEmpresa = new Empresa();
             outraEmpresa.setId(UUID.randomUUID());
             mockarEnvio(outraEmpresa);
+            UUID remetenteId = outraEmpresa.getId();
+            MensagemRequest req = request("Oi");
 
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.enviar(outraEmpresa.getId(), request("Oi")));
+                    () -> service.enviar(remetenteId, req));
             verify(mensagemRepository, never()).save(any());
         }
 
@@ -154,9 +158,11 @@ class MensagemServiceTest {
         @DisplayName("Enviar para agendamento inexistente dá 404")
         void agendamentoInexistente() {
             when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.empty());
+            UUID remetenteId = cliente.getId();
+            MensagemRequest req = request("Oi");
 
             assertThrows(RecursoNaoEncontradoException.class,
-                    () -> service.enviar(cliente.getId(), request("Oi")));
+                    () -> service.enviar(remetenteId, req));
             verify(mensagemRepository, never()).save(any());
         }
 
@@ -165,9 +171,11 @@ class MensagemServiceTest {
         void remetenteInexistente() {
             when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
             when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.empty());
+            UUID remetenteId = cliente.getId();
+            MensagemRequest req = request("Oi");
 
             assertThrows(RecursoNaoEncontradoException.class,
-                    () -> service.enviar(cliente.getId(), request("Oi")));
+                    () -> service.enviar(remetenteId, req));
             verify(mensagemRepository, never()).save(any());
         }
     }
