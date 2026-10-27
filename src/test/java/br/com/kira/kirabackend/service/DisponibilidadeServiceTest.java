@@ -262,8 +262,11 @@ class DisponibilidadeServiceTest {
             when(disponibilidadeRepository.findByEmpresaIdAndDiaSemana(eq(empresa.getId()), any()))
                     .thenReturn(Optional.empty());
 
+            UUID empresaId = empresa.getId();
+            UUID servicoId = servico.getId();
+
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.calcularSlotsDisponiveis(empresa.getId(), servico.getId(), data));
+                    () -> service.calcularSlotsDisponiveis(empresaId, servicoId, data));
 
             ArgumentCaptor<DiaSemana> dia = ArgumentCaptor.forClass(DiaSemana.class);
             verify(disponibilidadeRepository).findByEmpresaIdAndDiaSemana(eq(empresa.getId()), dia.capture());
@@ -319,9 +322,11 @@ class DisponibilidadeServiceTest {
         void fimAntesDoInicioDaErro(LocalTime inicio, LocalTime fim) {
             when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
 
+            UUID empresaId = empresa.getId();
+            DisponibilidadeRequest req = new DisponibilidadeRequest(DiaSemana.SEGUNDA, inicio, fim);
+
             RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
-                    () -> service.cadastrar(empresa.getId(),
-                            new DisponibilidadeRequest(DiaSemana.SEGUNDA, inicio, fim)));
+                    () -> service.cadastrar(empresaId, req));
             assertEquals("Hora de fim deve ser após hora de início", ex.getMessage());
             verify(disponibilidadeRepository, never()).save(any());
         }
@@ -331,9 +336,11 @@ class DisponibilidadeServiceTest {
         void empresaInexistenteDa404() {
             when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.empty());
 
+            UUID empresaId = empresa.getId();
+            DisponibilidadeRequest req = new DisponibilidadeRequest(DiaSemana.SEGUNDA, hora(9, 0), hora(18, 0));
+
             assertThrows(RecursoNaoEncontradoException.class,
-                    () -> service.cadastrar(empresa.getId(),
-                            new DisponibilidadeRequest(DiaSemana.SEGUNDA, hora(9, 0), hora(18, 0))));
+                    () -> service.cadastrar(empresaId, req));
             verify(disponibilidadeRepository, never()).save(any());
         }
     }
