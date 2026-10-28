@@ -44,6 +44,7 @@ public class AgendamentoService {
     private final DisponibilidadeEstudioRepository disponibilidadeRepository;
     private final List<CancelamentoStrategy> cancelamentoStrategies;
     private final ApplicationEventPublisher eventPublisher;
+    private final OcupacaoService ocupacaoService;
 
     private CancelamentoStrategy resolverEstrategiaCancelamento(TipoUsuario tipo) {
         return cancelamentoStrategies.stream()
@@ -86,12 +87,13 @@ public class AgendamentoService {
 
         validarDataFutura(request.dataHoraInicio());
         validarExpediente(empresa.getId(), request.dataHoraInicio(), dataHoraFim);
-        validarConflitoDeHorario(empresa.getId(), request.dataHoraInicio(), dataHoraFim, null);
+        Funcionaria quemAtende = reservarHorario(
+                empresa.getId(), funcionaria, request.dataHoraInicio(), dataHoraFim, null);
 
         Agendamento agendamento = new Agendamento();
         agendamento.setCliente(cliente);
         agendamento.setEmpresa(empresa);
-        agendamento.setFuncionaria(funcionaria);
+        agendamento.setFuncionaria(quemAtende);
         agendamento.setServico(servico);
         agendamento.setDataHoraInicio(request.dataHoraInicio());
         agendamento.setDataHoraFim(dataHoraFim);
@@ -218,9 +220,13 @@ public class AgendamentoService {
 
         validarDataFutura(request.novaDataHoraInicio());
         validarExpediente(agendamento.getEmpresa().getId(), request.novaDataHoraInicio(), novaDataHoraFim);
-        validarConflitoDeHorario(agendamento.getEmpresa().getId(),
+        // Mantém a funcionária; se ela foi desativada, o horário fica com outra que esteja livre
+        Funcionaria atual = agendamento.getFuncionaria();
+        Funcionaria escolhida = atual != null && !Boolean.FALSE.equals(atual.getAtivo()) ? atual : null;
+        Funcionaria quemAtende = reservarHorario(agendamento.getEmpresa().getId(), escolhida,
                 request.novaDataHoraInicio(), novaDataHoraFim, agendamento.getId());
 
+        agendamento.setFuncionaria(quemAtende);
         agendamento.setDataHoraInicio(request.novaDataHoraInicio());
         agendamento.setDataHoraFim(novaDataHoraFim);
         agendamento.setStatus(StatusAgendamento.REAGENDADO);
@@ -264,22 +270,30 @@ public class AgendamentoService {
     }
 
     /**
-     * Impede dois agendamentos no mesmo estabelecimento com horários sobrepostos.
-     * Agendamentos cancelados liberam o horário. No reagendamento, o próprio
-     * agendamento é desconsiderado.
+     * Confere se o horário está livre e devolve quem atende. Estúdio sem funcionárias atende
+     * um cliente por vez. Com funcionárias, a escolhida precisa estar livre; sem escolha, o
+     * horário fica com a livre que tem menos atendimentos no dia. Agendamentos cancelados
+     * liberam o horário e, no reagendamento, o próprio agendamento é desconsiderado.
      */
-    private void validarConflitoDeHorario(UUID empresaId, LocalDateTime inicio,
-                                          LocalDateTime fim, UUID agendamentoIgnorado) {
-        boolean conflito = agendamentoRepository
-                .findByEmpresaIdAndStatusNotAndDataHoraInicioBeforeAndDataHoraFimAfter(
-                        empresaId, StatusAgendamento.CANCELADO, fim, inicio)
-                .stream()
-                .anyMatch(a -> !a.getId().equals(agendamentoIgnorado));
+    private Funcionaria reservarHorario(UUID empresaId, Funcionaria escolhida, LocalDateTime inicio,
+                                        LocalDateTime fim, UUID agendamentoIgnorado) {
+        // Carrega o dia inteiro para contar quantos atendimentos cada funcionária já tem
+        QuadroDeHorarios quadro = ocupacaoService.carregar(empresaId, inicio.toLocalDate().atStartOfDay(),
+                fim.toLocalDate().plusDays(1).atStartOfDay(), agendamentoIgnorado);
 
-        if (conflito) {
-            throw new RegraDeNegocioException(
-                    "Já existe um agendamento neste horário para este estabelecimento");
+        if (!quadro.temFuncionarias()) {
+            if (!quadro.livre(null, inicio, fim)) {
+                throw new RegraDeNegocioException(
+                        "Já existe um agendamento neste horário para este estabelecimento");
+            }
+            return escolhida;
         }
+
+        UUID escolhidaId = escolhida != null ? escolhida.getId() : null;
+        return quadro.funcionariaLivre(escolhidaId, inicio, fim)
+                .orElseThrow(() -> new RegraDeNegocioException(escolhida != null
+                        ? "A funcionária não está livre neste horário"
+                        : "Já existe um agendamento neste horário para este estabelecimento"));
     }
 
     private AgendamentoResponse toResponse(Agendamento a) {

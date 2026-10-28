@@ -2,7 +2,9 @@ package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.Agendamento;
 import br.com.kira.kirabackend.domain.entity.DisponibilidadeEstudio;
+import br.com.kira.kirabackend.domain.entity.BloqueioHorario;
 import br.com.kira.kirabackend.domain.entity.Empresa;
+import br.com.kira.kirabackend.domain.entity.Funcionaria;
 import br.com.kira.kirabackend.domain.entity.Servico;
 import br.com.kira.kirabackend.domain.enums.DiaSemana;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
@@ -12,7 +14,9 @@ import br.com.kira.kirabackend.dto.response.SlotDisponivel;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
+import br.com.kira.kirabackend.repository.BloqueioHorarioRepository;
 import br.com.kira.kirabackend.repository.DisponibilidadeEstudioRepository;
+import br.com.kira.kirabackend.repository.FuncionariaRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,7 +29,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -66,7 +69,12 @@ class DisponibilidadeServiceTest {
     @Mock
     private UsuarioRepository usuarioRepository;
 
-    @InjectMocks
+    @Mock
+    private FuncionariaRepository funcionariaRepository;
+
+    @Mock
+    private BloqueioHorarioRepository bloqueioHorarioRepository;
+
     private DisponibilidadeService service;
 
     private Empresa empresa;
@@ -74,6 +82,9 @@ class DisponibilidadeServiceTest {
 
     @BeforeEach
     void setUp() {
+        service = new DisponibilidadeService(disponibilidadeRepository, servicoRepository, usuarioRepository,
+                new OcupacaoService(agendamentoRepository, funcionariaRepository, bloqueioHorarioRepository));
+
         empresa = new Empresa();
         empresa.setId(UUID.randomUUID());
 
@@ -117,7 +128,7 @@ class DisponibilidadeServiceTest {
     }
 
     private List<SlotDisponivel> calcular() {
-        return service.calcularSlotsDisponiveis(empresa.getId(), servico.getId(), SEGUNDA);
+        return service.calcularSlotsDisponiveis(empresa.getId(), servico.getId(), SEGUNDA, null);
     }
 
     private static List<LocalTime> horariosDeInicio(List<SlotDisponivel> slots) {
@@ -267,7 +278,7 @@ class DisponibilidadeServiceTest {
             UUID servicoId = servico.getId();
 
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.calcularSlotsDisponiveis(empresaId, servicoId, data));
+                    () -> service.calcularSlotsDisponiveis(empresaId, servicoId, data, null));
 
             ArgumentCaptor<DiaSemana> dia = ArgumentCaptor.forClass(DiaSemana.class);
             verify(disponibilidadeRepository).findByEmpresaIdAndDiaSemana(eq(empresa.getId()), dia.capture());
@@ -442,6 +453,93 @@ class DisponibilidadeServiceTest {
 
             assertThrows(RegraDeNegocioException.class, () -> substituir(invertido));
             verify(disponibilidadeRepository, never()).deleteAll(any());
+        }
+    }
+
+    // ---------- horários por funcionária ----------
+
+    @Nested
+    @DisplayName("calcularSlotsDisponiveis com funcionárias")
+    class SlotsPorFuncionaria {
+
+        private Funcionaria ana;
+        private Funcionaria bia;
+
+        @BeforeEach
+        void setUp() {
+            ana = funcionaria("Ana");
+            bia = funcionaria("Bia");
+            when(funcionariaRepository.findByEmpresaIdAndAtivoTrue(empresa.getId())).thenReturn(List.of(ana, bia));
+            mockarServico(60);
+            mockarExpediente(DiaSemana.SEGUNDA, hora(9, 0), hora(11, 0));
+        }
+
+        private Funcionaria funcionaria(String nome) {
+            Funcionaria f = new Funcionaria();
+            f.setId(UUID.randomUUID());
+            f.setNome(nome);
+            f.setEmpresa(empresa);
+            return f;
+        }
+
+        private Agendamento agendamentoDe(Funcionaria f, LocalTime inicio, LocalTime fim) {
+            Agendamento a = agendamento(inicio, fim);
+            a.setFuncionaria(f);
+            return a;
+        }
+
+        private void semBloqueios() {
+            when(bloqueioHorarioRepository.findByFuncionaria_Empresa_IdAndDataHoraInicioBeforeAndDataHoraFimAfter(
+                    eq(empresa.getId()), any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(List.of());
+        }
+
+        @Test
+        @DisplayName("Sem escolha, o horário continua livre enquanto houver uma funcionária livre")
+        void livreComUmaFuncionariaOcupada() {
+            mockarAgendamentos(agendamentoDe(ana, hora(9, 0), hora(10, 0)));
+            semBloqueios();
+
+            assertEquals(List.of(hora(9, 0), hora(10, 0)), horariosDeInicio(calcular()));
+        }
+
+        @Test
+        @DisplayName("Com a funcionária escolhida, some o horário em que ela está ocupada")
+        void escolhidaOcupada() {
+            mockarAgendamentos(agendamentoDe(ana, hora(9, 0), hora(10, 0)));
+            semBloqueios();
+
+            List<SlotDisponivel> slots = service.calcularSlotsDisponiveis(
+                    empresa.getId(), servico.getId(), SEGUNDA, ana.getId());
+
+            assertEquals(List.of(hora(10, 0)), horariosDeInicio(slots));
+        }
+
+        @Test
+        @DisplayName("Horário some quando todas as funcionárias estão ocupadas ou bloqueadas")
+        void todasOcupadas() {
+            mockarAgendamentos(agendamentoDe(ana, hora(9, 0), hora(10, 0)));
+            BloqueioHorario almoco = new BloqueioHorario();
+            almoco.setFuncionaria(bia);
+            almoco.setDataHoraInicio(LocalDateTime.of(SEGUNDA, hora(9, 0)));
+            almoco.setDataHoraFim(LocalDateTime.of(SEGUNDA, hora(10, 0)));
+            when(bloqueioHorarioRepository.findByFuncionaria_Empresa_IdAndDataHoraInicioBeforeAndDataHoraFimAfter(
+                    eq(empresa.getId()), any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(List.of(almoco));
+
+            assertEquals(List.of(hora(10, 0)), horariosDeInicio(calcular()));
+        }
+
+        @Test
+        @DisplayName("Funcionária que não é deste estúdio dá erro")
+        void funcionariaDeOutroEstudio() {
+            mockarAgendamentos();
+            semBloqueios();
+            UUID empresaId = empresa.getId();
+            UUID servicoId = servico.getId();
+            UUID outra = UUID.randomUUID();
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> service.calcularSlotsDisponiveis(empresaId, servicoId, SEGUNDA, outra));
+            assertEquals("Funcionária não atende neste estabelecimento", ex.getMessage());
         }
     }
 }

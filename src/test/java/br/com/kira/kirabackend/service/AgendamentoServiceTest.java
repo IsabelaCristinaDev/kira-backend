@@ -18,6 +18,7 @@ import br.com.kira.kirabackend.observer.AgendamentoCanceladoEvent;
 import br.com.kira.kirabackend.observer.AgendamentoCriadoEvent;
 import br.com.kira.kirabackend.observer.AtendimentoConcluidoEvent;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
+import br.com.kira.kirabackend.repository.BloqueioHorarioRepository;
 import br.com.kira.kirabackend.repository.DisponibilidadeEstudioRepository;
 import br.com.kira.kirabackend.repository.FuncionariaRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
@@ -89,6 +90,9 @@ class AgendamentoServiceTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private BloqueioHorarioRepository bloqueioHorarioRepository;
+
     private AgendamentoService service;
 
     private Cliente cliente;
@@ -111,7 +115,8 @@ class AgendamentoServiceTest {
                 funcionariaRepository,
                 disponibilidadeRepository,
                 List.of(cancelamentoClienteStrategy, cancelamentoEmpresaStrategy),
-                eventPublisher);
+                eventPublisher,
+                new OcupacaoService(agendamentoRepository, funcionariaRepository, bloqueioHorarioRepository));
 
         cliente = new Cliente();
         cliente.setId(UUID.randomUUID());
@@ -243,7 +248,7 @@ class AgendamentoServiceTest {
         }
 
         @Test
-        @DisplayName("Deve consultar conflitos no intervalo [início, fim) ignorando cancelados")
+        @DisplayName("Deve consultar os agendamentos do dia ignorando cancelados")
         void deveConsultarConflitoComIntervaloCorreto() {
             mockarEntidadesDaCriacao();
             mockarExpedientePadrao();
@@ -254,7 +259,7 @@ class AgendamentoServiceTest {
 
             verify(agendamentoRepository).findByEmpresaIdAndStatusNotAndDataHoraInicioBeforeAndDataHoraFimAfter(
                     empresa.getId(), StatusAgendamento.CANCELADO,
-                    inicioValido.plusMinutes(DURACAO_SERVICO), inicioValido);
+                    inicioValido.toLocalDate().plusDays(1).atStartOfDay(), inicioValido.toLocalDate().atStartOfDay());
         }
 
         @Test
@@ -582,6 +587,8 @@ class AgendamentoServiceTest {
         void deveRejeitarConflitoNoReagendamento() {
             Agendamento agendamento = agendamentoExistente(StatusAgendamento.PENDENTE);
             Agendamento outro = agendamentoExistente(StatusAgendamento.CONFIRMADO);
+            outro.setDataHoraInicio(inicioValido.withHour(14));
+            outro.setDataHoraFim(inicioValido.withHour(14).plusMinutes(DURACAO_SERVICO));
             when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
             mockarExpedientePadrao();
             mockarAgendamentosNoIntervalo(List.of(outro));
@@ -776,6 +783,102 @@ class AgendamentoServiceTest {
                     () -> service.reagendarPelaEmpresa(agendamentoId, outroUsuario, reagendamento));
             assertEquals(inicioValido, agendamento.getDataHoraInicio());
             verify(agendamentoRepository, never()).save(any());
+        }
+    }
+
+    // ---------- horário por funcionária ----------
+
+    @Nested
+    @DisplayName("horário por funcionária")
+    class HorarioPorFuncionaria {
+
+        private Funcionaria bia;
+
+        @BeforeEach
+        void setUp() {
+            funcionaria.setNome("Ana");
+            bia = new Funcionaria();
+            bia.setId(UUID.randomUUID());
+            bia.setNome("Bia");
+            bia.setEmpresa(empresa);
+            when(funcionariaRepository.findByEmpresaIdAndAtivoTrue(empresa.getId()))
+                    .thenReturn(List.of(funcionaria, bia));
+            when(bloqueioHorarioRepository.findByFuncionaria_Empresa_IdAndDataHoraInicioBeforeAndDataHoraFimAfter(
+                    eq(empresa.getId()), any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(List.of());
+            mockarExpedientePadrao();
+        }
+
+        private Agendamento daAna() {
+            Agendamento a = agendamentoExistente(StatusAgendamento.CONFIRMADO);
+            a.setFuncionaria(funcionaria);
+            return a;
+        }
+
+        @Test
+        @DisplayName("Sem preferência, o horário fica com a funcionária livre")
+        void semPreferenciaAtribuiFuncionariaLivre() {
+            when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
+            when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+            when(servicoRepository.findById(servico.getId())).thenReturn(Optional.of(servico));
+            mockarAgendamentosNoIntervalo(List.of(daAna()));
+            mockarSaveDevolvendoArgumento();
+            AgendamentoRequest semPreferencia = new AgendamentoRequest(empresa.getId(), null, servico.getId(),
+                    inicioValido, null, null);
+
+            service.criar(cliente.getId(), cliente.getId(), semPreferencia);
+
+            ArgumentCaptor<Agendamento> salvo = ArgumentCaptor.forClass(Agendamento.class);
+            verify(agendamentoRepository).save(salvo.capture());
+            assertSame(bia, salvo.getValue().getFuncionaria());
+        }
+
+        @Test
+        @DisplayName("Duas funcionárias atendem no mesmo horário")
+        void duasNoMesmoHorario() {
+            when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
+            when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+            when(servicoRepository.findById(servico.getId())).thenReturn(Optional.of(servico));
+            when(funcionariaRepository.findById(bia.getId())).thenReturn(Optional.of(bia));
+            mockarAgendamentosNoIntervalo(List.of(daAna()));
+            mockarSaveDevolvendoArgumento();
+            AgendamentoRequest comBia = new AgendamentoRequest(empresa.getId(), bia.getId(), servico.getId(),
+                    inicioValido, null, null);
+
+            AgendamentoResponse criado = service.criar(cliente.getId(), cliente.getId(), comBia);
+
+            assertEquals(bia.getId(), criado.funcionariaId());
+        }
+
+        @Test
+        @DisplayName("Dá erro quando a funcionária escolhida já tem atendimento no horário")
+        void escolhidaOcupada() {
+            mockarEntidadesDaCriacao();
+            mockarAgendamentosNoIntervalo(List.of(daAna()));
+            UUID clienteId = cliente.getId();
+            AgendamentoRequest req = request(inicioValido);
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> service.criar(clienteId, clienteId, req));
+            assertEquals("A funcionária não está livre neste horário", ex.getMessage());
+            verify(agendamentoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Reagendar mantém a funcionária e confere a agenda dela")
+        void reagendarMantemFuncionaria() {
+            Agendamento agendamento = daAna();
+            when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+            Agendamento outroDaAna = daAna();
+            outroDaAna.setDataHoraInicio(inicioValido.plusHours(3));
+            outroDaAna.setDataHoraFim(inicioValido.plusHours(3).plusMinutes(DURACAO_SERVICO));
+            mockarAgendamentosNoIntervalo(List.of(outroDaAna));
+            UUID id = agendamento.getId();
+            UUID empresaId = empresa.getId();
+            ReagendamentoRequest req = new ReagendamentoRequest(inicioValido.plusHours(3), null);
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> service.reagendarPelaEmpresa(id, empresaId, req));
+            assertEquals("A funcionária não está livre neste horário", ex.getMessage());
         }
     }
 }
