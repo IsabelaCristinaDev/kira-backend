@@ -320,6 +320,38 @@ class AgendamentoServiceTest {
         }
 
         @Test
+        @DisplayName("Deve dar erro quando a funcionária é de outra empresa")
+        void deveFalharFuncionariaDeOutraEmpresa() {
+            Empresa outraEmpresa = new Empresa();
+            outraEmpresa.setId(UUID.randomUUID());
+            funcionaria.setEmpresa(outraEmpresa);
+            mockarEntidadesDaCriacao();
+
+            UUID clienteId = cliente.getId();
+            AgendamentoRequest req = request(inicioValido);
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> service.criar(clienteId, clienteId, req));
+            assertEquals("Funcionária não pertence a este estabelecimento", ex.getMessage());
+            verify(agendamentoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Deve dar erro quando a funcionária foi desativada")
+        void deveFalharFuncionariaInativa() {
+            funcionaria.setAtivo(false);
+            mockarEntidadesDaCriacao();
+
+            UUID clienteId = cliente.getId();
+            AgendamentoRequest req = request(inicioValido);
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> service.criar(clienteId, clienteId, req));
+            assertEquals("Funcionária não está mais atendendo", ex.getMessage());
+            verify(agendamentoRepository, never()).save(any());
+        }
+
+        @Test
         @DisplayName("Deve dar erro quando o serviço pertence a outra empresa")
         void deveFalharServicoDeOutraEmpresa() {
             Empresa outraEmpresa = new Empresa();
