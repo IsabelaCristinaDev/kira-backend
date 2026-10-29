@@ -287,6 +287,39 @@ class AgendamentoServiceTest {
         }
 
         @Test
+        @DisplayName("Deve dar 404 quando a empresa está desativada")
+        void deveFalharEmpresaDesativada() {
+            empresa.setAtivo(false);
+            when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
+            when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+
+            UUID clienteId = cliente.getId();
+            AgendamentoRequest req = request(inicioValido);
+
+            RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
+                    () -> service.criar(clienteId, clienteId, req));
+            assertEquals("Empresa não encontrada", ex.getMessage());
+            verify(agendamentoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Deve dar 404 quando o ID da empresa é de um cliente")
+        void deveFalharEmpresaQueEhCliente() {
+            Cliente outroCliente = new Cliente();
+            outroCliente.setId(empresa.getId());
+            when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
+            when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(outroCliente));
+
+            UUID clienteId = cliente.getId();
+            AgendamentoRequest req = request(inicioValido);
+
+            RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
+                    () -> service.criar(clienteId, clienteId, req));
+            assertEquals("Empresa não encontrada", ex.getMessage());
+            verify(agendamentoRepository, never()).save(any());
+        }
+
+        @Test
         @DisplayName("Deve dar 404 quando o serviço não existe")
         void deveFalharServicoInexistente() {
             when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
@@ -595,6 +628,23 @@ class AgendamentoServiceTest {
                     () -> service.reagendarPeloCliente(agendamentoId, clienteId, req));
             verify(agendamentoRepository, never()).save(any());
         }
+
+        @Test
+        @DisplayName("Cliente não remarca agendamento de empresa desativada")
+        void naoRemarcaComEmpresaDesativada() {
+            empresa.setAtivo(false);
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.CONFIRMADO);
+            when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+
+            UUID agendamentoId = agendamento.getId();
+            UUID clienteId = cliente.getId();
+            ReagendamentoRequest req = new ReagendamentoRequest(inicioValido.withHour(14), null);
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> service.reagendarPeloCliente(agendamentoId, clienteId, req));
+            assertEquals("Este estabelecimento não está mais disponível", ex.getMessage());
+            verify(agendamentoRepository, never()).save(any());
+        }
     }
 
     // ---------- cancelar ----------
@@ -614,6 +664,20 @@ class AgendamentoServiceTest {
 
             verify(cancelamentoClienteStrategy).validarCancelamento(agendamento);
             verify(cancelamentoEmpresaStrategy, never()).validarCancelamento(any());
+            assertEquals(StatusAgendamento.CANCELADO, response.status());
+            assertCanceladoComEvento(agendamento);
+        }
+
+        @Test
+        @DisplayName("Cliente ainda cancela agendamento de empresa desativada")
+        void clienteCancelaComEmpresaDesativada() {
+            empresa.setAtivo(false);
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.PENDENTE);
+            when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+            mockarSaveDevolvendoArgumento();
+
+            AgendamentoResponse response = service.cancelarPeloCliente(agendamento.getId(), cliente.getId());
+
             assertEquals(StatusAgendamento.CANCELADO, response.status());
             assertCanceladoComEvento(agendamento);
         }
