@@ -49,3 +49,5 @@ backup_dados.sql
 
 # Configuracao local do Claude Code
 .claude/
+CLAUDE.md
+CLAUDE.local.md
