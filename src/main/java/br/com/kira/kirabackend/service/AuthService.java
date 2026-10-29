@@ -81,6 +81,10 @@ public class AuthService {
         }
 
         Usuario usuario = refreshTokenEntity.getUsuario();
+        if (!usuario.isEnabled()) {
+            throw new RegraDeNegocioException("Conta desativada");
+        }
+
         String tipoUsuario = Hibernate.getClass(usuario).getSimpleName().toUpperCase();
         var novoToken = jwtTokenProvider.gerarToken(usuario, tipoUsuario);
         var novoRefreshToken = gerarERegistrarRefreshToken(usuario);

@@ -169,6 +169,30 @@ class EstudioServiceTest {
     }
 
     @Test
+    @DisplayName("Empresa desativada some da listagem, da busca por nome, por tipo e por cidade")
+    void empresaDesativadaSomeDaVitrine() {
+        espacoCilios.setAtivo(false);
+
+        assertEquals(List.of("Studio Bela Vista", "Bela Unhas"), nomes(service.listarTodos()));
+        assertTrue(service.buscarPorNome("cílios").isEmpty());
+        assertEquals(List.of("Bela Unhas"), nomes(service.buscarPorTipo(TipoEstabelecimento.AUTONOMA)));
+        assertTrue(service.buscarPorCidade("campinas").isEmpty());
+    }
+
+    @Test
+    @DisplayName("Buscar o ID de uma empresa desativada dá 404")
+    void buscarEmpresaDesativadaDa404() {
+        espacoCilios.setAtivo(false);
+        when(usuarioRepository.findById(espacoCilios.getId())).thenReturn(Optional.of(espacoCilios));
+
+        UUID empresaId = espacoCilios.getId();
+
+        RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
+                () -> service.buscarPorId(empresaId));
+        assertEquals("Estúdio não encontrado", ex.getMessage());
+    }
+
+    @Test
     @DisplayName("Busca sem resultado devolve lista vazia")
     void buscaSemResultado() {
         assertTrue(service.buscarPorNome("inexistente").isEmpty());
