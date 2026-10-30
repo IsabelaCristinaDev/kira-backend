@@ -10,6 +10,7 @@ import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.AvaliacaoRepository;
+import br.com.kira.kirabackend.repository.UsuarioRepository;
 import jakarta.transaction.Transactional;
 
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ public class AvaliacaoService {
 
     private final AvaliacaoRepository avaliacaoRepository;
     private final AgendamentoRepository agendamentoRepository;
+    private final UsuarioRepository usuarioRepository;
 
     public AvaliacaoResponse avaliarComoCliente(UUID clienteId, AvaliacaoRequest request) {
         Agendamento agendamento = agendamentoRepository.findById(request.agendamentoId())
@@ -85,6 +87,7 @@ public class AvaliacaoService {
     }
 
     public List<AvaliacaoResponse> listarAvaliacoesEmpresa(UUID empresaId) {
+        exigirEmpresaAtiva(empresaId);
         return avaliacaoRepository
                 .findByEmpresaIdAndTipoAvaliador(empresaId, TipoAvaliador.CLIENTE)
                 .stream()
@@ -101,6 +104,7 @@ public class AvaliacaoService {
     }
 
     public Double mediaAvaliacaoEmpresa(UUID empresaId) {
+        exigirEmpresaAtiva(empresaId);
         return avaliacaoRepository.calcularMediaAvaliacaoEmpresa(empresaId);
     }
 
@@ -117,5 +121,12 @@ public class AvaliacaoService {
                 a.getComentario(),
                 a.getDataCriacao()
         );
+    }
+
+    // Empresa desativada responde como inexistente, igual à vitrine
+    private void exigirEmpresaAtiva(UUID empresaId) {
+        if (!usuarioRepository.existsEmpresaAtivaById(empresaId)) {
+            throw new RecursoNaoEncontradoException("Empresa não encontrada");
+        }
     }
 }

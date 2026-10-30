@@ -97,6 +97,7 @@ public class DisponibilidadeService {
     }
 
     public List<DisponibilidadeResponse> listarPorEmpresa(UUID empresaId) {
+        exigirEmpresaAtiva(empresaId);
         return disponibilidadeRepository.findByEmpresaId(empresaId)
                 .stream()
                 .sorted(Comparator.comparing(DisponibilidadeEstudio::getDiaSemana))
@@ -124,6 +125,7 @@ public class DisponibilidadeService {
             UUID servicoId,
             LocalDate data,
             UUID funcionariaId) {
+        exigirEmpresaAtiva(empresaId);
 
         var servico = servicoRepository.findById(servicoId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Serviço não encontrado"));
@@ -173,5 +175,12 @@ public class DisponibilidadeService {
                 d.getHoraInicio(),
                 d.getHoraFim()
         );
+    }
+
+    // Empresa desativada responde como inexistente, igual à vitrine
+    private void exigirEmpresaAtiva(UUID empresaId) {
+        if (!usuarioRepository.existsEmpresaAtivaById(empresaId)) {
+            throw new RecursoNaoEncontradoException("Empresa não encontrada");
+        }
     }
 }

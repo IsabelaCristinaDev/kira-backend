@@ -42,6 +42,7 @@ public class FuncionariaService {
     }
 
     public List<FuncionariaResponse> listarPorEmpresa(UUID empresaId) {
+        exigirEmpresaAtiva(empresaId);
         return funcionariaRepository.findByEmpresaIdAndAtivoTrue(empresaId)
                 .stream()
                 .map(this::toResponse)
@@ -84,5 +85,12 @@ public class FuncionariaService {
                 funcionaria.getAtivo(),
                 funcionaria.getComissaoPercentual()
         );
+    }
+
+    // Empresa desativada responde como inexistente, igual à vitrine
+    private void exigirEmpresaAtiva(UUID empresaId) {
+        if (!usuarioRepository.existsEmpresaAtivaById(empresaId)) {
+            throw new RecursoNaoEncontradoException("Empresa não encontrada");
+        }
     }
 }

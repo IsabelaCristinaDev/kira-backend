@@ -54,7 +54,8 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**"
                         ).permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/admin/**").hasRole("ADMIN")
+                        // Sem filtrar por método: senão GET/PUT/DELETE caem no authenticated() e qualquer login passa
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/auth/recuperar-senha").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/redefinir-senha").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()

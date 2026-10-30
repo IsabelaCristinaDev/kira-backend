@@ -24,4 +24,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, UUID> {
 
     @Query("select count(e) > 0 from Empresa e where e.cnpj = :cnpj")
     boolean existsEmpresaByCnpj(String cnpj);
+
+    @Query("select count(e) > 0 from Empresa e where e.id = :id and e.ativo = true")
+    boolean existsEmpresaAtivaById(UUID id);
 }

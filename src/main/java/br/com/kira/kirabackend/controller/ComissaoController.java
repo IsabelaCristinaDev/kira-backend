@@ -2,7 +2,7 @@ package br.com.kira.kirabackend.controller;
 
 import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.security.AcessoEmpresa;
-import br.com.kira.kirabackend.domain.entity.ComissaoAgendamento;
+import br.com.kira.kirabackend.dto.response.ComissaoResponse;
 import br.com.kira.kirabackend.service.ComissaoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,7 +22,7 @@ public class ComissaoController {
     private final AcessoEmpresa acessoEmpresa;
 
     @GetMapping("/funcionaria/{funcionariaId}")
-    public ResponseEntity<List<ComissaoAgendamento>> listarPorFuncionaria(
+    public ResponseEntity<List<ComissaoResponse>> listarPorFuncionaria(
             @PathVariable UUID funcionariaId,
             @AuthenticationPrincipal Usuario usuario) {
         acessoEmpresa.exigirFuncionariaDaEmpresa(funcionariaId, usuario);
