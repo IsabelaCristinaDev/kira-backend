@@ -58,7 +58,11 @@ public class AgendamentoService {
         Cliente cliente = (Cliente) usuarioRepository.findById(clienteId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Cliente não encontrado"));
 
-        Empresa empresa = (Empresa) usuarioRepository.findById(request.empresaId())
+        // Empresa desativada responde como inexistente, igual à vitrine
+        Empresa empresa = usuarioRepository.findById(request.empresaId())
+                .filter(Empresa.class::isInstance)
+                .map(Empresa.class::cast)
+                .filter(Empresa::isEnabled)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Empresa não encontrada"));
 
         Servico servico = servicoRepository.findById(request.servicoId())
@@ -204,6 +208,11 @@ public class AgendamentoService {
         if (agendamento.getStatus() == StatusAgendamento.CANCELADO ||
                 agendamento.getStatus() == StatusAgendamento.CONCLUIDO) {
             throw new RegraDeNegocioException("Não é possível reagendar este agendamento");
+        }
+
+        // Cancelar continua permitido: a cliente precisa conseguir desmarcar
+        if (!agendamento.getEmpresa().isEnabled()) {
+            throw new RegraDeNegocioException("Este estabelecimento não está mais disponível");
         }
 
         LocalDateTime novaDataHoraFim = request.novaDataHoraInicio()

@@ -101,6 +101,23 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    @DisplayName("Token válido de conta desativada não autentica, mas a requisição segue")
+    void tokenDeContaDesativadaNaoAutentica() throws Exception {
+        Cliente cliente = new Cliente();
+        cliente.setEmail("ana@teste.com");
+        cliente.setAtivo(false);
+        request.addHeader("Authorization", "Bearer token-valido");
+        when(jwtTokenProvider.tokenValido("token-valido")).thenReturn(true);
+        when(jwtTokenProvider.extrairEmail("token-valido")).thenReturn("ana@teste.com");
+        when(userDetailsService.loadUserByUsername("ana@teste.com")).thenReturn(cliente);
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        assertNull(autenticacaoAtual());
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
     @DisplayName("Token inválido não autentica, mas a requisição segue")
     void tokenInvalidoNaoAutentica() throws Exception {
         request.addHeader("Authorization", "Bearer token-invalido");

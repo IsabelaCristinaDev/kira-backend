@@ -31,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class EstudioServiceTest {
@@ -169,9 +170,56 @@ class EstudioServiceTest {
     }
 
     @Test
+    @DisplayName("Empresa desativada some da listagem, da busca por nome, por tipo e por cidade")
+    void empresaDesativadaSomeDaVitrine() {
+        espacoCilios.setAtivo(false);
+
+        assertEquals(List.of("Studio Bela Vista", "Bela Unhas"), nomes(service.listarTodos()));
+        assertTrue(service.buscarPorNome("cílios").isEmpty());
+        assertEquals(List.of("Bela Unhas"), nomes(service.buscarPorTipo(TipoEstabelecimento.AUTONOMA)));
+        assertTrue(service.buscarPorCidade("campinas").isEmpty());
+    }
+
+    @Test
+    @DisplayName("Buscar o ID de uma empresa desativada dá 404")
+    void buscarEmpresaDesativadaDa404() {
+        espacoCilios.setAtivo(false);
+        when(usuarioRepository.findById(espacoCilios.getId())).thenReturn(Optional.of(espacoCilios));
+
+        UUID empresaId = espacoCilios.getId();
+
+        RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
+                () -> service.buscarPorId(empresaId));
+        assertEquals("Estúdio não encontrado", ex.getMessage());
+    }
+
+    @Test
     @DisplayName("Busca sem resultado devolve lista vazia")
     void buscaSemResultado() {
         assertTrue(service.buscarPorNome("inexistente").isEmpty());
         assertTrue(service.buscarPorCidade("Recife").isEmpty());
+    }
+
+    @Test
+    @DisplayName("Funcionárias e serviços de empresa desativada dão 404")
+    void funcionariasEServicosDeEmpresaDesativadaDao404() {
+        UUID empresaId = espacoCilios.getId();
+        when(usuarioRepository.existsEmpresaAtivaById(empresaId)).thenReturn(false);
+
+        assertThrows(RecursoNaoEncontradoException.class, () -> service.listarFuncionarias(empresaId));
+        assertThrows(RecursoNaoEncontradoException.class, () -> service.listarServicos(empresaId));
+        verifyNoInteractions(funcionariaRepository, servicoRepository);
+    }
+
+    @Test
+    @DisplayName("Funcionárias e serviços de empresa ativa são listados")
+    void funcionariasEServicosDeEmpresaAtiva() {
+        UUID empresaId = espacoCilios.getId();
+        when(usuarioRepository.existsEmpresaAtivaById(empresaId)).thenReturn(true);
+        when(funcionariaRepository.findByEmpresaIdAndAtivoTrue(empresaId)).thenReturn(List.of());
+        when(servicoRepository.findByEmpresaIdAndAtivoTrue(empresaId)).thenReturn(List.of());
+
+        assertTrue(service.listarFuncionarias(empresaId).isEmpty());
+        assertTrue(service.listarServicos(empresaId).isEmpty());
     }
 }

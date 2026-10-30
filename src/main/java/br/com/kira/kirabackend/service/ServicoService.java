@@ -37,6 +37,7 @@ public class ServicoService {
     }
 
     public List<ServicoResponse> listarPorEmpresa(UUID empresaId) {
+        exigirEmpresaAtiva(empresaId);
         return servicoRepository.findByEmpresaIdAndAtivoTrue(empresaId)
                 .stream()
                 .map(this::toResponse)
@@ -77,5 +78,12 @@ public class ServicoService {
                 servico.getPreco(),
                 servico.getAtivo()
         );
+    }
+
+    // Empresa desativada responde como inexistente, igual à vitrine
+    private void exigirEmpresaAtiva(UUID empresaId) {
+        if (!usuarioRepository.existsEmpresaAtivaById(empresaId)) {
+            throw new RecursoNaoEncontradoException("Empresa não encontrada");
+        }
     }
 }

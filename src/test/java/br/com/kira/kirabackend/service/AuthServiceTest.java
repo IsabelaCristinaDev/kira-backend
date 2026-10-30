@@ -270,6 +270,22 @@ class AuthServiceTest {
         }
 
         @Test
+        @DisplayName("Refresh de conta desativada dá erro e não gera token novo")
+        void refreshDeContaDesativada() {
+            Cliente cliente = cliente();
+            cliente.setAtivo(false);
+            when(refreshTokenRepository.findByToken("refresh-antigo"))
+                    .thenReturn(Optional.of(refreshToken(cliente, agora().plusDays(1), false)));
+
+            RefreshTokenRequest req = new RefreshTokenRequest("refresh-antigo");
+
+            assertThrows(RegraDeNegocioException.class,
+                    () -> service.refreshToken(req));
+            verifyNoInteractions(jwtTokenProvider);
+            verify(refreshTokenRepository, never()).save(any());
+        }
+
+        @Test
         @DisplayName("Refresh com token revogado dá erro")
         void refreshRevogado() {
             when(refreshTokenRepository.findByToken("refresh-antigo"))

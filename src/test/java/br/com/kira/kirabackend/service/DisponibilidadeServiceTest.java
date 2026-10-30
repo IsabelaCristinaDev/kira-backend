@@ -47,6 +47,8 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class DisponibilidadeServiceTest {
@@ -81,6 +83,9 @@ class DisponibilidadeServiceTest {
         servico.setId(UUID.randomUUID());
         servico.setDuracaoMinutos(60);
         servico.setEmpresa(empresa);
+
+        // Nos testes, a empresa é ativa por padrão; os casos de empresa desativada sobrescrevem
+        lenient().when(usuarioRepository.existsEmpresaAtivaById(empresa.getId())).thenReturn(true);
     }
 
     // ---------- helpers ----------
@@ -443,5 +448,18 @@ class DisponibilidadeServiceTest {
             assertThrows(RegraDeNegocioException.class, () -> substituir(invertido));
             verify(disponibilidadeRepository, never()).deleteAll(any());
         }
+    }
+
+    @Test
+    @DisplayName("Expediente e horários livres de empresa desativada dão 404")
+    void empresaDesativadaDa404() {
+        UUID empresaId = empresa.getId();
+        UUID servicoId = servico.getId();
+        when(usuarioRepository.existsEmpresaAtivaById(empresaId)).thenReturn(false);
+
+        assertThrows(RecursoNaoEncontradoException.class, () -> service.listarPorEmpresa(empresaId));
+        assertThrows(RecursoNaoEncontradoException.class,
+                () -> service.calcularSlotsDisponiveis(empresaId, servicoId, SEGUNDA));
+        verifyNoInteractions(disponibilidadeRepository, servicoRepository, agendamentoRepository);
     }
 }

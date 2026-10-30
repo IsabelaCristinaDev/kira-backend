@@ -27,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import br.com.kira.kirabackend.repository.UsuarioRepository;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -36,6 +37,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class AvaliacaoServiceTest {
@@ -45,6 +48,9 @@ class AvaliacaoServiceTest {
 
     @Mock
     private AgendamentoRepository agendamentoRepository;
+
+    @Mock
+    private UsuarioRepository usuarioRepository;
 
     @InjectMocks
     private AvaliacaoService service;
@@ -68,6 +74,9 @@ class AvaliacaoServiceTest {
         agendamento.setCliente(cliente);
         agendamento.setEmpresa(empresa);
         agendamento.setStatus(StatusAgendamento.CONCLUIDO);
+
+        // Nos testes, a empresa é ativa por padrão; os casos de empresa desativada sobrescrevem
+        lenient().when(usuarioRepository.existsEmpresaAtivaById(empresa.getId())).thenReturn(true);
     }
 
     // ---------- helpers ----------
@@ -296,5 +305,16 @@ class AvaliacaoServiceTest {
         assertEquals(1, avaliacoes.size());
         assertEquals(TipoAvaliador.EMPRESA, avaliacoes.get(0).tipoAvaliador());
         verify(avaliacaoRepository, never()).findByClienteIdAndTipoAvaliador(cliente.getId(), TipoAvaliador.CLIENTE);
+    }
+
+    @Test
+    @DisplayName("Avaliações e média de empresa desativada dão 404")
+    void empresaDesativadaDa404() {
+        UUID empresaId = empresa.getId();
+        when(usuarioRepository.existsEmpresaAtivaById(empresaId)).thenReturn(false);
+
+        assertThrows(RecursoNaoEncontradoException.class, () -> service.listarAvaliacoesEmpresa(empresaId));
+        assertThrows(RecursoNaoEncontradoException.class, () -> service.mediaAvaliacaoEmpresa(empresaId));
+        verifyNoInteractions(avaliacaoRepository);
     }
 }
