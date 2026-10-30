@@ -1,9 +1,11 @@
 package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.Agendamento;
+import br.com.kira.kirabackend.domain.entity.Cliente;
 import br.com.kira.kirabackend.domain.entity.ComissaoAgendamento;
 import br.com.kira.kirabackend.domain.entity.Funcionaria;
 import br.com.kira.kirabackend.domain.entity.Servico;
+import br.com.kira.kirabackend.dto.response.ComissaoResponse;
 import br.com.kira.kirabackend.repository.ComissaoAgendamentoRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,6 +18,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -124,5 +128,39 @@ class ComissaoServiceTest {
                 .thenReturn(new BigDecimal("129.50"));
 
         assertEquals(new BigDecimal("129.50"), service.totalComissaoFuncionaria(funcionariaId));
+    }
+
+    @Test
+    @DisplayName("Lista as comissões da funcionária como DTO, com cliente, serviço e data do atendimento")
+    void listaComoDto() {
+        Agendamento agendamento = agendamento("80.00", "30");
+        Cliente cliente = new Cliente();
+        cliente.setNome("Ana");
+        agendamento.setCliente(cliente);
+        agendamento.getServico().setNome("Escova");
+        LocalDateTime inicio = LocalDateTime.of(2026, 10, 20, 14, 0);
+        agendamento.setDataHoraInicio(inicio);
+
+        ComissaoAgendamento comissao = new ComissaoAgendamento();
+        comissao.setId(UUID.randomUUID());
+        comissao.setAgendamento(agendamento);
+        comissao.setFuncionaria(agendamento.getFuncionaria());
+        comissao.setValorServico(new BigDecimal("80.00"));
+        comissao.setPercentualComissao(new BigDecimal("30"));
+        comissao.setValorComissao(new BigDecimal("24.00"));
+
+        UUID funcionariaId = agendamento.getFuncionaria().getId();
+        when(comissaoRepository.findByFuncionariaId(funcionariaId)).thenReturn(List.of(comissao));
+
+        List<ComissaoResponse> lista = service.listarPorFuncionaria(funcionariaId);
+
+        assertEquals(1, lista.size());
+        ComissaoResponse dto = lista.get(0);
+        assertEquals(comissao.getId(), dto.id());
+        assertEquals(agendamento.getId(), dto.agendamentoId());
+        assertEquals(inicio, dto.dataHoraAtendimento());
+        assertEquals("Ana", dto.nomeCliente());
+        assertEquals("Escova", dto.nomeServico());
+        assertEquals(new BigDecimal("24.00"), dto.valorComissao());
     }
 }

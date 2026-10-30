@@ -2,6 +2,7 @@ package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.Agendamento;
 import br.com.kira.kirabackend.domain.entity.ComissaoAgendamento;
+import br.com.kira.kirabackend.dto.response.ComissaoResponse;
 import br.com.kira.kirabackend.repository.ComissaoAgendamentoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -40,8 +41,12 @@ public class ComissaoService {
         comissaoRepository.save(comissao);
     }
 
-    public List<ComissaoAgendamento> listarPorFuncionaria(UUID funcionariaId) {
-        return comissaoRepository.findByFuncionariaId(funcionariaId);
+    // Converte aqui, dentro da transação: com open-in-view desligado, as relações LAZY não carregam no controller
+    public List<ComissaoResponse> listarPorFuncionaria(UUID funcionariaId) {
+        return comissaoRepository.findByFuncionariaId(funcionariaId)
+                .stream()
+                .map(ComissaoResponse::from)
+                .toList();
     }
 
     public BigDecimal totalComissaoFuncionaria(UUID funcionariaId) {
