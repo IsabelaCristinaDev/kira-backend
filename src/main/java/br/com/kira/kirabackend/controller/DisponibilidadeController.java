@@ -53,8 +53,9 @@ public class DisponibilidadeController {
     public ResponseEntity<List<SlotDisponivel>> calcularSlots(
             @PathVariable UUID empresaId,
             @RequestParam UUID servicoId,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate data) {
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate data,
+            @RequestParam(required = false) UUID funcionariaId) {
         return ResponseEntity.ok(
-                disponibilidadeService.calcularSlotsDisponiveis(empresaId, servicoId, data));
+                disponibilidadeService.calcularSlotsDisponiveis(empresaId, servicoId, data, funcionariaId));
     }
 }

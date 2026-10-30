@@ -17,4 +17,10 @@ public interface BloqueioHorarioRepository extends JpaRepository<BloqueioHorario
             UUID funcionariaId,
             LocalDateTime inicio,
             LocalDateTime fim);
+
+    /** Bloqueios das funcionárias do estúdio que cruzam o intervalo [inicio, fim). */
+    List<BloqueioHorario> findByFuncionaria_Empresa_IdAndDataHoraInicioBeforeAndDataHoraFimAfter(
+            UUID empresaId,
+            LocalDateTime fim,
+            LocalDateTime inicio);
 }

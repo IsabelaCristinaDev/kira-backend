@@ -3,13 +3,11 @@ package br.com.kira.kirabackend.service;
 import br.com.kira.kirabackend.domain.entity.DisponibilidadeEstudio;
 import br.com.kira.kirabackend.domain.entity.Empresa;
 import br.com.kira.kirabackend.domain.enums.DiaSemana;
-import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import br.com.kira.kirabackend.dto.request.DisponibilidadeRequest;
 import br.com.kira.kirabackend.dto.response.DisponibilidadeResponse;
 import br.com.kira.kirabackend.dto.response.SlotDisponivel;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
-import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.DisponibilidadeEstudioRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
@@ -32,9 +30,9 @@ import java.util.UUID;
 public class DisponibilidadeService {
 
     private final DisponibilidadeEstudioRepository disponibilidadeRepository;
-    private final AgendamentoRepository agendamentoRepository;
     private final ServicoRepository servicoRepository;
     private final UsuarioRepository usuarioRepository;
+    private final OcupacaoService ocupacaoService;
 
     /**
      * Cadastra o expediente de um dia. Se o dia já tiver expediente, ele é atualizado:
@@ -118,10 +116,15 @@ public class DisponibilidadeService {
         }
     }
 
+    /**
+     * Horários livres do dia para o serviço. Com {@code funcionariaId}, só os horários em que ela
+     * está livre; sem, os horários em que alguma funcionária (ou o estúdio, se não tiver) está livre.
+     */
     public List<SlotDisponivel> calcularSlotsDisponiveis(
             UUID empresaId,
             UUID servicoId,
-            LocalDate data) {
+            LocalDate data,
+            UUID funcionariaId) {
         exigirEmpresaAtiva(empresaId);
 
         var servico = servicoRepository.findById(servicoId)
@@ -133,12 +136,11 @@ public class DisponibilidadeService {
                 .findByEmpresaIdAndDiaSemana(empresaId, diaSemana)
                 .orElseThrow(() -> new RegraDeNegocioException("Empresa não atende neste dia da semana"));
 
-        var agendamentosExistentes = agendamentoRepository
-                .findByEmpresaIdAndStatusNotAndDataHoraInicioBeforeAndDataHoraFimAfter(
-                        empresaId,
-                        StatusAgendamento.CANCELADO,
-                        data.plusDays(1).atStartOfDay(),
-                        data.atStartOfDay());
+        QuadroDeHorarios quadro = ocupacaoService.carregar(
+                empresaId, data.atStartOfDay(), data.plusDays(1).atStartOfDay(), null);
+        if (funcionariaId != null && !quadro.temFuncionaria(funcionariaId)) {
+            throw new RegraDeNegocioException("Funcionária não atende neste estabelecimento");
+        }
 
         Integer duracaoMinutos = servico.getDuracaoMinutos();
         if (duracaoMinutos == null || duracaoMinutos <= 0) {
@@ -156,12 +158,7 @@ public class DisponibilidadeService {
             LocalDateTime slotInicio = cursor;
             LocalDateTime slotFim = slotInicio.plusMinutes(duracaoMinutos);
 
-            boolean ocupado = agendamentosExistentes.stream()
-                    .anyMatch(a ->
-                            a.getDataHoraInicio().isBefore(slotFim) &&
-                                    a.getDataHoraFim().isAfter(slotInicio));
-
-            if (!ocupado) {
+            if (quadro.livre(funcionariaId, slotInicio, slotFim)) {
                 slots.add(new SlotDisponivel(slotInicio, slotFim));
             }
 
