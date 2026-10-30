@@ -76,6 +76,13 @@ public class AgendamentoService {
         if (request.funcionariaId() != null) {
             funcionaria = funcionariaRepository.findById(request.funcionariaId())
                     .orElseThrow(() -> new RecursoNaoEncontradoException("Funcionária não encontrada"));
+
+            if (!empresa.getId().equals(funcionaria.getEmpresa().getId())) {
+                throw new RegraDeNegocioException("Funcionária não pertence a este estabelecimento");
+            }
+            if (Boolean.FALSE.equals(funcionaria.getAtivo())) {
+                throw new RegraDeNegocioException("Funcionária não está mais atendendo");
+            }
         }
 
         LocalDateTime dataHoraFim = request.dataHoraInicio()
