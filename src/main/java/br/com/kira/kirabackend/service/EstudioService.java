@@ -73,6 +73,7 @@ public class EstudioService {
     }
 
     public List<FuncionariaResponse> listarFuncionarias(UUID empresaId) {
+        exigirEmpresaAtiva(empresaId);
         return funcionariaRepository.findByEmpresaIdAndAtivoTrue(empresaId)
                 .stream()
                 .map(f -> new FuncionariaResponse(
@@ -86,6 +87,7 @@ public class EstudioService {
     }
 
     public List<ServicoResponse> listarServicos(UUID empresaId) {
+        exigirEmpresaAtiva(empresaId);
         return servicoRepository.findByEmpresaIdAndAtivoTrue(empresaId)
                 .stream()
                 .map(s -> new ServicoResponse(
@@ -119,4 +121,12 @@ public class EstudioService {
                 empresa.getTipoEstabelecimento(),
                 media
         );
-    }}
+    }
+
+    // Empresa desativada responde como inexistente, igual à vitrine
+    private void exigirEmpresaAtiva(UUID empresaId) {
+        if (!usuarioRepository.existsEmpresaAtivaById(empresaId)) {
+            throw new RecursoNaoEncontradoException("Estúdio não encontrado");
+        }
+    }
+}

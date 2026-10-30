@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -28,6 +29,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class ServicoServiceTest {
@@ -142,5 +144,28 @@ class ServicoServiceTest {
         assertThrows(RecursoNaoEncontradoException.class, () -> service.desativar(empresaId, servicoId));
         assertTrue(servico.getAtivo());
         verify(servicoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Listar serviços de empresa desativada dá 404")
+    void listarDeEmpresaDesativadaDa404() {
+        UUID empresaId = empresa.getId();
+        when(usuarioRepository.existsEmpresaAtivaById(empresaId)).thenReturn(false);
+
+        RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
+                () -> service.listarPorEmpresa(empresaId));
+        assertEquals("Empresa não encontrada", ex.getMessage());
+        verifyNoInteractions(servicoRepository);
+    }
+
+    @Test
+    @DisplayName("Listar serviços de empresa ativa consulta só os ativos")
+    void listarDeEmpresaAtiva() {
+        UUID empresaId = empresa.getId();
+        when(usuarioRepository.existsEmpresaAtivaById(empresaId)).thenReturn(true);
+        when(servicoRepository.findByEmpresaIdAndAtivoTrue(empresaId)).thenReturn(List.of());
+
+        assertTrue(service.listarPorEmpresa(empresaId).isEmpty());
+        verify(servicoRepository).findByEmpresaIdAndAtivoTrue(empresaId);
     }
 }
