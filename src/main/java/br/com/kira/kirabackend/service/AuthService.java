@@ -4,6 +4,7 @@ import br.com.kira.kirabackend.domain.entity.Cliente;
 import br.com.kira.kirabackend.domain.entity.Empresa;
 import br.com.kira.kirabackend.domain.entity.RefreshToken;
 import br.com.kira.kirabackend.domain.entity.Servico;
+import br.com.kira.kirabackend.domain.enums.CategoriaServico;
 import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.dto.request.ClienteRegistroRequest;
 import br.com.kira.kirabackend.dto.request.EmpresaRegistroRequest;
@@ -192,6 +193,7 @@ public class AuthService {
                 servico.setNome(servicoData.nome());
                 servico.setPreco(parsePreco(servicoData.preco()));
                 servico.setDuracaoMinutos(parseDuracaoMinutos(servicoData.duracao()));
+                servico.setCategoria(CategoriaServico.escolhidaOuPeloNome(servicoData.categoria(), servicoData.nome()));
                 servico.setEmpresa(empresa);
                 servicoRepository.save(servico);
             }

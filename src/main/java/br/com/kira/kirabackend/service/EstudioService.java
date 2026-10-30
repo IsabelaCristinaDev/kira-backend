@@ -90,13 +90,7 @@ public class EstudioService {
         exigirEmpresaAtiva(empresaId);
         return servicoRepository.findByEmpresaIdAndAtivoTrue(empresaId)
                 .stream()
-                .map(s -> new ServicoResponse(
-                        s.getId(),
-                        s.getNome(),
-                        s.getDescricao(),
-                        s.getDuracaoMinutos(),
-                        s.getPreco(),
-                        s.getAtivo()))
+                .map(ServicoResponse::from)
                 .toList();
     }
 
@@ -119,7 +113,9 @@ public class EstudioService {
                 empresa.getTelefone(),
                 empresa.getFotoUrl(),
                 empresa.getTipoEstabelecimento(),
-                media
+                media,
+                empresa.getLatitude(),
+                empresa.getLongitude()
         );
     }
 

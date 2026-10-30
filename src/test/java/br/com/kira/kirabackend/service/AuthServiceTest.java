@@ -5,6 +5,7 @@ import br.com.kira.kirabackend.domain.entity.Empresa;
 import br.com.kira.kirabackend.domain.entity.RefreshToken;
 import br.com.kira.kirabackend.domain.entity.Servico;
 import br.com.kira.kirabackend.domain.entity.Usuario;
+import br.com.kira.kirabackend.domain.enums.CategoriaServico;
 import br.com.kira.kirabackend.domain.enums.Genero;
 import br.com.kira.kirabackend.domain.enums.TipoEstabelecimento;
 import br.com.kira.kirabackend.dto.request.ClienteRegistroRequest;
@@ -150,7 +151,7 @@ class AuthServiceTest {
         when(usuarioRepository.existsByEmailIgnoreCase("estudio@teste.com")).thenReturn(false);
 
         service.registrarEmpresa(registroEmpresa(null,
-                List.of(new ServicoRegistroRequest("Corte", preco, duracao))));
+                List.of(new ServicoRegistroRequest("Corte", preco, duracao, null))));
 
         ArgumentCaptor<Servico> captor = ArgumentCaptor.forClass(Servico.class);
         verify(servicoRepository).save(captor.capture());
@@ -421,8 +422,8 @@ class AuthServiceTest {
             when(usuarioRepository.existsByEmailIgnoreCase("estudio@teste.com")).thenReturn(false);
 
             service.registrarEmpresa(registroEmpresa(null, List.of(
-                    new ServicoRegistroRequest("Corte", "R$ 50", "45 min"),
-                    new ServicoRegistroRequest("Escova", "80,00", "1h"))));
+                    new ServicoRegistroRequest("Corte", "R$ 50", "45 min", null),
+                    new ServicoRegistroRequest("Escova", "80,00", "1h", CategoriaServico.ESTETICA))));
 
             ArgumentCaptor<Usuario> empresaCaptor = ArgumentCaptor.forClass(Usuario.class);
             verify(usuarioRepository).save(empresaCaptor.capture());
@@ -434,6 +435,9 @@ class AuthServiceTest {
 
             assertEquals(List.of("Corte", "Escova"), servicos.stream().map(Servico::getNome).toList());
             assertTrue(servicos.stream().allMatch(s -> s.getEmpresa() == empresa));
+            // Sem categoria, deduz pelo nome; com categoria, usa a escolhida
+            assertEquals(List.of(CategoriaServico.CABELO, CategoriaServico.ESTETICA),
+                    servicos.stream().map(Servico::getCategoria).toList());
         }
 
         @Test

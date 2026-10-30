@@ -12,5 +12,7 @@ public record EstudioResponse(
         String telefone,
         String fotoUrl,
         TipoEstabelecimento tipoEstabelecimento,
-        Double mediaAvaliacoes
+        Double mediaAvaliacoes,
+        Double latitude,
+        Double longitude
 ) {}

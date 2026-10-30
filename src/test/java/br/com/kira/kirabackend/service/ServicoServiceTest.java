@@ -2,6 +2,7 @@ package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.Empresa;
 import br.com.kira.kirabackend.domain.entity.Servico;
+import br.com.kira.kirabackend.domain.enums.CategoriaServico;
 import br.com.kira.kirabackend.dto.request.ServicoRequest;
 import br.com.kira.kirabackend.dto.response.ServicoResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
@@ -60,7 +61,7 @@ class ServicoServiceTest {
         when(servicoRepository.save(any(Servico.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         ServicoResponse response = service.cadastrar(empresa.getId(),
-                new ServicoRequest("Design de sobrancelha", null, 45, new BigDecimal("50.00")));
+                new ServicoRequest("Design de sobrancelha", null, 45, new BigDecimal("50.00"), null));
 
         ArgumentCaptor<Servico> captor = ArgumentCaptor.forClass(Servico.class);
         verify(servicoRepository).save(captor.capture());
@@ -68,6 +69,50 @@ class ServicoServiceTest {
         assertTrue(response.ativo());
         assertEquals(45, response.duracaoMinutos());
         assertEquals(new BigDecimal("50.00"), response.preco());
+        assertEquals(CategoriaServico.SOBRANCELHAS, captor.getValue().getCategoria());
+        assertEquals(CategoriaServico.SOBRANCELHAS, response.categoria());
+    }
+
+    @Test
+    @DisplayName("A categoria escolhida é salva mesmo que o nome sugira outra")
+    void cadastraComCategoriaEscolhida() {
+        when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+        when(servicoRepository.save(any(Servico.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ServicoResponse response = service.cadastrar(empresa.getId(),
+                new ServicoRequest("Pacote noiva", null, 120, new BigDecimal("300"), CategoriaServico.MAQUIAGEM));
+
+        assertEquals(CategoriaServico.MAQUIAGEM, response.categoria());
+    }
+
+    @Test
+    @DisplayName("Editar sem categoria deduz de novo pelo nome novo")
+    void editarDeduzPeloNomeNovo() {
+        Servico servico = new Servico();
+        servico.setId(UUID.randomUUID());
+        servico.setEmpresa(empresa);
+        servico.setCategoria(CategoriaServico.CABELO);
+        when(servicoRepository.findById(servico.getId())).thenReturn(Optional.of(servico));
+        when(servicoRepository.save(any(Servico.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ServicoResponse response = service.atualizar(empresa.getId(), servico.getId(),
+                new ServicoRequest("Manicure", null, 40, new BigDecimal("35"), null));
+
+        assertEquals(CategoriaServico.UNHAS, servico.getCategoria());
+        assertEquals(CategoriaServico.UNHAS, response.categoria());
+    }
+
+    @Test
+    @DisplayName("Serviço antigo, sem categoria no banco, sai com a categoria deduzida pelo nome")
+    void servicoAntigoSemCategoria() {
+        Servico antigo = new Servico();
+        antigo.setId(UUID.randomUUID());
+        antigo.setNome("Lash lifting");
+        when(usuarioRepository.existsEmpresaAtivaById(empresa.getId())).thenReturn(true);
+        when(servicoRepository.findByEmpresaIdAndAtivoTrue(empresa.getId())).thenReturn(List.of(antigo));
+
+        assertEquals(CategoriaServico.CILIOS, service.listarPorEmpresa(empresa.getId()).get(0).categoria());
+        assertEquals(null, antigo.getCategoria());
     }
 
     @Test
@@ -76,7 +121,7 @@ class ServicoServiceTest {
         when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.empty());
 
         UUID empresaId = empresa.getId();
-        ServicoRequest req = new ServicoRequest("Corte", null, 30, new BigDecimal("40"));
+        ServicoRequest req = new ServicoRequest("Corte", null, 30, new BigDecimal("40"), null);
 
         assertThrows(RecursoNaoEncontradoException.class,
                 () -> service.cadastrar(empresaId, req));
@@ -121,7 +166,7 @@ class ServicoServiceTest {
         when(servicoRepository.findById(id)).thenReturn(Optional.empty());
 
         UUID empresaId = empresa.getId();
-        ServicoRequest request = new ServicoRequest("Corte", null, 30, new BigDecimal("40"));
+        ServicoRequest request = new ServicoRequest("Corte", null, 30, new BigDecimal("40"), null);
         assertThrows(RecursoNaoEncontradoException.class, () -> service.atualizar(empresaId, id, request));
         verify(servicoRepository, never()).save(any());
     }
@@ -137,7 +182,7 @@ class ServicoServiceTest {
         servico.setEmpresa(outra);
         UUID servicoId = servico.getId();
         UUID empresaId = empresa.getId();
-        ServicoRequest request = new ServicoRequest("Corte", null, 30, new BigDecimal("40"));
+        ServicoRequest request = new ServicoRequest("Corte", null, 30, new BigDecimal("40"), null);
         when(servicoRepository.findById(servicoId)).thenReturn(Optional.of(servico));
 
         assertThrows(RecursoNaoEncontradoException.class, () -> service.atualizar(empresaId, servicoId, request));
