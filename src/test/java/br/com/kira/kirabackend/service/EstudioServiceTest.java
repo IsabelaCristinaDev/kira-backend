@@ -146,6 +146,20 @@ class EstudioServiceTest {
         assertEquals("Bela Unhas", response.nome());
         assertNull(response.endereco());
         assertEquals(4.5, response.mediaAvaliacoes());
+        assertNull(response.latitude());
+    }
+
+    @Test
+    @DisplayName("Buscar estúdio por ID devolve as coordenadas do cadastro")
+    void buscarPorIdDevolveCoordenadas() {
+        studioBelaVista.setLatitude(-23.5505);
+        studioBelaVista.setLongitude(-46.6333);
+        when(usuarioRepository.findById(studioBelaVista.getId())).thenReturn(Optional.of(studioBelaVista));
+
+        EstudioResponse response = service.buscarPorId(studioBelaVista.getId());
+
+        assertEquals(-23.5505, response.latitude());
+        assertEquals(-46.6333, response.longitude());
     }
 
     @Test

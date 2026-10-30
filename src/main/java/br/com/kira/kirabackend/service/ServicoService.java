@@ -2,6 +2,7 @@ package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.Empresa;
 import br.com.kira.kirabackend.domain.entity.Servico;
+import br.com.kira.kirabackend.domain.enums.CategoriaServico;
 import br.com.kira.kirabackend.dto.request.ServicoRequest;
 import br.com.kira.kirabackend.dto.response.ServicoResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
@@ -29,6 +30,7 @@ public class ServicoService {
         servico.setDescricao(request.descricao());
         servico.setDuracaoMinutos(request.duracaoMinutos());
         servico.setPreco(request.preco());
+        servico.setCategoria(CategoriaServico.escolhidaOuPeloNome(request.categoria(), request.nome()));
         servico.setAtivo(true);
         servico.setEmpresa(empresa);
 
@@ -50,6 +52,7 @@ public class ServicoService {
         servico.setDescricao(request.descricao());
         servico.setDuracaoMinutos(request.duracaoMinutos());
         servico.setPreco(request.preco());
+        servico.setCategoria(CategoriaServico.escolhidaOuPeloNome(request.categoria(), request.nome()));
 
         Servico salvo = servicoRepository.save(servico);
         return toResponse(salvo);
@@ -70,14 +73,7 @@ public class ServicoService {
     }
 
     private ServicoResponse toResponse(Servico servico) {
-        return new ServicoResponse(
-                servico.getId(),
-                servico.getNome(),
-                servico.getDescricao(),
-                servico.getDuracaoMinutos(),
-                servico.getPreco(),
-                servico.getAtivo()
-        );
+        return ServicoResponse.from(servico);
     }
 
     // Empresa desativada responde como inexistente, igual à vitrine

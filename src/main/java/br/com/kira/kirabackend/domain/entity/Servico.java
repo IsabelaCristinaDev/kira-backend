@@ -1,5 +1,6 @@
 package br.com.kira.kirabackend.domain.entity;
 
+import br.com.kira.kirabackend.domain.enums.CategoriaServico;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -35,6 +36,11 @@ public class Servico {
 
     @Column(nullable = false)
     private Boolean ativo = true;
+
+    // Nulo nos serviços antigos: a resposta deduz pelo nome (CategoriaServico.escolhidaOuPeloNome)
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private CategoriaServico categoria;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "empresa_id", nullable = false)
