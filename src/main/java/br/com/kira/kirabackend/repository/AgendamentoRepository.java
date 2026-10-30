@@ -54,4 +54,10 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID> 
             StatusAgendamento status,
             LocalDateTime inicio,
             LocalDateTime fim);
+
+    long countByEmpresaIdAndStatusAndDataHoraInicioBetween(
+            UUID empresaId,
+            StatusAgendamento status,
+            LocalDateTime inicio,
+            LocalDateTime fim);
 }
