@@ -47,6 +47,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/avaliacoes/**").permitAll()
                         // O painel tem faturamento e clientes: exige login (a regra abaixo libera o resto de /api/empresas)
                         .requestMatchers(HttpMethod.GET, "/api/empresas/*/dashboard").authenticated()
+                        // O perfil tem e-mail e documentos: também exige login
+                        .requestMatchers(HttpMethod.GET, "/api/empresas/*/perfil").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/empresas/**").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers(

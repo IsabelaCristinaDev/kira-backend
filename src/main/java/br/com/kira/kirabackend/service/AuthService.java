@@ -2,7 +2,6 @@ package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.Cliente;
 import br.com.kira.kirabackend.domain.entity.Empresa;
-import br.com.kira.kirabackend.domain.entity.Endereco;
 import br.com.kira.kirabackend.domain.entity.RefreshToken;
 import br.com.kira.kirabackend.domain.entity.Servico;
 import br.com.kira.kirabackend.domain.entity.Usuario;
@@ -138,15 +137,7 @@ public class AuthService {
         cliente.setLongitude(data.longitude());
 
         if (data.endereco() != null) {
-            Endereco endereco = new Endereco();
-            endereco.setCep(data.endereco().cep());
-            endereco.setLogradouro(data.endereco().logradouro());
-            endereco.setNumero(data.endereco().numero());
-            endereco.setComplemento(data.endereco().complemento());
-            endereco.setBairro(data.endereco().bairro());
-            endereco.setCidade(data.endereco().cidade());
-            endereco.setEstado(data.endereco().estado());
-            cliente.setEndereco(endereco);
+            cliente.setEndereco(data.endereco().paraEndereco());
 
         }
         usuarioRepository.save(cliente);
@@ -189,15 +180,7 @@ public class AuthService {
         }
 
         if (data.endereco() != null) {
-            Endereco endereco = new Endereco();
-            endereco.setCep(data.endereco().cep());
-            endereco.setLogradouro(data.endereco().logradouro());
-            endereco.setNumero(data.endereco().numero());
-            endereco.setComplemento(data.endereco().complemento());
-            endereco.setBairro(data.endereco().bairro());
-            endereco.setCidade(data.endereco().cidade());
-            endereco.setEstado(data.endereco().estado());
-            empresa.setEndereco(endereco);
+            empresa.setEndereco(data.endereco().paraEndereco());
         }
 
         usuarioRepository.save(empresa);
