@@ -4,9 +4,11 @@ import br.com.kira.kirabackend.domain.entity.Agendamento;
 import br.com.kira.kirabackend.domain.entity.Cliente;
 import br.com.kira.kirabackend.domain.entity.Empresa;
 import br.com.kira.kirabackend.domain.entity.Mensagem;
+import br.com.kira.kirabackend.domain.entity.Servico;
 import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import br.com.kira.kirabackend.dto.request.MensagemRequest;
+import br.com.kira.kirabackend.dto.response.ConversaResponse;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
@@ -326,6 +328,73 @@ class MensagemServiceTest {
 
         assertThrows(RecursoNaoEncontradoException.class, () -> service.marcarComoLida(id, cliente.getId()));
         verify(mensagemRepository, never()).save(any());
+    }
+
+    // ---------- lista de conversas ----------
+
+    @Nested
+    @DisplayName("listarConversas")
+    class ListarConversas {
+
+        private MensagemRepository.ConversaResumo resumo(Mensagem ultima, long naoLidas) {
+            return new MensagemRepository.ConversaResumo() {
+                @Override
+                public Mensagem getUltimaMensagem() {
+                    return ultima;
+                }
+
+                @Override
+                public long getNaoLidas() {
+                    return naoLidas;
+                }
+            };
+        }
+
+        @BeforeEach
+        void setUpServico() {
+            Servico servico = new Servico();
+            servico.setNome("Corte");
+            agendamento.setServico(servico);
+        }
+
+        @Test
+        @DisplayName("Para o estúdio, a outra parte é a cliente")
+        void estudioVeACliente() {
+            Mensagem ultima = mensagem(cliente, "Oi", LocalDateTime.now());
+            when(mensagemRepository.listarConversas(empresa.getId())).thenReturn(List.of(resumo(ultima, 2)));
+
+            ConversaResponse conversa = service.listarConversas(empresa.getId()).get(0);
+
+            assertEquals(agendamento.getId(), conversa.agendamentoId());
+            assertEquals("Ana", conversa.nomeOutraParte());
+            assertEquals("Corte", conversa.nomeServico());
+            assertEquals("Oi", conversa.ultimaMensagem());
+            assertFalse(conversa.ultimaMensagemMinha());
+            assertEquals(2, conversa.naoLidas());
+        }
+
+        @Test
+        @DisplayName("Para a cliente, a outra parte é o estúdio, e a última mensagem pode ser dela")
+        void clienteVeOEstudio() {
+            Mensagem ultima = mensagem(cliente, "Oi", LocalDateTime.now());
+            when(mensagemRepository.listarConversas(cliente.getId())).thenReturn(List.of(resumo(ultima, 0)));
+
+            ConversaResponse conversa = service.listarConversas(cliente.getId()).get(0);
+
+            assertEquals("Estúdio Kira", conversa.nomeOutraParte());
+            assertTrue(conversa.ultimaMensagemMinha());
+        }
+
+        @Test
+        @DisplayName("Duas mensagens no mesmo instante não repetem a conversa")
+        void empateNaoRepete() {
+            LocalDateTime agora = LocalDateTime.now();
+            when(mensagemRepository.listarConversas(cliente.getId())).thenReturn(List.of(
+                    resumo(mensagem(cliente, "A", agora), 0),
+                    resumo(mensagem(empresa, "B", agora), 0)));
+
+            assertEquals(1, service.listarConversas(cliente.getId()).size());
+        }
     }
 
     // ---------- marcar a conversa como lida ----------
