@@ -109,7 +109,7 @@ class SecurityConfigAdminTest {
     @Test
     @DisplayName("Sem login, /api/admin é bloqueado")
     void semLoginBloqueado() throws Exception {
-        mockMvc.perform(get(ROTA)).andExpect(status().isForbidden());
-        mockMvc.perform(delete(ROTA)).andExpect(status().isForbidden());
+        mockMvc.perform(get(ROTA)).andExpect(status().isUnauthorized());
+        mockMvc.perform(delete(ROTA)).andExpect(status().isUnauthorized());
     }
 }
