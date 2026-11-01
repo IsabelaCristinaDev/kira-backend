@@ -12,6 +12,7 @@ import br.com.kira.kirabackend.dto.response.ConversaResponse;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
+import br.com.kira.kirabackend.observer.ConversaLidaEvent;
 import br.com.kira.kirabackend.observer.MensagemEnviadaEvent;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.MensagemRepository;
@@ -134,6 +135,7 @@ class MensagemServiceTest {
             ArgumentCaptor<MensagemEnviadaEvent> captor = ArgumentCaptor.forClass(MensagemEnviadaEvent.class);
             verify(eventPublisher).publishEvent(captor.capture());
             assertSame(response, captor.getValue().getMensagem());
+            assertEquals(List.of(cliente.getId(), empresa.getId()), captor.getValue().getParticipantes());
         }
 
         @Test
@@ -294,6 +296,7 @@ class MensagemServiceTest {
 
         assertTrue(mensagem.getLida());
         verify(mensagemRepository).save(mensagem);
+        verify(eventPublisher).publishEvent(any(ConversaLidaEvent.class));
     }
 
     @Test
@@ -403,10 +406,24 @@ class MensagemServiceTest {
     @DisplayName("Participante marca de uma vez o que recebeu na conversa")
     void marcarConversaComoLida() {
         when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+        when(mensagemRepository.marcarRecebidasComoLidas(agendamento.getId(), empresa.getId())).thenReturn(2);
 
         service.marcarConversaComoLida(agendamento.getId(), empresa.getId());
 
-        verify(mensagemRepository).marcarRecebidasComoLidas(agendamento.getId(), empresa.getId());
+        ArgumentCaptor<ConversaLidaEvent> captor = ArgumentCaptor.forClass(ConversaLidaEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertEquals(agendamento.getId(), captor.getValue().getAgendamentoId());
+        assertEquals(empresa.getId(), captor.getValue().getUsuarioId());
+    }
+
+    @Test
+    @DisplayName("Conversa sem nada para ler não gera aviso")
+    void conversaSemNaoLidasNaoAvisa() {
+        when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+
+        service.marcarConversaComoLida(agendamento.getId(), empresa.getId());
+
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test

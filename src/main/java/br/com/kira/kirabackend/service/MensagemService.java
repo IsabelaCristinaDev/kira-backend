@@ -9,6 +9,7 @@ import br.com.kira.kirabackend.dto.response.ConversaResponse;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
+import br.com.kira.kirabackend.observer.ConversaLidaEvent;
 import br.com.kira.kirabackend.observer.MensagemEnviadaEvent;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.MensagemRepository;
@@ -53,7 +54,8 @@ public class MensagemService {
         mensagem.setConteudo(request.conteudo());
 
         MensagemResponse response = toResponse(mensagemRepository.save(mensagem));
-        eventPublisher.publishEvent(new MensagemEnviadaEvent(this, response));
+        eventPublisher.publishEvent(new MensagemEnviadaEvent(this, response,
+                List.of(agendamento.getCliente().getId(), agendamento.getEmpresa().getId())));
         return response;
     }
 
@@ -86,12 +88,15 @@ public class MensagemService {
         }
         mensagem.setLida(true);
         mensagemRepository.save(mensagem);
+        eventPublisher.publishEvent(new ConversaLidaEvent(this, mensagem.getAgendamento().getId(), usuarioId));
     }
 
     /** Marca de uma vez o que a pessoa recebeu na conversa; as mensagens que ela enviou não mudam. */
     public void marcarConversaComoLida(UUID agendamentoId, UUID usuarioId) {
         exigirParticipante(agendamentoId, usuarioId);
-        mensagemRepository.marcarRecebidasComoLidas(agendamentoId, usuarioId);
+        if (mensagemRepository.marcarRecebidasComoLidas(agendamentoId, usuarioId) > 0) {
+            eventPublisher.publishEvent(new ConversaLidaEvent(this, agendamentoId, usuarioId));
+        }
     }
 
     /** Usado também ao assinar a conversa pelo WebSocket. */

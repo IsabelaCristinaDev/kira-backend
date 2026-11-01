@@ -162,12 +162,31 @@ class WebSocketAutenticacaoInterceptorTest {
     @Test
     @DisplayName("Curinga e outros destinos não podem ser assinados")
     void destinoNaoPermitido() {
-        for (String destino : List.of("/topic/**", "/topic/agendamentos/*/mensagens", "/topic/outro", "/user/queue/x")) {
+        for (String destino : List.of("/topic/**", "/topic/agendamentos/*/mensagens", "/topic/usuarios/*/conversas",
+                "/topic/outro", "/user/queue/x")) {
             Message<byte[]> mensagem = frame(StompCommand.SUBSCRIBE, destino, autenticacao());
 
             assertThrows(MessageDeliveryException.class, () -> interceptor.preSend(mensagem, canal), destino);
         }
         verifyNoInteractions(mensagemService);
+    }
+
+    @Test
+    @DisplayName("A pessoa assina o próprio canal de conversas")
+    void assinaOProprioCanal() {
+        Message<byte[]> mensagem = frame(StompCommand.SUBSCRIBE,
+                "/topic/usuarios/" + cliente.getId() + "/conversas", autenticacao());
+
+        assertEquals(mensagem, interceptor.preSend(mensagem, canal));
+    }
+
+    @Test
+    @DisplayName("Ninguém assina o canal de conversas de outra pessoa")
+    void naoAssinaCanalDeOutraPessoa() {
+        Message<byte[]> mensagem = frame(StompCommand.SUBSCRIBE,
+                "/topic/usuarios/" + UUID.randomUUID() + "/conversas", autenticacao());
+
+        assertThrows(MessageDeliveryException.class, () -> interceptor.preSend(mensagem, canal));
     }
 
     @Test

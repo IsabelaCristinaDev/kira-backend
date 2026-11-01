@@ -22,7 +22,8 @@ import java.util.regex.Pattern;
 /**
  * Segurança do WebSocket, comando a comando:
  * CONNECT exige um token válido, SUBSCRIBE só vale para a conversa de um agendamento de que a pessoa
- * participa, e SEND é sempre recusado, senão daria para publicar mensagem falsa direto no tópico.
+ * participa e para o canal da própria pessoa, e SEND é sempre recusado, senão daria para publicar
+ * mensagem falsa direto no tópico.
  * Qualquer recusa aqui encerra a conexão com um frame ERROR.
  */
 @Component
@@ -31,6 +32,8 @@ public class WebSocketAutenticacaoInterceptor implements ChannelInterceptor {
 
     private static final Pattern TOPICO_DA_CONVERSA = Pattern.compile(
             "^/topic/agendamentos/([0-9a-fA-F-]{36})/mensagens$");
+    private static final Pattern CANAL_DO_USUARIO = Pattern.compile(
+            "^/topic/usuarios/([0-9a-fA-F-]{36})/conversas$");
 
     private final JwtTokenProvider jwtTokenProvider;
     private final CustomUserDetailsService userDetailsService;
@@ -74,11 +77,15 @@ public class WebSocketAutenticacaoInterceptor implements ChannelInterceptor {
                 || !(autenticacao.getPrincipal() instanceof Usuario usuario)) {
             throw new MessageDeliveryException("Conexão sem autenticação");
         }
-        String destino = stomp.getDestination();
-        Matcher conversa = destino == null ? null : TOPICO_DA_CONVERSA.matcher(destino);
-        if (conversa == null || !conversa.matches()) {
+        String destino = stomp.getDestination() == null ? "" : stomp.getDestination();
+        Matcher conversa = TOPICO_DA_CONVERSA.matcher(destino);
+        if (conversa.matches()) {
+            mensagemService.exigirParticipante(UUID.fromString(conversa.group(1)), usuario.getId());
+            return;
+        }
+        Matcher canal = CANAL_DO_USUARIO.matcher(destino);
+        if (!canal.matches() || !UUID.fromString(canal.group(1)).equals(usuario.getId())) {
             throw new MessageDeliveryException("Destino não permitido");
         }
-        mensagemService.exigirParticipante(UUID.fromString(conversa.group(1)), usuario.getId());
     }
 }

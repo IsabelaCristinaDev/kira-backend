@@ -1,10 +1,13 @@
 package br.com.kira.kirabackend.observer;
 
+import br.com.kira.kirabackend.dto.response.AvisoConversaResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
+
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -18,5 +21,18 @@ public class MensagemEventListener {
     public void onMensagemEnviada(MensagemEnviadaEvent event) {
         var mensagem = event.getMensagem();
         messagingTemplate.convertAndSend("/topic/agendamentos/" + mensagem.agendamentoId() + "/mensagens", mensagem);
+        // Os dois lados: quem enviou também tem a lista de conversas mudada, em outra aba por exemplo
+        AvisoConversaResponse aviso = new AvisoConversaResponse(mensagem.agendamentoId(), mensagem);
+        event.getParticipantes().forEach(participante -> avisar(participante, aviso));
+    }
+
+    // Só para quem leu: o contador da outra parte não muda
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onConversaLida(ConversaLidaEvent event) {
+        avisar(event.getUsuarioId(), new AvisoConversaResponse(event.getAgendamentoId(), null));
+    }
+
+    private void avisar(UUID usuarioId, AvisoConversaResponse aviso) {
+        messagingTemplate.convertAndSend("/topic/usuarios/" + usuarioId + "/conversas", aviso);
     }
 }
