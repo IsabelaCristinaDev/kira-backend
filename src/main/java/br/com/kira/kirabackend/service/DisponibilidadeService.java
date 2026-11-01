@@ -34,11 +34,19 @@ public class DisponibilidadeService {
     private final UsuarioRepository usuarioRepository;
     private final OcupacaoService ocupacaoService;
 
+    private static void exigirDono(UUID empresaId, UUID usuarioId) {
+        if (!empresaId.equals(usuarioId)) {
+            throw new RegraDeNegocioException("Você só pode alterar o horário do seu estabelecimento");
+        }
+    }
+
     /**
      * Cadastra o expediente de um dia. Se o dia já tiver expediente, ele é atualizado:
      * o cálculo de horários livres espera no máximo um registro por dia.
+     * Só a própria empresa pode alterar o seu horário.
      */
-    public DisponibilidadeResponse cadastrar(UUID empresaId, DisponibilidadeRequest request) {
+    public DisponibilidadeResponse cadastrar(UUID empresaId, UUID usuarioId, DisponibilidadeRequest request) {
+        exigirDono(empresaId, usuarioId);
         Empresa empresa = buscarEmpresa(empresaId);
         validarHorario(request);
 
@@ -63,9 +71,7 @@ public class DisponibilidadeService {
             UUID usuarioId,
             List<DisponibilidadeRequest> dias) {
 
-        if (!empresaId.equals(usuarioId)) {
-            throw new RegraDeNegocioException("Você só pode alterar o horário do seu estabelecimento");
-        }
+        exigirDono(empresaId, usuarioId);
         Empresa empresa = buscarEmpresa(empresaId);
 
         Set<DiaSemana> vistos = EnumSet.noneOf(DiaSemana.class);

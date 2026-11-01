@@ -28,10 +28,11 @@ public class DisponibilidadeController {
     @PostMapping
     public ResponseEntity<DisponibilidadeResponse> cadastrar(
             @PathVariable UUID empresaId,
+            @AuthenticationPrincipal Usuario usuario,
             @RequestBody @Valid DisponibilidadeRequest request) {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(disponibilidadeService.cadastrar(empresaId, request));
+                .body(disponibilidadeService.cadastrar(empresaId, usuario.getId(), request));
     }
 
     @PutMapping

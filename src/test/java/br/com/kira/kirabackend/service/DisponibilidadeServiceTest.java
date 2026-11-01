@@ -312,13 +312,27 @@ class DisponibilidadeServiceTest {
     class Cadastrar {
 
         @Test
+        @DisplayName("Quem não é a empresa não altera o horário dela, e nada é consultado nem salvo")
+        void outroUsuarioNaoCadastra() {
+            UUID empresaId = empresa.getId();
+            UUID outroUsuario = UUID.randomUUID();
+            DisponibilidadeRequest req = new DisponibilidadeRequest(DiaSemana.SEGUNDA, hora(3, 0), hora(4, 0));
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> service.cadastrar(empresaId, outroUsuario, req));
+
+            assertEquals("Você só pode alterar o horário do seu estabelecimento", ex.getMessage());
+            verifyNoInteractions(usuarioRepository, disponibilidadeRepository);
+        }
+
+        @Test
         @DisplayName("Cadastra o expediente com os dados enviados")
         void deveCadastrarExpediente() {
             when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
             when(disponibilidadeRepository.save(any(DisponibilidadeEstudio.class)))
                     .thenAnswer(invocation -> invocation.getArgument(0));
 
-            DisponibilidadeResponse response = service.cadastrar(empresa.getId(),
+            DisponibilidadeResponse response = service.cadastrar(empresa.getId(), empresa.getId(),
                     new DisponibilidadeRequest(DiaSemana.TERCA, hora(9, 0), hora(18, 0)));
 
             assertEquals(DiaSemana.TERCA, response.diaSemana());
@@ -343,7 +357,7 @@ class DisponibilidadeServiceTest {
             DisponibilidadeRequest req = new DisponibilidadeRequest(DiaSemana.SEGUNDA, inicio, fim);
 
             RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
-                    () -> service.cadastrar(empresaId, req));
+                    () -> service.cadastrar(empresaId, empresaId, req));
             assertEquals("Hora de fim deve ser após hora de início", ex.getMessage());
             verify(disponibilidadeRepository, never()).save(any());
         }
@@ -357,7 +371,7 @@ class DisponibilidadeServiceTest {
             DisponibilidadeRequest req = new DisponibilidadeRequest(DiaSemana.SEGUNDA, hora(9, 0), hora(18, 0));
 
             assertThrows(RecursoNaoEncontradoException.class,
-                    () -> service.cadastrar(empresaId, req));
+                    () -> service.cadastrar(empresaId, empresaId, req));
             verify(disponibilidadeRepository, never()).save(any());
         }
 
@@ -375,7 +389,7 @@ class DisponibilidadeServiceTest {
                     .thenReturn(Optional.of(existente));
             when(disponibilidadeRepository.save(existente)).thenReturn(existente);
 
-            DisponibilidadeResponse response = service.cadastrar(empresa.getId(),
+            DisponibilidadeResponse response = service.cadastrar(empresa.getId(), empresa.getId(),
                     new DisponibilidadeRequest(DiaSemana.TERCA, hora(9, 0), hora(18, 0)));
 
             assertEquals(existente.getId(), response.id());
