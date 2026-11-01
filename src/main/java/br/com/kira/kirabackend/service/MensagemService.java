@@ -8,10 +8,12 @@ import br.com.kira.kirabackend.dto.request.MensagemRequest;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
+import br.com.kira.kirabackend.observer.MensagemEnviadaEvent;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.MensagemRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +28,7 @@ public class MensagemService {
     private final MensagemRepository mensagemRepository;
     private final AgendamentoRepository agendamentoRepository;
     private final UsuarioRepository usuarioRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public MensagemResponse enviar(UUID remetenteId, MensagemRequest request) {
         Agendamento agendamento = agendamentoRepository
@@ -46,14 +49,13 @@ public class MensagemService {
         mensagem.setRemetente(remetente);
         mensagem.setConteudo(request.conteudo());
 
-        Mensagem salva = mensagemRepository.save(mensagem);
-        return toResponse(salva);
+        MensagemResponse response = toResponse(mensagemRepository.save(mensagem));
+        eventPublisher.publishEvent(new MensagemEnviadaEvent(this, response));
+        return response;
     }
 
     public List<MensagemResponse> listarConversa(UUID agendamentoId, UUID usuarioId) {
-        Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
-                .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
-        validarParticipante(agendamento, usuarioId);
+        exigirParticipante(agendamentoId, usuarioId);
 
         return mensagemRepository
                 .findByAgendamentoIdOrderByDataEnvioAsc(agendamentoId)
@@ -75,10 +77,15 @@ public class MensagemService {
 
     /** Marca de uma vez o que a pessoa recebeu na conversa; as mensagens que ela enviou não mudam. */
     public void marcarConversaComoLida(UUID agendamentoId, UUID usuarioId) {
+        exigirParticipante(agendamentoId, usuarioId);
+        mensagemRepository.marcarRecebidasComoLidas(agendamentoId, usuarioId);
+    }
+
+    /** Usado também ao assinar a conversa pelo WebSocket. */
+    public void exigirParticipante(UUID agendamentoId, UUID usuarioId) {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
         validarParticipante(agendamento, usuarioId);
-        mensagemRepository.marcarRecebidasComoLidas(agendamentoId, usuarioId);
     }
 
     /** Só a cliente e a empresa do agendamento podem ver e usar a conversa. */

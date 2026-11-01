@@ -25,6 +25,14 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
+    /** Origens do app web: valem para o CORS da API e para a conexão do WebSocket. */
+    static final List<String> ORIGENS_PERMITIDAS = List.of(
+            "http://localhost:8080",
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "http://localhost:4200"
+    );
+
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
@@ -51,6 +59,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/empresas/*/perfil").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/empresas/**").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
+                        // O navegador não manda header na abertura do WebSocket: o token é conferido
+                        // no CONNECT do STOMP (WebSocketAutenticacaoInterceptor)
+                        .requestMatchers("/ws").permitAll()
                         .requestMatchers(
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
@@ -72,12 +83,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(
-                "http://localhost:8080",
-                "http://localhost:3000",
-                "http://localhost:5173",
-                "http://localhost:4200"
-        ));
+        config.setAllowedOrigins(ORIGENS_PERMITIDAS);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of("Authorization"));

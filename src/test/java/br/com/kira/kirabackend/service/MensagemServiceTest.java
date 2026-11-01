@@ -10,6 +10,7 @@ import br.com.kira.kirabackend.dto.request.MensagemRequest;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
+import br.com.kira.kirabackend.observer.MensagemEnviadaEvent;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.MensagemRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
@@ -22,6 +23,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -49,6 +51,9 @@ class MensagemServiceTest {
 
     @Mock
     private UsuarioRepository usuarioRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private MensagemService service;
@@ -117,6 +122,19 @@ class MensagemServiceTest {
         }
 
         @Test
+        @DisplayName("Mensagem salva gera o evento para avisar quem está na conversa")
+        void mensagemSalvaPublicaEvento() {
+            mockarEnvio(cliente);
+            when(mensagemRepository.save(any(Mensagem.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            MensagemResponse response = service.enviar(cliente.getId(), request("Oi"));
+
+            ArgumentCaptor<MensagemEnviadaEvent> captor = ArgumentCaptor.forClass(MensagemEnviadaEvent.class);
+            verify(eventPublisher).publishEvent(captor.capture());
+            assertSame(response, captor.getValue().getMensagem());
+        }
+
+        @Test
         @DisplayName("Empresa do agendamento envia mensagem")
         void empresaEnviaMensagem() {
             mockarEnvio(empresa);
@@ -136,6 +154,7 @@ class MensagemServiceTest {
             assertThrows(RegraDeNegocioException.class,
                     () -> service.enviar(cliente.getId(), request("Oi")));
             verify(mensagemRepository, never()).save(any());
+            verify(eventPublisher, never()).publishEvent(any());
         }
 
         @Test
