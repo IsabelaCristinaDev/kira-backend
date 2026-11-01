@@ -1,0 +1,155 @@
+package br.com.kira.kirabackend.service;
+
+import br.com.kira.kirabackend.domain.entity.DispositivoNotificacao;
+import br.com.kira.kirabackend.dto.request.DispositivoWebRequest;
+import br.com.kira.kirabackend.dto.response.MensagemResponse;
+import br.com.kira.kirabackend.exception.RegraDeNegocioException;
+import br.com.kira.kirabackend.repository.DispositivoNotificacaoRepository;
+import br.com.kira.kirabackend.repository.UsuarioRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.security.GeneralSecurityException;
+import java.util.Base64;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+@RequiredArgsConstructor
+@Service
+public class NotificacaoService {
+
+    private static final Logger log = LoggerFactory.getLogger(NotificacaoService.class);
+
+    private static final int MAXIMO_POR_USUARIO = 10;
+    private static final int MAXIMO_NO_CORPO = 120;
+    private static final List<Integer> DISPOSITIVO_NAO_EXISTE_MAIS = List.of(404, 410);
+    private static final List<String> SERVICOS_DE_PUSH = List.of(
+            "fcm.googleapis.com", "push.services.mozilla.com", "push.apple.com", "notify.windows.com");
+
+    private final DispositivoNotificacaoRepository dispositivoRepository;
+    private final UsuarioRepository usuarioRepository;
+    private final WebPushEnvio webPush;
+    private final ObjectMapper objectMapper;
+
+    public String chavePublica() {
+        return webPush.chavePublica();
+    }
+
+    @Transactional
+    public void registrar(UUID usuarioId, DispositivoWebRequest request) {
+        validarEndereco(request.endpoint());
+        validarChaves(request);
+
+        // Se outra conta usou o mesmo navegador antes, ele passa a ser desta
+        DispositivoNotificacao dispositivo = dispositivoRepository.findByEndpoint(request.endpoint())
+                .orElseGet(DispositivoNotificacao::new);
+        boolean novo = dispositivo.getId() == null;
+        dispositivo.setUsuario(usuarioRepository.getReferenceById(usuarioId));
+        dispositivo.setEndpoint(request.endpoint());
+        dispositivo.setP256dh(request.p256dh());
+        dispositivo.setAuth(request.auth());
+        dispositivoRepository.save(dispositivo);
+
+        if (novo) {
+            removerOsMaisAntigos(usuarioId);
+        }
+    }
+
+    @Transactional
+    public void remover(UUID usuarioId, String endpoint) {
+        dispositivoRepository.deleteByEndpointAndUsuarioId(endpoint, usuarioId);
+    }
+
+    /** Assíncrono: a mensagem já foi salva e entregue, e o serviço de push pode demorar ou falhar. */
+    @Async
+    public void notificarMensagem(MensagemResponse mensagem, List<UUID> destinatarios) {
+        if (!webPush.ativo() || destinatarios.isEmpty()) {
+            return;
+        }
+        byte[] conteudo;
+        try {
+            conteudo = objectMapper.writeValueAsBytes(Map.of(
+                    "titulo", mensagem.nomeRemetente(),
+                    "corpo", resumir(mensagem.conteudo()),
+                    "agendamentoId", mensagem.agendamentoId().toString()));
+        } catch (JsonProcessingException e) {
+            log.warn("Não foi possível montar a notificação da mensagem {}", mensagem.id());
+            return;
+        }
+        for (DispositivoNotificacao dispositivo : dispositivoRepository.findByUsuarioIdIn(destinatarios)) {
+            enviar(dispositivo, conteudo);
+        }
+    }
+
+    private void enviar(DispositivoNotificacao dispositivo, byte[] conteudo) {
+        try {
+            int status = webPush.enviar(
+                    dispositivo.getEndpoint(), dispositivo.getP256dh(), dispositivo.getAuth(), conteudo);
+            if (DISPOSITIVO_NAO_EXISTE_MAIS.contains(status)) {
+                dispositivoRepository.deleteById(dispositivo.getId());
+            } else if (status >= 300) {
+                log.warn("Serviço de push recusou o envio ao dispositivo {}: {}", dispositivo.getId(), status);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (IOException | GeneralSecurityException | IllegalArgumentException e) {
+            log.warn("Falha ao notificar o dispositivo {}: {}", dispositivo.getId(), e.getClass().getSimpleName());
+        }
+    }
+
+    private void removerOsMaisAntigos(UUID usuarioId) {
+        List<DispositivoNotificacao> dispositivos = dispositivoRepository.findByUsuarioIdOrderByDataCriacaoAsc(usuarioId);
+        int excesso = dispositivos.size() - MAXIMO_POR_USUARIO;
+        if (excesso > 0) {
+            dispositivoRepository.deleteAll(dispositivos.subList(0, excesso));
+        }
+    }
+
+    /** O servidor faz chamadas a este endereço, então só valem os serviços de push dos navegadores. */
+    private static void validarEndereco(String endpoint) {
+        try {
+            URI uri = new URI(endpoint);
+            String host = uri.getHost();
+            boolean valido = "https".equals(uri.getScheme())
+                    && uri.getUserInfo() == null
+                    && uri.getPort() == -1
+                    && host != null
+                    && SERVICOS_DE_PUSH.stream().anyMatch(s -> host.equals(s) || host.endsWith("." + s));
+            if (!valido) {
+                throw new RegraDeNegocioException("Endereço de notificação inválido");
+            }
+        } catch (URISyntaxException e) {
+            throw new RegraDeNegocioException("Endereço de notificação inválido");
+        }
+    }
+
+    private static void validarChaves(DispositivoWebRequest request) {
+        try {
+            WebPushEnvio.lerChavePublica(Base64.getUrlDecoder().decode(request.p256dh()));
+            if (Base64.getUrlDecoder().decode(request.auth()).length != 16) {
+                throw new RegraDeNegocioException("Chaves de notificação inválidas");
+            }
+        } catch (GeneralSecurityException | IllegalArgumentException e) {
+            throw new RegraDeNegocioException("Chaves de notificação inválidas");
+        }
+    }
+
+    private static String resumir(String texto) {
+        if (texto.codePointCount(0, texto.length()) <= MAXIMO_NO_CORPO) {
+            return texto;
+        }
+        // Conta caracteres, não metades: um emoji não pode ser cortado
+        int fim = texto.offsetByCodePoints(0, Math.min(MAXIMO_NO_CORPO, texto.codePointCount(0, texto.length())));
+        return texto.substring(0, fim) + "…";
+    }
+}

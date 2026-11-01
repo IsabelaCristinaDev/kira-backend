@@ -2,6 +2,7 @@ package br.com.kira.kirabackend.observer;
 
 import br.com.kira.kirabackend.dto.response.AvisoConversaResponse;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
+import br.com.kira.kirabackend.service.NotificacaoService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +24,9 @@ class MensagemEventListenerTest {
     @Mock
     private SimpMessagingTemplate messagingTemplate;
 
+    @Mock
+    private NotificacaoService notificacaoService;
+
     @InjectMocks
     private MensagemEventListener listener;
 
@@ -30,11 +34,11 @@ class MensagemEventListenerTest {
     @DisplayName("Envia a mensagem para o tópico da conversa e avisa o canal dos dois participantes")
     void enviaParaAConversaEAvisaOsParticipantes() {
         UUID agendamentoId = UUID.randomUUID();
-        MensagemResponse mensagem = new MensagemResponse(UUID.randomUUID(), agendamentoId, UUID.randomUUID(),
-                "Ana", "Oi", false, LocalDateTime.now());
-
         UUID clienteId = UUID.randomUUID();
         UUID empresaId = UUID.randomUUID();
+        MensagemResponse mensagem = new MensagemResponse(UUID.randomUUID(), agendamentoId, clienteId,
+                "Ana", "Oi", false, LocalDateTime.now());
+
         AvisoConversaResponse aviso = new AvisoConversaResponse(agendamentoId, mensagem);
 
         listener.onMensagemEnviada(new MensagemEnviadaEvent(this, mensagem, List.of(clienteId, empresaId)));
@@ -42,6 +46,8 @@ class MensagemEventListenerTest {
         verify(messagingTemplate).convertAndSend("/topic/agendamentos/" + agendamentoId + "/mensagens", mensagem);
         verify(messagingTemplate).convertAndSend("/topic/usuarios/" + clienteId + "/conversas", aviso);
         verify(messagingTemplate).convertAndSend("/topic/usuarios/" + empresaId + "/conversas", aviso);
+        // A notificação do aparelho vai só para quem recebeu, não para quem enviou
+        verify(notificacaoService).notificarMensagem(mensagem, List.of(empresaId));
     }
 
     @Test
