@@ -3,6 +3,7 @@ package br.com.kira.kirabackend.service;
 import br.com.kira.kirabackend.domain.entity.Agendamento;
 import br.com.kira.kirabackend.domain.entity.Mensagem;
 import br.com.kira.kirabackend.domain.entity.Usuario;
+import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import br.com.kira.kirabackend.dto.request.MensagemRequest;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
@@ -35,6 +36,10 @@ public class MensagemService {
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
 
         validarParticipante(agendamento, remetenteId);
+        // A conversa continua aberta depois de concluído (ex.: objeto esquecido); no cancelado, é só leitura
+        if (agendamento.getStatus() == StatusAgendamento.CANCELADO) {
+            throw new RegraDeNegocioException("Este agendamento foi cancelado: a conversa está só para leitura");
+        }
 
         Mensagem mensagem = new Mensagem();
         mensagem.setAgendamento(agendamento);
@@ -68,6 +73,14 @@ public class MensagemService {
         mensagemRepository.save(mensagem);
     }
 
+    /** Marca de uma vez o que a pessoa recebeu na conversa; as mensagens que ela enviou não mudam. */
+    public void marcarConversaComoLida(UUID agendamentoId, UUID usuarioId) {
+        Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Agendamento não encontrado"));
+        validarParticipante(agendamento, usuarioId);
+        mensagemRepository.marcarRecebidasComoLidas(agendamentoId, usuarioId);
+    }
+
     /** Só a cliente e a empresa do agendamento podem ver e usar a conversa. */
     private static void validarParticipante(Agendamento agendamento, UUID usuarioId) {
         boolean participa = usuarioId.equals(agendamento.getCliente().getId())
@@ -88,4 +101,4 @@ public class MensagemService {
                 m.getDataEnvio()
         );
     }
-}
+}

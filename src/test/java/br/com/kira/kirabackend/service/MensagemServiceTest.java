@@ -5,6 +5,7 @@ import br.com.kira.kirabackend.domain.entity.Cliente;
 import br.com.kira.kirabackend.domain.entity.Empresa;
 import br.com.kira.kirabackend.domain.entity.Mensagem;
 import br.com.kira.kirabackend.domain.entity.Usuario;
+import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import br.com.kira.kirabackend.dto.request.MensagemRequest;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
@@ -124,6 +125,29 @@ class MensagemServiceTest {
             MensagemResponse response = service.enviar(empresa.getId(), request("Pode sim!"));
 
             assertEquals(empresa.getId(), response.remetenteId());
+        }
+
+        @Test
+        @DisplayName("Agendamento cancelado não recebe mensagem nova")
+        void canceladoNaoRecebeMensagem() {
+            agendamento.setStatus(StatusAgendamento.CANCELADO);
+            mockarEnvio(cliente);
+
+            assertThrows(RegraDeNegocioException.class,
+                    () -> service.enviar(cliente.getId(), request("Oi")));
+            verify(mensagemRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Agendamento concluído continua recebendo mensagem")
+        void concluidoRecebeMensagem() {
+            agendamento.setStatus(StatusAgendamento.CONCLUIDO);
+            mockarEnvio(cliente);
+            when(mensagemRepository.save(any(Mensagem.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            MensagemResponse response = service.enviar(cliente.getId(), request("Esqueci meu guarda-chuva aí"));
+
+            assertEquals("Esqueci meu guarda-chuva aí", response.conteudo());
         }
 
         @Test
@@ -283,5 +307,39 @@ class MensagemServiceTest {
 
         assertThrows(RecursoNaoEncontradoException.class, () -> service.marcarComoLida(id, cliente.getId()));
         verify(mensagemRepository, never()).save(any());
+    }
+
+    // ---------- marcar a conversa como lida ----------
+
+    @Test
+    @DisplayName("Participante marca de uma vez o que recebeu na conversa")
+    void marcarConversaComoLida() {
+        when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+
+        service.marcarConversaComoLida(agendamento.getId(), empresa.getId());
+
+        verify(mensagemRepository).marcarRecebidasComoLidas(agendamento.getId(), empresa.getId());
+    }
+
+    @Test
+    @DisplayName("Quem não participa do agendamento não marca a conversa como lida")
+    void usuarioDeForaNaoMarcaConversa() {
+        UUID outroUsuario = UUID.randomUUID();
+        when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+
+        assertThrows(RegraDeNegocioException.class,
+                () -> service.marcarConversaComoLida(agendamento.getId(), outroUsuario));
+        verify(mensagemRepository, never()).marcarRecebidasComoLidas(any(), any());
+    }
+
+    @Test
+    @DisplayName("Marcar como lida a conversa de um agendamento inexistente dá 404")
+    void marcarConversaInexistente() {
+        UUID id = UUID.randomUUID();
+        when(agendamentoRepository.findById(id)).thenReturn(Optional.empty());
+
+        assertThrows(RecursoNaoEncontradoException.class,
+                () -> service.marcarConversaComoLida(id, cliente.getId()));
+        verify(mensagemRepository, never()).marcarRecebidasComoLidas(any(), any());
     }
 }
