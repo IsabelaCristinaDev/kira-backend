@@ -154,9 +154,11 @@ class MensagemServiceTest {
         void canceladoNaoRecebeMensagem() {
             agendamento.setStatus(StatusAgendamento.CANCELADO);
             mockarEnvio(cliente);
+            UUID remetenteId = cliente.getId();
+            MensagemRequest req = request("Oi");
 
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.enviar(cliente.getId(), request("Oi")));
+                    () -> service.enviar(remetenteId, req));
             verify(mensagemRepository, never()).save(any());
             verify(eventPublisher, never()).publishEvent(any());
         }
@@ -268,9 +270,10 @@ class MensagemServiceTest {
         @DisplayName("Quem não participa do agendamento não vê a conversa")
         void usuarioDeForaNaoVe() {
             UUID outroUsuario = UUID.randomUUID();
+            UUID agendamentoId = agendamento.getId();
 
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.listarConversa(agendamento.getId(), outroUsuario));
+                    () -> service.listarConversa(agendamentoId, outroUsuario));
             verify(mensagemRepository, never()).findByAgendamentoIdOrderByDataEnvioAsc(any());
         }
     }
@@ -279,9 +282,11 @@ class MensagemServiceTest {
     @DisplayName("Listar conversa de agendamento inexistente dá 404")
     void listarConversaAgendamentoInexistente() {
         when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.empty());
+        UUID agendamentoId = agendamento.getId();
+        UUID clienteId = cliente.getId();
 
         assertThrows(RecursoNaoEncontradoException.class,
-                () -> service.listarConversa(agendamento.getId(), cliente.getId()));
+                () -> service.listarConversa(agendamentoId, clienteId));
     }
 
     // ---------- marcar como lida ----------
@@ -304,9 +309,11 @@ class MensagemServiceTest {
     void remetenteNaoMarcaComoLida() {
         Mensagem mensagem = mensagem(cliente, "Oi", LocalDateTime.now());
         when(mensagemRepository.findById(mensagem.getId())).thenReturn(Optional.of(mensagem));
+        UUID mensagemId = mensagem.getId();
+        UUID clienteId = cliente.getId();
 
         assertThrows(RegraDeNegocioException.class,
-                () -> service.marcarComoLida(mensagem.getId(), cliente.getId()));
+                () -> service.marcarComoLida(mensagemId, clienteId));
         assertFalse(mensagem.getLida());
         verify(mensagemRepository, never()).save(any());
     }
@@ -316,9 +323,11 @@ class MensagemServiceTest {
     void usuarioDeForaNaoMarcaComoLida() {
         Mensagem mensagem = mensagem(cliente, "Oi", LocalDateTime.now());
         when(mensagemRepository.findById(mensagem.getId())).thenReturn(Optional.of(mensagem));
+        UUID mensagemId = mensagem.getId();
+        UUID outroUsuario = UUID.randomUUID();
 
         assertThrows(RegraDeNegocioException.class,
-                () -> service.marcarComoLida(mensagem.getId(), UUID.randomUUID()));
+                () -> service.marcarComoLida(mensagemId, outroUsuario));
         assertFalse(mensagem.getLida());
         verify(mensagemRepository, never()).save(any());
     }
@@ -328,8 +337,9 @@ class MensagemServiceTest {
     void marcarComoLidaInexistente() {
         UUID id = UUID.randomUUID();
         when(mensagemRepository.findById(id)).thenReturn(Optional.empty());
+        UUID clienteId = cliente.getId();
 
-        assertThrows(RecursoNaoEncontradoException.class, () -> service.marcarComoLida(id, cliente.getId()));
+        assertThrows(RecursoNaoEncontradoException.class, () -> service.marcarComoLida(id, clienteId));
         verify(mensagemRepository, never()).save(any());
     }
 
@@ -431,9 +441,10 @@ class MensagemServiceTest {
     void usuarioDeForaNaoMarcaConversa() {
         UUID outroUsuario = UUID.randomUUID();
         when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+        UUID agendamentoId = agendamento.getId();
 
         assertThrows(RegraDeNegocioException.class,
-                () -> service.marcarConversaComoLida(agendamento.getId(), outroUsuario));
+                () -> service.marcarConversaComoLida(agendamentoId, outroUsuario));
         verify(mensagemRepository, never()).marcarRecebidasComoLidas(any(), any());
     }
 
@@ -442,9 +453,10 @@ class MensagemServiceTest {
     void marcarConversaInexistente() {
         UUID id = UUID.randomUUID();
         when(agendamentoRepository.findById(id)).thenReturn(Optional.empty());
+        UUID clienteId = cliente.getId();
 
         assertThrows(RecursoNaoEncontradoException.class,
-                () -> service.marcarConversaComoLida(id, cliente.getId()));
+                () -> service.marcarConversaComoLida(id, clienteId));
         verify(mensagemRepository, never()).marcarRecebidasComoLidas(any(), any());
     }
 }

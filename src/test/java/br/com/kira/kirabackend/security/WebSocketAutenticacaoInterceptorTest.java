@@ -26,7 +26,6 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -47,7 +46,9 @@ class WebSocketAutenticacaoInterceptorTest {
     @InjectMocks
     private WebSocketAutenticacaoInterceptor interceptor;
 
-    private final MessageChannel canal = mock(MessageChannel.class);
+    @Mock
+    private MessageChannel canal;
+
     private final UUID agendamentoId = UUID.randomUUID();
     private Cliente cliente;
 
