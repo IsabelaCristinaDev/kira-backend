@@ -19,6 +19,7 @@ import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.AvaliacaoRepository;
 import br.com.kira.kirabackend.util.KiraTimeZone;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -45,6 +46,8 @@ public class DashboardEmpresaService {
         this.avaliacaoRepository = avaliacaoRepository;
     }
 
+    // Só leitura, mas lê relações LAZY (serviço, cliente, funcionária): precisa da sessão aberta
+    @Transactional(readOnly = true)
     public DashboardEmpresaResponse gerar(UUID empresaId, LocalDate dataInicio, LocalDate dataFim) {
         LocalDate inicio = dataInicio != null ? dataInicio
                 : LocalDate.now(KiraTimeZone.DEFAULT).withDayOfMonth(1);
