@@ -95,7 +95,10 @@ public class AvaliacaoService {
                 .toList();
     }
 
-    public List<AvaliacaoResponse> listarAvaliacoesCliente(UUID clienteId) {
+    public List<AvaliacaoResponse> listarAvaliacoesCliente(UUID clienteId, UUID usuarioId) {
+        if (!clienteId.equals(usuarioId)) {
+            throw new RegraDeNegocioException("Você só pode ver as suas avaliações");
+        }
         return avaliacaoRepository
                 .findByClienteIdAndTipoAvaliador(clienteId, TipoAvaliador.EMPRESA)
                 .stream()

@@ -18,7 +18,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 // Controller falso nas rotas de avaliação: testa só a regra do SecurityConfig.
-// O resto de GET /api/avaliacoes/** é público, então /minhas precisa de regra própria.
+// O resto de GET /api/avaliacoes/** é público, então /minhas e /cliente precisam de regra própria.
 @WebMvcTest(controllers = SecurityConfigAvaliacoesTest.AvaliacoesFalsoController.class)
 @Import({SecurityConfig.class, SecurityConfigAvaliacoesTest.AvaliacoesFalsoController.class})
 class SecurityConfigAvaliacoesTest {
@@ -43,6 +43,11 @@ class SecurityConfigAvaliacoesTest {
             return "ok";
         }
 
+        @GetMapping("/api/avaliacoes/cliente/{id}")
+        String daCliente(@PathVariable String id) {
+            return "ok";
+        }
+
         @GetMapping("/api/avaliacoes/empresa/{id}")
         String daEmpresa(@PathVariable String id) {
             return "ok";
@@ -50,10 +55,11 @@ class SecurityConfigAvaliacoesTest {
     }
 
     @Test
-    @DisplayName("Sem login, minhas avaliações é bloqueada")
+    @DisplayName("Sem login, as avaliações da pessoa são bloqueadas")
     void semLoginBloqueado() throws Exception {
         // 4xx: o código exato de quem não está logado é definido no SecurityConfig
         mockMvc.perform(get("/api/avaliacoes/minhas")).andExpect(status().is4xxClientError());
+        mockMvc.perform(get("/api/avaliacoes/cliente/" + ID)).andExpect(status().is4xxClientError());
     }
 
     @Test

@@ -60,6 +60,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/studios/**").permitAll()
                         // As avaliações feitas pela própria pessoa dependem de quem está logado (a regra abaixo libera o resto)
                         .requestMatchers(HttpMethod.GET, "/api/avaliacoes/minhas").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/avaliacoes/cliente/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/avaliacoes/**").permitAll()
                         // O painel tem faturamento e clientes: exige login (a regra abaixo libera o resto de /api/empresas)
                         .requestMatchers(HttpMethod.GET, "/api/empresas/*/dashboard").authenticated()

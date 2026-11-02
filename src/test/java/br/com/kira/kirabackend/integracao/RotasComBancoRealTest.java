@@ -219,6 +219,7 @@ class RotasComBancoRealTest {
         chamar("POST", "/api/avaliacoes/cliente", Map.of("agendamentoId", concluido, "nota", 5, "comentario", "Ótimo"), ana, 201);
         chamar("POST", "/api/avaliacoes/empresa", Map.of("agendamentoId", concluido, "nota", 4), estudio, 201);
         get("/api/avaliacoes/cliente/" + anaId, ana);
+        chamar("GET", "/api/avaliacoes/cliente/" + anaId, null, estudio, 400);
         assertEquals(5, get("/api/avaliacoes/minhas", ana).get(0).get("nota").asInt());
         assertEquals("ana", get("/api/avaliacoes/empresa/" + estudioId, null).get(0).get("nomeCliente").asText());
         get("/api/avaliacoes/empresa/" + estudioId + "/media", null);
