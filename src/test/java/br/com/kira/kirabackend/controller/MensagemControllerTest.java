@@ -2,6 +2,7 @@ package br.com.kira.kirabackend.controller;
 
 import br.com.kira.kirabackend.domain.entity.Cliente;
 import br.com.kira.kirabackend.dto.request.MensagemRequest;
+import br.com.kira.kirabackend.dto.response.ConversaResponse;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.service.MensagemService;
@@ -16,6 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -67,5 +69,17 @@ class MensagemControllerTest {
         assertThrows(RegraDeNegocioException.class,
                 () -> controller.enviar(outroUsuario, usuarioLogado, request));
         verifyNoInteractions(mensagemService);
+    }
+
+    @Test
+    @DisplayName("A lista de conversas usa o usuário logado: não há id na URL para trocar")
+    void conversasDoUsuarioLogado() {
+        List<ConversaResponse> conversas = List.of();
+        when(mensagemService.listarConversas(usuarioLogado.getId())).thenReturn(conversas);
+
+        ResponseEntity<List<ConversaResponse>> response = controller.listarConversas(usuarioLogado);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertSame(conversas, response.getBody());
     }
 }

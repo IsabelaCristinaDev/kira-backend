@@ -2,6 +2,7 @@ package br.com.kira.kirabackend.controller;
 
 import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.dto.request.MensagemRequest;
+import br.com.kira.kirabackend.dto.response.ConversaResponse;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.service.MensagemService;
@@ -41,6 +42,11 @@ public class MensagemController {
             @PathVariable UUID agendamentoId,
             @AuthenticationPrincipal Usuario usuario) {
         return ResponseEntity.ok(mensagemService.listarConversa(agendamentoId, usuario.getId()));
+    }
+
+    @GetMapping("/conversas")
+    public ResponseEntity<List<ConversaResponse>> listarConversas(@AuthenticationPrincipal Usuario usuario) {
+        return ResponseEntity.ok(mensagemService.listarConversas(usuario.getId()));
     }
 
     @PatchMapping("/{id}/lida")

@@ -468,9 +468,10 @@ class AuthServiceTest {
         @DisplayName("Cadastro de cliente com CPF repetido dá erro de CPF já cadastrado")
         void clienteCpfRepetido() {
             when(usuarioRepository.existsClienteByCpf("123.456.789-00")).thenReturn(true);
+            ClienteRegistroRequest request = registroCliente();
 
             DocumentoJaCadastradoException ex = assertThrows(DocumentoJaCadastradoException.class,
-                    () -> service.registrarCliente(registroCliente()));
+                    () -> service.registrarCliente(request));
             assertEquals("CPF já cadastrado", ex.getMessage());
             verify(usuarioRepository, never()).save(any());
             verifyNoInteractions(emailService);
@@ -480,9 +481,10 @@ class AuthServiceTest {
         @DisplayName("Cadastro de empresa com CNPJ repetido dá erro de CNPJ já cadastrado")
         void empresaCnpjRepetido() {
             when(usuarioRepository.existsEmpresaByCnpj("12.345.678/0001-90")).thenReturn(true);
+            EmpresaRegistroRequest request = registroEmpresa(null, null);
 
             DocumentoJaCadastradoException ex = assertThrows(DocumentoJaCadastradoException.class,
-                    () -> service.registrarEmpresa(registroEmpresa(null, null)));
+                    () -> service.registrarEmpresa(request));
             assertEquals("CNPJ já cadastrado", ex.getMessage());
             verify(usuarioRepository, never()).save(any());
             verifyNoInteractions(servicoRepository, emailService);
@@ -492,11 +494,12 @@ class AuthServiceTest {
         @DisplayName("Cadastro de empresa com CPF repetido dá erro de CPF já cadastrado")
         void empresaCpfRepetido() {
             when(usuarioRepository.existsEmpresaByCpf("123.456.789-00")).thenReturn(true);
+            EmpresaRegistroRequest request = new EmpresaRegistroRequest("Estúdio Kira", "estudio@teste.com",
+                    "senha12345", "11988888888", null, "123.456.789-00", null, null, null, null,
+                    null, null, null, TipoEstabelecimento.AUTONOMA);
 
             DocumentoJaCadastradoException ex = assertThrows(DocumentoJaCadastradoException.class,
-                    () -> service.registrarEmpresa(new EmpresaRegistroRequest("Estúdio Kira", "estudio@teste.com",
-                            "senha12345", "11988888888", null, "123.456.789-00", null, null, null, null,
-                            null, null, null, TipoEstabelecimento.AUTONOMA)));
+                    () -> service.registrarEmpresa(request));
             assertEquals("CPF já cadastrado", ex.getMessage());
             verify(usuarioRepository, never()).save(any());
         }
@@ -563,6 +566,8 @@ class AuthServiceTest {
                 "'1h30',        90",
                 "'1h 30min',    90",
                 "'1 h 15 min',  75",
+                "'1h 30 minutos', 90",
+                "'2 horas 30 minutos', 150",
                 "'2 horas',     120",
                 "'2H',          120"
         })
@@ -575,18 +580,9 @@ class AuthServiceTest {
 
         @ParameterizedTest(name = "\"{0}\" = 0 min")
         @NullAndEmptySource
-        @ValueSource(strings = {"a combinar"})
-        @DisplayName("Duração vazia, nula ou sem número vira zero")
-        void duracaoVaziaViraZero(String bruto) {
-            Servico servico = registrarEmpresaComUmServico("50", bruto);
-
-            assertEquals(0, servico.getDuracaoMinutos());
-        }
-
-        @ParameterizedTest(name = "\"{0}\" = 0 min")
-        @ValueSource(strings = {"99999999999", "99999999999h", "40000000h", "1h99999999999"})
-        @DisplayName("Duração com número grande demais vira zero em vez de estourar")
-        void duracaoGrandeDemaisViraZero(String bruto) {
+        @ValueSource(strings = {"a combinar", "99999999999", "99999999999h", "40000000h", "1h99999999999"})
+        @DisplayName("Duração vazia, nula, sem número ou grande demais vira zero em vez de estourar")
+        void duracaoInvalidaViraZero(String bruto) {
             Servico servico = registrarEmpresaComUmServico("50", bruto);
 
             assertEquals(0, servico.getDuracaoMinutos());

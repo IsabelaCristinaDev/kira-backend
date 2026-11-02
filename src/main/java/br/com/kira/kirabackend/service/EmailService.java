@@ -11,6 +11,7 @@ import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.format.DateTimeFormatter;
 
@@ -32,7 +33,7 @@ public class EmailService {
     // sem esperar o SMTP nem devolver erro quando ele falha.
     @Async
     public void enviarEmailRecuperacaoSenha(String destinatario, String token) {
-        String link = frontendUrl.replaceAll("/+$", "") + "/redefinir-senha?token=" + token;
+        String link = StringUtils.trimTrailingCharacter(frontendUrl, '/') + "/redefinir-senha?token=" + token;
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(destinatario);
         message.setSubject("KIRA — Recuperação de Senha");

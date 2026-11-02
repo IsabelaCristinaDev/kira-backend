@@ -4,6 +4,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -45,6 +47,20 @@ class EmailServiceTest {
         assertArrayEquals(new String[]{"ana@teste.com"}, captor.getValue().getTo());
         assertTrue(texto.contains("https://app.kira.com/redefinir-senha?token=abc-123"), texto);
         assertTrue(texto.contains("\nabc-123\n"), texto);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"https://app.kira.com", "https://app.kira.com///"})
+    @DisplayName("O link sai sem barra duplicada, com ou sem barras no fim do endereço")
+    void linkSemBarraDuplicada(String frontendUrl) {
+        ReflectionTestUtils.setField(service, "frontendUrl", frontendUrl);
+
+        service.enviarEmailRecuperacaoSenha("ana@teste.com", "abc-123");
+
+        ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender).send(captor.capture());
+        String texto = captor.getValue().getText();
+        assertTrue(texto.contains("https://app.kira.com/redefinir-senha?token=abc-123"), texto);
     }
 
     @Test

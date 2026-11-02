@@ -88,17 +88,17 @@ class SecurityConfigAdminTest {
     @WithMockUser(roles = "USER")
     @DisplayName("Cliente logado é bloqueado em /api/admin em qualquer método HTTP")
     void clienteBloqueadoEmTodosOsMetodos() throws Exception {
-        mockMvc.perform(get(ROTA)).andExpect(status().isForbidden());
-        mockMvc.perform(post(ROTA)).andExpect(status().isForbidden());
-        mockMvc.perform(put(ROTA)).andExpect(status().isForbidden());
-        mockMvc.perform(patch(ROTA)).andExpect(status().isForbidden());
-        mockMvc.perform(delete(ROTA)).andExpect(status().isForbidden());
+        assertBloqueadoEmTodosOsMetodos();
     }
 
     @Test
     @WithMockUser(roles = {"EMPRESA", "USER"})
     @DisplayName("Empresa logada é bloqueada em /api/admin em qualquer método HTTP")
     void empresaBloqueadaEmTodosOsMetodos() throws Exception {
+        assertBloqueadoEmTodosOsMetodos();
+    }
+
+    private void assertBloqueadoEmTodosOsMetodos() throws Exception {
         mockMvc.perform(get(ROTA)).andExpect(status().isForbidden());
         mockMvc.perform(post(ROTA)).andExpect(status().isForbidden());
         mockMvc.perform(put(ROTA)).andExpect(status().isForbidden());

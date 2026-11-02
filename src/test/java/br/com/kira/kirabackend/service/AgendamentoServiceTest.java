@@ -514,8 +514,9 @@ class AgendamentoServiceTest {
         void deveFalharAgendamentoInexistente() {
             UUID id = UUID.randomUUID();
             when(agendamentoRepository.findById(id)).thenReturn(Optional.empty());
+            UUID empresaId = empresa.getId();
 
-            assertThrows(RecursoNaoEncontradoException.class, () -> service.concluir(id, empresa.getId()));
+            assertThrows(RecursoNaoEncontradoException.class, () -> service.concluir(id, empresaId));
         }
 
         @Test

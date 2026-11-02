@@ -5,9 +5,11 @@ import br.com.kira.kirabackend.domain.entity.Mensagem;
 import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import br.com.kira.kirabackend.dto.request.MensagemRequest;
+import br.com.kira.kirabackend.dto.response.ConversaResponse;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
+import br.com.kira.kirabackend.observer.ConversaLidaEvent;
 import br.com.kira.kirabackend.observer.MensagemEnviadaEvent;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.MensagemRepository;
@@ -17,7 +19,9 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RequiredArgsConstructor
@@ -50,7 +54,8 @@ public class MensagemService {
         mensagem.setConteudo(request.conteudo());
 
         MensagemResponse response = toResponse(mensagemRepository.save(mensagem));
-        eventPublisher.publishEvent(new MensagemEnviadaEvent(this, response));
+        eventPublisher.publishEvent(new MensagemEnviadaEvent(this, response,
+                List.of(agendamento.getCliente().getId(), agendamento.getEmpresa().getId())));
         return response;
     }
 
@@ -64,6 +69,16 @@ public class MensagemService {
                 .toList();
     }
 
+    public List<ConversaResponse> listarConversas(UUID usuarioId) {
+        // Duas mensagens no mesmo instante trariam a conversa duas vezes: fica só a primeira
+        Map<UUID, ConversaResponse> conversas = new LinkedHashMap<>();
+        for (MensagemRepository.ConversaResumo resumo : mensagemRepository.listarConversas(usuarioId)) {
+            ConversaResponse conversa = toConversa(resumo, usuarioId);
+            conversas.putIfAbsent(conversa.agendamentoId(), conversa);
+        }
+        return List.copyOf(conversas.values());
+    }
+
     public void marcarComoLida(UUID mensagemId, UUID usuarioId) {
         Mensagem mensagem = mensagemRepository.findById(mensagemId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Mensagem não encontrada"));
@@ -73,12 +88,15 @@ public class MensagemService {
         }
         mensagem.setLida(true);
         mensagemRepository.save(mensagem);
+        eventPublisher.publishEvent(new ConversaLidaEvent(mensagem.getAgendamento().getId(), usuarioId));
     }
 
     /** Marca de uma vez o que a pessoa recebeu na conversa; as mensagens que ela enviou não mudam. */
     public void marcarConversaComoLida(UUID agendamentoId, UUID usuarioId) {
         exigirParticipante(agendamentoId, usuarioId);
-        mensagemRepository.marcarRecebidasComoLidas(agendamentoId, usuarioId);
+        if (mensagemRepository.marcarRecebidasComoLidas(agendamentoId, usuarioId) > 0) {
+            eventPublisher.publishEvent(new ConversaLidaEvent(agendamentoId, usuarioId));
+        }
     }
 
     /** Usado também ao assinar a conversa pelo WebSocket. */
@@ -95,6 +113,25 @@ public class MensagemService {
         if (!participa) {
             throw new RegraDeNegocioException("Você não participa deste agendamento");
         }
+    }
+
+    private static ConversaResponse toConversa(MensagemRepository.ConversaResumo resumo, UUID usuarioId) {
+        Mensagem ultima = resumo.getUltimaMensagem();
+        Agendamento agendamento = ultima.getAgendamento();
+        boolean souCliente = usuarioId.equals(agendamento.getCliente().getId());
+        Usuario outraParte = souCliente ? agendamento.getEmpresa() : agendamento.getCliente();
+        return new ConversaResponse(
+                agendamento.getId(),
+                outraParte.getNome(),
+                outraParte.getFotoUrl(),
+                agendamento.getServico().getNome(),
+                agendamento.getDataHoraInicio(),
+                agendamento.getStatus(),
+                ultima.getConteudo(),
+                usuarioId.equals(ultima.getRemetente().getId()),
+                ultima.getDataEnvio(),
+                resumo.getNaoLidas()
+        );
     }
 
     private MensagemResponse toResponse(Mensagem m) {

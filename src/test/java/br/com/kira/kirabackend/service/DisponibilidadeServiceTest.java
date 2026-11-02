@@ -430,9 +430,10 @@ class DisponibilidadeServiceTest {
         void outroUsuarioNaoPodeAlterar() {
             UUID outroUsuario = UUID.randomUUID();
             List<DisponibilidadeRequest> dias = List.of();
+            UUID empresaId = empresa.getId();
 
             RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
-                    () -> service.substituirSemana(empresa.getId(), outroUsuario, dias));
+                    () -> service.substituirSemana(empresaId, outroUsuario, dias));
             assertEquals("Você só pode alterar o horário do seu estabelecimento", ex.getMessage());
             verify(disponibilidadeRepository, never()).saveAll(any());
         }

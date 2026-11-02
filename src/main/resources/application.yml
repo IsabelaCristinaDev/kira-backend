@@ -46,6 +46,12 @@ jwt:
 kira:
   # Endereço do app web, usado no link do e-mail de recuperação de senha
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  notificacoes:
+    web:
+      # Sem as chaves no .env, as notificações ficam desligadas e o resto funciona
+      chave-publica: ${VAPID_PUBLIC_KEY:}
+      chave-privada: ${VAPID_PRIVATE_KEY:}
+      assunto: ${VAPID_SUBJECT:}
   lembrete:
     antecedencia-horas: ${LEMBRETE_ANTECEDENCIA_HORAS:24}
     cron: ${LEMBRETE_CRON:0 0 * * * *}
