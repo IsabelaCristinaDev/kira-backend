@@ -40,6 +40,12 @@ public class AvaliacaoController {
                 .body(avaliacaoService.avaliarComoEmpresa(usuario.getId(), request));
     }
 
+    @GetMapping("/minhas")
+    public ResponseEntity<List<AvaliacaoResponse>> listarMinhasAvaliacoes(
+            @AuthenticationPrincipal Usuario usuario) {
+        return ResponseEntity.ok(avaliacaoService.listarMinhasAvaliacoes(usuario.getId()));
+    }
+
     @GetMapping("/empresa/{empresaId}")
     public ResponseEntity<List<AvaliacaoResponse>> listarAvaliacoesEmpresa(
             @PathVariable UUID empresaId) {

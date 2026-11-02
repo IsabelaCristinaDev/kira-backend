@@ -103,6 +103,15 @@ public class AvaliacaoService {
                 .toList();
     }
 
+    /** As avaliações que a própria cliente fez. A lista de cima traz as que ela recebeu das empresas. */
+    public List<AvaliacaoResponse> listarMinhasAvaliacoes(UUID clienteId) {
+        return avaliacaoRepository
+                .findByClienteIdAndTipoAvaliador(clienteId, TipoAvaliador.CLIENTE)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     public Double mediaAvaliacaoEmpresa(UUID empresaId) {
         exigirEmpresaAtiva(empresaId);
         return avaliacaoRepository.calcularMediaAvaliacaoEmpresa(empresaId);
