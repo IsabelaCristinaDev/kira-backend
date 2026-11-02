@@ -50,4 +50,12 @@ public class MensagemController {
         mensagemService.marcarComoLida(id, usuario.getId());
         return ResponseEntity.noContent().build();
     }
-}
+
+    @PatchMapping("/agendamento/{agendamentoId}/lidas")
+    public ResponseEntity<Void> marcarConversaComoLida(
+            @PathVariable UUID agendamentoId,
+            @AuthenticationPrincipal Usuario usuario) {
+        mensagemService.marcarConversaComoLida(agendamentoId, usuario.getId());
+        return ResponseEntity.noContent().build();
+    }
+}

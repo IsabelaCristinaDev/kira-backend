@@ -65,9 +65,9 @@ class SecurityConfigPerfilTest {
     @Test
     @DisplayName("Sem login, o perfil da empresa e o da cliente são bloqueados")
     void semLoginBloqueado() throws Exception {
-        mockMvc.perform(get("/api/empresas/" + ID + "/perfil")).andExpect(status().isForbidden());
-        mockMvc.perform(put("/api/empresas/" + ID + "/perfil").with(csrf())).andExpect(status().isForbidden());
-        mockMvc.perform(get("/api/clientes/" + ID + "/perfil")).andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/empresas/" + ID + "/perfil")).andExpect(status().isUnauthorized());
+        mockMvc.perform(put("/api/empresas/" + ID + "/perfil").with(csrf())).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/clientes/" + ID + "/perfil")).andExpect(status().isUnauthorized());
     }
 
     @Test
