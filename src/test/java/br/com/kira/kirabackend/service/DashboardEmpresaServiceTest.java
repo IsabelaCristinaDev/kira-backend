@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -292,5 +293,13 @@ class DashboardEmpresaServiceTest {
                 new NotaQuantidadeResponse(3, 0),
                 new NotaQuantidadeResponse(2, 1),
                 new NotaQuantidadeResponse(1, 0)), resumo.distribuicao());
+    }
+
+    @Test
+    @DisplayName("Gerar o painel roda em transação: sem ela, as relações LAZY dão erro 500 com o banco de verdade")
+    void gerarRodaEmTransacao() throws NoSuchMethodException {
+        var gerar = DashboardEmpresaService.class.getMethod("gerar", UUID.class, LocalDate.class, LocalDate.class);
+
+        assertTrue(gerar.isAnnotationPresent(org.springframework.transaction.annotation.Transactional.class));
     }
 }
