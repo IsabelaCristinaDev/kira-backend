@@ -295,6 +295,16 @@ class AvaliacaoServiceTest {
     }
 
     @Test
+    @DisplayName("Outra conta não vê as avaliações recebidas pela cliente")
+    void outraContaNaoVeAvaliacoesDaCliente() {
+        UUID clienteId = cliente.getId();
+        UUID outraConta = UUID.randomUUID();
+
+        assertThrows(RegraDeNegocioException.class, () -> service.listarAvaliacoesCliente(clienteId, outraConta));
+        verifyNoInteractions(avaliacaoRepository);
+    }
+
+    @Test
     @DisplayName("Minhas avaliações traz apenas as feitas pela própria cliente")
     void minhasAvaliacoesSoTrazAsDaCliente() {
         when(avaliacaoRepository.findByClienteIdAndTipoAvaliador(cliente.getId(), TipoAvaliador.CLIENTE))
@@ -313,7 +323,7 @@ class AvaliacaoServiceTest {
         when(avaliacaoRepository.findByClienteIdAndTipoAvaliador(cliente.getId(), TipoAvaliador.EMPRESA))
                 .thenReturn(List.of(avaliacao(TipoAvaliador.EMPRESA)));
 
-        List<AvaliacaoResponse> avaliacoes = service.listarAvaliacoesCliente(cliente.getId());
+        List<AvaliacaoResponse> avaliacoes = service.listarAvaliacoesCliente(cliente.getId(), cliente.getId());
 
         assertEquals(1, avaliacoes.size());
         assertEquals(TipoAvaliador.EMPRESA, avaliacoes.get(0).tipoAvaliador());

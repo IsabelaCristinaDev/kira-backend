@@ -54,8 +54,9 @@ public class AvaliacaoController {
 
     @GetMapping("/cliente/{clienteId}")
     public ResponseEntity<List<AvaliacaoResponse>> listarAvaliacoesCliente(
+            @AuthenticationPrincipal Usuario usuario,
             @PathVariable UUID clienteId) {
-        return ResponseEntity.ok(avaliacaoService.listarAvaliacoesCliente(clienteId));
+        return ResponseEntity.ok(avaliacaoService.listarAvaliacoesCliente(clienteId, usuario.getId()));
     }
 
     @GetMapping("/empresa/{empresaId}/media")
