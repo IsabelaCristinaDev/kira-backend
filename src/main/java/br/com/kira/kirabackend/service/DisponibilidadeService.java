@@ -112,7 +112,9 @@ public class DisponibilidadeService {
     }
 
     private Empresa buscarEmpresa(UUID empresaId) {
-        return (Empresa) usuarioRepository.findById(empresaId)
+        return usuarioRepository.findById(empresaId)
+                .filter(Empresa.class::isInstance)
+                .map(Empresa.class::cast)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Empresa não encontrada"));
     }
 

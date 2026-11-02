@@ -3,6 +3,7 @@ package br.com.kira.kirabackend.service;
 import br.com.kira.kirabackend.domain.entity.Agendamento;
 import br.com.kira.kirabackend.domain.entity.DisponibilidadeEstudio;
 import br.com.kira.kirabackend.domain.entity.BloqueioHorario;
+import br.com.kira.kirabackend.domain.entity.Cliente;
 import br.com.kira.kirabackend.domain.entity.Empresa;
 import br.com.kira.kirabackend.domain.entity.Funcionaria;
 import br.com.kira.kirabackend.domain.entity.Servico;
@@ -359,6 +360,18 @@ class DisponibilidadeServiceTest {
             RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
                     () -> service.cadastrar(empresaId, empresaId, req));
             assertEquals("Hora de fim deve ser após hora de início", ex.getMessage());
+            verify(disponibilidadeRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Conta que não é de empresa dá 404, mesmo usando o próprio id")
+        void contaDeClienteDa404() {
+            UUID clienteId = UUID.randomUUID();
+            when(usuarioRepository.findById(clienteId)).thenReturn(Optional.of(new Cliente()));
+            DisponibilidadeRequest req = new DisponibilidadeRequest(DiaSemana.SEGUNDA, hora(9, 0), hora(18, 0));
+
+            assertThrows(RecursoNaoEncontradoException.class,
+                    () -> service.cadastrar(clienteId, clienteId, req));
             verify(disponibilidadeRepository, never()).save(any());
         }
 
