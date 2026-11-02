@@ -88,14 +88,14 @@ public class MensagemService {
         }
         mensagem.setLida(true);
         mensagemRepository.save(mensagem);
-        eventPublisher.publishEvent(new ConversaLidaEvent(this, mensagem.getAgendamento().getId(), usuarioId));
+        eventPublisher.publishEvent(new ConversaLidaEvent(mensagem.getAgendamento().getId(), usuarioId));
     }
 
     /** Marca de uma vez o que a pessoa recebeu na conversa; as mensagens que ela enviou não mudam. */
     public void marcarConversaComoLida(UUID agendamentoId, UUID usuarioId) {
         exigirParticipante(agendamentoId, usuarioId);
         if (mensagemRepository.marcarRecebidasComoLidas(agendamentoId, usuarioId) > 0) {
-            eventPublisher.publishEvent(new ConversaLidaEvent(this, agendamentoId, usuarioId));
+            eventPublisher.publishEvent(new ConversaLidaEvent(agendamentoId, usuarioId));
         }
     }
 

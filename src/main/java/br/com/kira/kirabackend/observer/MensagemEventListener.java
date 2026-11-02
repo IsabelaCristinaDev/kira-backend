@@ -35,7 +35,7 @@ public class MensagemEventListener {
     // Só para quem leu: o contador da outra parte não muda
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onConversaLida(ConversaLidaEvent event) {
-        avisar(event.getUsuarioId(), new AvisoConversaResponse(event.getAgendamentoId(), null));
+        avisar(event.usuarioId(), new AvisoConversaResponse(event.agendamentoId(), null));
     }
 
     private void avisar(UUID usuarioId, AvisoConversaResponse aviso) {

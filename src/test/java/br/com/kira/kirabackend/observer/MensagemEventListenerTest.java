@@ -56,7 +56,7 @@ class MensagemEventListenerTest {
         UUID agendamentoId = UUID.randomUUID();
         UUID usuarioId = UUID.randomUUID();
 
-        listener.onConversaLida(new ConversaLidaEvent(this, agendamentoId, usuarioId));
+        listener.onConversaLida(new ConversaLidaEvent(agendamentoId, usuarioId));
 
         verify(messagingTemplate).convertAndSend("/topic/usuarios/" + usuarioId + "/conversas",
                 new AvisoConversaResponse(agendamentoId, null));

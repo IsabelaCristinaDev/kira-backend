@@ -412,8 +412,8 @@ class MensagemServiceTest {
 
         ArgumentCaptor<ConversaLidaEvent> captor = ArgumentCaptor.forClass(ConversaLidaEvent.class);
         verify(eventPublisher).publishEvent(captor.capture());
-        assertEquals(agendamento.getId(), captor.getValue().getAgendamentoId());
-        assertEquals(empresa.getId(), captor.getValue().getUsuarioId());
+        assertEquals(agendamento.getId(), captor.getValue().agendamentoId());
+        assertEquals(empresa.getId(), captor.getValue().usuarioId());
     }
 
     @Test
