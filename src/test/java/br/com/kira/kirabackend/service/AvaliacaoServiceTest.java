@@ -295,6 +295,19 @@ class AvaliacaoServiceTest {
     }
 
     @Test
+    @DisplayName("Minhas avaliações traz apenas as feitas pela própria cliente")
+    void minhasAvaliacoesSoTrazAsDaCliente() {
+        when(avaliacaoRepository.findByClienteIdAndTipoAvaliador(cliente.getId(), TipoAvaliador.CLIENTE))
+                .thenReturn(List.of(avaliacao(TipoAvaliador.CLIENTE)));
+
+        List<AvaliacaoResponse> avaliacoes = service.listarMinhasAvaliacoes(cliente.getId());
+
+        assertEquals(1, avaliacoes.size());
+        assertEquals(TipoAvaliador.CLIENTE, avaliacoes.get(0).tipoAvaliador());
+        verify(avaliacaoRepository, never()).findByClienteIdAndTipoAvaliador(cliente.getId(), TipoAvaliador.EMPRESA);
+    }
+
+    @Test
     @DisplayName("A listagem do cliente traz apenas as avaliações feitas por empresas")
     void listagemDoClienteSoTrazAvaliacoesDeEmpresas() {
         when(avaliacaoRepository.findByClienteIdAndTipoAvaliador(cliente.getId(), TipoAvaliador.EMPRESA))
