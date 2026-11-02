@@ -109,6 +109,14 @@ class WebPushEnvioTest {
     }
 
     @Test
+    @DisplayName("Assunto vazio usa o padrão, e assunto preenchido é mantido")
+    void assuntoVazioUsaPadrao() {
+        assertEquals(WebPushEnvio.ASSUNTO_PADRAO, WebPushEnvio.assuntoOuPadrao(""));
+        assertEquals(WebPushEnvio.ASSUNTO_PADRAO, WebPushEnvio.assuntoOuPadrao("  "));
+        assertEquals("mailto:contato@exemplo.test", WebPushEnvio.assuntoOuPadrao("mailto:contato@exemplo.test"));
+    }
+
+    @Test
     @DisplayName("Sem chaves, o envio fica desligado e a aplicação sobe normalmente")
     void semChaves() {
         WebPushEnvio envio = new WebPushEnvio("", "", "https://exemplo.test");

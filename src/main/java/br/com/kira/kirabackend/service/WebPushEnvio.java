@@ -54,6 +54,7 @@ public class WebPushEnvio {
     private static final int TEMPO_DE_VIDA_SEGUNDOS = 24 * 60 * 60;
     private static final Duration VALIDADE_DO_TOKEN = Duration.ofHours(12);
     private static final Duration TEMPO_LIMITE = Duration.ofSeconds(10);
+    static final String ASSUNTO_PADRAO = "https://github.com/IsabelaCristinaDev/kira-backend";
 
     private static final Base64.Decoder BASE64 = Base64.getUrlDecoder();
     private static final Base64.Encoder BASE64_SEM_PREENCHIMENTO = Base64.getUrlEncoder().withoutPadding();
@@ -69,7 +70,7 @@ public class WebPushEnvio {
             @Value("${kira.notificacoes.web.chave-publica}") String chavePublica,
             @Value("${kira.notificacoes.web.chave-privada}") String chavePrivada,
             @Value("${kira.notificacoes.web.assunto}") String assunto) {
-        this.assunto = assunto;
+        this.assunto = assuntoOuPadrao(assunto);
         PrivateKey privada = null;
         if (!chavePublica.isBlank() && !chavePrivada.isBlank()) {
             try {
@@ -81,6 +82,11 @@ public class WebPushEnvio {
         }
         this.chavePrivada = privada;
         this.chavePublica = privada == null ? null : chavePublica;
+    }
+
+    // VAPID_SUBJECT vazio no .env não usa o padrão do application.yml, e o serviço de push da Apple exige o assunto
+    static String assuntoOuPadrao(String assunto) {
+        return assunto == null || assunto.isBlank() ? ASSUNTO_PADRAO : assunto;
     }
 
     public boolean ativo() {
