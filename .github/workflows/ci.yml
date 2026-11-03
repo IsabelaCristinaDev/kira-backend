@@ -48,7 +48,8 @@ jobs:
       - name: Rodar os testes
         run: ./mvnw -B test
       # Sem Docker o teste é ignorado sem dar erro, e o CI passaria sem testar o banco
-      - name: Conferir que o teste com banco rodou
+      - name: Conferir que os testes com banco rodaram
         run: |
-          relatorio=target/surefire-reports/TEST-br.com.kira.kirabackend.integracao.RotasComBancoRealTest.xml
-          grep -q 'skipped="0"' "$relatorio"
+          for teste in RotasComBancoRealTest ConexaoAoVivoComBancoRealTest; do
+            grep -q 'skipped="0"' "target/surefire-reports/TEST-br.com.kira.kirabackend.integracao.$teste.xml"
+          done

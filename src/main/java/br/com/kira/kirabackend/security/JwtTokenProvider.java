@@ -45,6 +45,10 @@ public class JwtTokenProvider {
         return extrairClaims(token).getSubject();
     }
 
+    public Instant extrairExpiracao(String token) {
+        return extrairClaims(token).getExpiration().toInstant();
+    }
+
     public boolean tokenValido(String token) {
         try {
             var claims = extrairClaims(token);

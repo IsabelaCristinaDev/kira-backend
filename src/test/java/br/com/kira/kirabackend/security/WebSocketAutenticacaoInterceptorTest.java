@@ -20,6 +20,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -42,6 +43,9 @@ class WebSocketAutenticacaoInterceptorTest {
 
     @Mock
     private MensagemService mensagemService;
+
+    @Mock
+    private ConexoesAoVivo conexoesAoVivo;
 
     @InjectMocks
     private WebSocketAutenticacaoInterceptor interceptor;
@@ -87,6 +91,8 @@ class WebSocketAutenticacaoInterceptorTest {
     @Test
     @DisplayName("CONNECT com token válido guarda o usuário na conexão")
     void connectComTokenValido() {
+        Instant expira = Instant.now().plusSeconds(60);
+        when(jwtTokenProvider.extrairExpiracao("abc")).thenReturn(expira);
         when(jwtTokenProvider.tokenValido("abc")).thenReturn(true);
         when(jwtTokenProvider.extrairEmail("abc")).thenReturn(cliente.getEmail());
         when(userDetailsService.loadUserByUsername(cliente.getEmail())).thenReturn(cliente);
@@ -96,6 +102,7 @@ class WebSocketAutenticacaoInterceptorTest {
 
         Authentication usuario = (Authentication) StompHeaderAccessor.wrap(resultado).getUser();
         assertSame(cliente, usuario.getPrincipal());
+        verify(conexoesAoVivo).registrar(null, cliente.getId(), expira);
     }
 
     @Test
@@ -127,6 +134,7 @@ class WebSocketAutenticacaoInterceptorTest {
         Message<byte[]> mensagem = connect("Bearer abc");
 
         assertThrows(MessageDeliveryException.class, () -> interceptor.preSend(mensagem, canal));
+        verifyNoInteractions(conexoesAoVivo);
     }
 
     @Test
