@@ -14,6 +14,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -67,6 +68,29 @@ public class GlobalExceptionHandler {
                         ex.getMessage(),
                         request.getRequestURI(),
                         null));
+    }
+
+    // 428: falta uma condição prévia (o consentimento). Não é 403, que o app trata como falta de permissão
+    @ExceptionHandler(ConsentimentoProvadorNecessarioException.class)
+    public ResponseEntity<ErroResponse> handleConsentimentoProvador(
+            ConsentimentoProvadorNecessarioException ex,
+            HttpServletRequest request) {
+        return resposta(HttpStatus.PRECONDITION_REQUIRED, "PROVADOR_CONSENTIMENTO_NECESSARIO",
+                "Aceite o termo do Provador virtual para continuar", request);
+    }
+
+    // O detalhe vem do log; ao app vai uma mensagem fixa que não cita o provedor da IA
+    @ExceptionHandler(GeracaoProvadorException.class)
+    public ResponseEntity<ErroResponse> handleGeracaoProvador(
+            GeracaoProvadorException ex,
+            HttpServletRequest request) {
+        return resposta(HttpStatus.BAD_GATEWAY, "PROVADOR_GERACAO_FALHOU",
+                "Não foi possível gerar a prévia agora. Tente novamente", request);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErroResponse> handleArquivoGrande(Exception ex, HttpServletRequest request) {
+        return resposta(HttpStatus.PAYLOAD_TOO_LARGE, "ARQUIVO_MUITO_GRANDE", "O arquivo enviado é grande demais", request);
     }
 
     @ExceptionHandler(EmailJaCadastradoException.class)
