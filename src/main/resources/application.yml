@@ -9,7 +9,8 @@ spring:
   servlet:
     multipart:
       max-file-size: 5MB
-      max-request-size: 6MB
+      # O Provador envia duas fotos de uma vez
+      max-request-size: 11MB
   jpa:
     hibernate:
       ddl-auto: update
@@ -59,6 +60,18 @@ kira:
       chave-publica: ${VAPID_PUBLIC_KEY:}
       chave-privada: ${VAPID_PRIVATE_KEY:}
       assunto: ${VAPID_SUBJECT:}
+  provador:
+    # Muda quando o texto jurídico do consentimento muda: quem aceitou a versão antiga precisa aceitar de novo
+    versao-consentimento: ${PROVADOR_VERSAO_CONSENTIMENTO:v1}
+    tamanho-maximo-bytes: ${PROVADOR_TAMANHO_MAXIMO_BYTES:5242880}
+    cloudflare:
+      # Sem as credenciais no .env, o resto da API funciona e a geração responde erro
+      account-id: ${CLOUDFLARE_ACCOUNT_ID:}
+      api-token: ${CLOUDFLARE_API_TOKEN:}
+      modelo: ${CLOUDFLARE_MODELO:@cf/black-forest-labs/flux-2-klein-4b}
+      base-url: ${CLOUDFLARE_BASE_URL:https://api.cloudflare.com/client/v4}
+      timeout-conexao-ms: ${CLOUDFLARE_TIMEOUT_CONEXAO_MS:5000}
+      timeout-leitura-ms: ${CLOUDFLARE_TIMEOUT_LEITURA_MS:90000}
   lembrete:
     antecedencia-horas: ${LEMBRETE_ANTECEDENCIA_HORAS:24}
     cron: ${LEMBRETE_CRON:0 0 * * * *}

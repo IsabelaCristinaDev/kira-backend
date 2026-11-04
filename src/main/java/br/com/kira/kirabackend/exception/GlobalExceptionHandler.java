@@ -72,6 +72,24 @@ public class GlobalExceptionHandler {
                         null));
     }
 
+    // 428: falta uma condição prévia (o consentimento). Não é 403, que o app trata como falta de permissão
+    @ExceptionHandler(ConsentimentoProvadorNecessarioException.class)
+    public ResponseEntity<ErroResponse> handleConsentimentoProvador(
+            ConsentimentoProvadorNecessarioException ex,
+            HttpServletRequest request) {
+        return resposta(HttpStatus.PRECONDITION_REQUIRED, "PROVADOR_CONSENTIMENTO_NECESSARIO",
+                "Aceite o termo do Provador virtual para continuar", request);
+    }
+
+    // O detalhe vem do log; ao app vai uma mensagem fixa que não cita o provedor da IA
+    @ExceptionHandler(GeracaoProvadorException.class)
+    public ResponseEntity<ErroResponse> handleGeracaoProvador(
+            GeracaoProvadorException ex,
+            HttpServletRequest request) {
+        return resposta(HttpStatus.BAD_GATEWAY, "PROVADOR_GERACAO_FALHOU",
+                "Não foi possível gerar a prévia agora. Tente novamente", request);
+    }
+
     @ExceptionHandler(EmailJaCadastradoException.class)
     public ResponseEntity<ErroResponse> handleEmailJaCadastrado(
             EmailJaCadastradoException ex,
