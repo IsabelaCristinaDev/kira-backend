@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -76,7 +77,7 @@ class BuscaEstudioServiceTest {
 
         service.buscar(SEM_FILTRO, semCoordenadas, 0, 20);
         service.buscar(SEM_FILTRO, empresa, 0, 20);
-        verify(buscaRepository, org.mockito.Mockito.times(2)).contar(eq(SEM_FILTRO), isNull());
+        verify(buscaRepository, times(2)).contar(eq(SEM_FILTRO), isNull());
     }
 
     @Test
