@@ -105,9 +105,9 @@ class RotasComBancoRealTest {
     // Criadas uma vez só: os testes abaixo usam as mesmas contas, sem depender da ordem
     private static Conta cliente;
     private static Conta outraCliente;
-    private static Conta estudio;
+    private static Conta salao;
     private static Conta outroEstudio;
-    private static String servicoId;
+    private static String servicoDoSalao;
 
     @BeforeEach
     void prepararContas() throws IOException, InterruptedException {
@@ -119,12 +119,12 @@ class RotasComBancoRealTest {
         cadastrarEstudio("salao", "11444777000161");
         cadastrarEstudio("espaco", "12345678000195");
         outraCliente = conta("duda");
-        estudio = conta("salao");
+        salao = conta("salao");
         outroEstudio = conta("espaco");
-        servicoId = get("/api/empresas/" + estudio.id() + "/servicos", estudio.token()).get(0).get("id").asText();
+        servicoDoSalao = get("/api/empresas/" + salao.id() + "/servicos", salao.token()).get(0).get("id").asText();
         List<Map<String, String>> semana = List.of("SEGUNDA", "TERCA", "QUARTA", "QUINTA", "SEXTA", "SABADO", "DOMINGO")
                 .stream().map(d -> Map.of("diaSemana", d, "horaInicio", "08:00", "horaFim", "20:00")).toList();
-        chamar("PUT", "/api/empresas/" + estudio.id() + "/disponibilidade", Map.of("dias", semana), estudio.token(), 200);
+        chamar("PUT", "/api/empresas/" + salao.id() + "/disponibilidade", Map.of("dias", semana), salao.token(), 200);
         cliente = conta("carol");
     }
 
@@ -173,7 +173,7 @@ class RotasComBancoRealTest {
     private String agendamentoNoPassado(int diasAdiante, int hora) throws IOException, InterruptedException {
         LocalDate dia = hoje.plusDays(diasAdiante);
         String horario = "T%02d:00:00".formatted(hora);
-        String id = agendar(cliente.id(), cliente.token(), estudio.id(), servicoId, null, dia + horario);
+        String id = agendar(cliente.id(), cliente.token(), salao.id(), servicoDoSalao, null, dia + horario);
         LocalDate ontem = hoje.minusDays(1);
         jdbc.update("update agendamento set data_hora_inicio = ?::timestamp, data_hora_fim = ?::timestamp where id = ?::uuid",
                 ontem + " %02d:00:00".formatted(hora), ontem + " %02d:00:00".formatted(hora + 1), id);
@@ -390,19 +390,19 @@ class RotasComBancoRealTest {
         String concluir = "/api/agendamentos/%s/concluir";
 
         JsonNode concluido = chamar("PATCH", concluir.formatted(comForma), Map.of("formaPagamento", "PIX"),
-                estudio.token(), 200);
+                salao.token(), 200);
         assertEquals("PIX", concluido.get("formaPagamento").asText());
         assertEquals("CONCLUIDO", concluido.get("status").asText());
 
-        JsonNode mantido = chamar("PATCH", concluir.formatted(semCorpo), null, estudio.token(), 200);
+        JsonNode mantido = chamar("PATCH", concluir.formatted(semCorpo), null, salao.token(), 200);
         assertEquals("DINHEIRO", mantido.get("formaPagamento").asText());
 
         // Valor que não existe e estúdio errado não concluem: a chamada certa depois disso ainda funciona
-        chamar("PATCH", concluir.formatted(recusado), Map.of("formaPagamento", "CHEQUE"), estudio.token(), 400);
+        chamar("PATCH", concluir.formatted(recusado), Map.of("formaPagamento", "CHEQUE"), salao.token(), 400);
         chamar("PATCH", concluir.formatted(recusado), Map.of("formaPagamento", "PIX"), outroEstudio.token(), 400);
         chamar("PATCH", concluir.formatted(recusado), Map.of("formaPagamento", "PIX"), cliente.token(), 400);
         assertEquals("CARTAO_DEBITO", chamar("PATCH", concluir.formatted(recusado),
-                Map.of("formaPagamento", "CARTAO_DEBITO"), estudio.token(), 200).get("formaPagamento").asText());
+                Map.of("formaPagamento", "CARTAO_DEBITO"), salao.token(), 200).get("formaPagamento").asText());
     }
 
     @Test
@@ -458,7 +458,7 @@ class RotasComBancoRealTest {
         assertEquals(0, get(publico, null).size());
 
         assertEquals(401, enviarArquivo(doDono, "arquivo", PNG, null).statusCode());
-        assertEquals(400, enviarArquivo(doDono, "arquivo", PNG, estudio.token()).statusCode());
+        assertEquals(400, enviarArquivo(doDono, "arquivo", PNG, salao.token()).statusCode());
         assertEquals(400, enviarArquivo(doDono, "arquivo", PNG, cliente.token()).statusCode());
 
         HttpResponse<String> enviada = enviarArquivo(doDono, "arquivo", PNG, outroEstudio.token());
@@ -469,8 +469,8 @@ class RotasComBancoRealTest {
         assertEquals(200, abrir(url).statusCode());
         assertEquals(url, get(publico, null).get(0).get("url").asText());
 
-        chamar("DELETE", doDono + "/" + fotoId, null, estudio.token(), 400);
-        chamar("DELETE", "/api/empresas/" + estudio.id() + "/portfolio/" + fotoId, null, estudio.token(), 404);
+        chamar("DELETE", doDono + "/" + fotoId, null, salao.token(), 400);
+        chamar("DELETE", "/api/empresas/" + salao.id() + "/portfolio/" + fotoId, null, salao.token(), 404);
         assertEquals(200, abrir(url).statusCode());
 
         chamar("GET", "/api/studios/" + UUID.randomUUID() + "/portfolio", null, null, 404);
@@ -491,13 +491,13 @@ class RotasComBancoRealTest {
     @Test
     @DisplayName("Lista de conversas e marcar todas como lidas respeitam quem participa")
     void listaDeConversas() throws IOException, InterruptedException {
-        String agendamento = agendar(cliente.id(), cliente.token(), estudio.id(), servicoId, null,
+        String agendamento = agendar(cliente.id(), cliente.token(), salao.id(), servicoDoSalao, null,
                 hoje.plusDays(6) + "T10:00:00");
         String enviar = "/api/mensagens/remetente/" + cliente.id();
         chamar("POST", enviar, Map.of("agendamentoId", agendamento, "conteudo", "Oi"), cliente.token(), 201);
         chamar("POST", enviar, Map.of("agendamentoId", agendamento, "conteudo", "Tudo bem?"), cliente.token(), 201);
 
-        JsonNode doEstudio = conversa(agendamento, estudio.token());
+        JsonNode doEstudio = conversa(agendamento, salao.token());
         assertEquals(2, doEstudio.get("naoLidas").asInt());
         assertEquals("Tudo bem?", doEstudio.get("ultimaMensagem").asText());
         assertFalse(doEstudio.get("ultimaMensagemMinha").asBoolean());
@@ -515,10 +515,10 @@ class RotasComBancoRealTest {
         String lidas = "/api/mensagens/agendamento/" + agendamento + "/lidas";
         chamar("PATCH", lidas, null, null, 401);
         chamar("PATCH", lidas, null, outraCliente.token(), 400);
-        assertEquals(2, conversa(agendamento, estudio.token()).get("naoLidas").asInt());
+        assertEquals(2, conversa(agendamento, salao.token()).get("naoLidas").asInt());
 
-        chamar("PATCH", lidas, null, estudio.token(), 204);
-        assertEquals(0, conversa(agendamento, estudio.token()).get("naoLidas").asInt());
+        chamar("PATCH", lidas, null, salao.token(), 204);
+        assertEquals(0, conversa(agendamento, salao.token()).get("naoLidas").asInt());
     }
 
     @Test
