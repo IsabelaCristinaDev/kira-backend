@@ -173,6 +173,7 @@ class RotasComBancoRealTest {
 
         // Vitrine
         get("/api/studios", null);
+        get("/api/studios/pesquisa?texto=a&categoria=CABELO", null);
         get("/api/studios/busca?nome=studio", null);
         get("/api/studios/tipo?tipo=ESTABELECIMENTO", null);
         get("/api/studios/cidade?cidade=Goiania", null);
