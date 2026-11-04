@@ -102,7 +102,7 @@ public class EstudioService {
                 .filter(Empresa::isEnabled);
     }
 
-    private EstudioResponse toResponse(Empresa empresa) {
+    EstudioResponse toResponse(Empresa empresa) {
         Double media = avaliacaoRepository
                 .calcularMediaAvaliacaoEmpresa(empresa.getId());
         return new EstudioResponse(
