@@ -7,6 +7,7 @@ import br.com.kira.kirabackend.domain.entity.Empresa;
 import br.com.kira.kirabackend.domain.entity.Funcionaria;
 import br.com.kira.kirabackend.domain.entity.Servico;
 import br.com.kira.kirabackend.domain.enums.DiaSemana;
+import br.com.kira.kirabackend.domain.enums.FormaPagamento;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import br.com.kira.kirabackend.domain.enums.TipoUsuario;
 import br.com.kira.kirabackend.dto.request.AgendamentoRequest;
@@ -50,6 +51,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -480,7 +482,7 @@ class AgendamentoServiceTest {
             when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
             mockarSaveDevolvendoArgumento();
 
-            AgendamentoResponse response = service.concluir(agendamento.getId(), empresa.getId());
+            AgendamentoResponse response = service.concluir(agendamento.getId(), empresa.getId(), null);
 
             assertEquals(StatusAgendamento.CONCLUIDO, response.status());
             assertEquals(StatusAgendamento.CONCLUIDO, agendamento.getStatus());
@@ -490,6 +492,34 @@ class AgendamentoServiceTest {
             AtendimentoConcluidoEvent concluido =
                     assertInstanceOf(AtendimentoConcluidoEvent.class, evento.getValue());
             assertSame(agendamento, concluido.getAgendamento());
+        }
+
+        @Test
+        @DisplayName("Ao concluir, a forma informada pelo estúdio substitui a do agendamento")
+        void deveRegistrarFormaInformada() {
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.PENDENTE);
+            agendamento.setFormaPagamento(FormaPagamento.PIX);
+            when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+            mockarSaveDevolvendoArgumento();
+
+            AgendamentoResponse response = service.concluir(agendamento.getId(), empresa.getId(),
+                    FormaPagamento.DINHEIRO);
+
+            assertEquals(FormaPagamento.DINHEIRO, response.formaPagamento());
+            assertEquals(FormaPagamento.DINHEIRO, agendamento.getFormaPagamento());
+        }
+
+        @Test
+        @DisplayName("Ao concluir sem informar a forma, fica a que veio no agendamento")
+        void deveManterFormaDoAgendamento() {
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.PENDENTE);
+            agendamento.setFormaPagamento(FormaPagamento.PIX);
+            when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+            mockarSaveDevolvendoArgumento();
+
+            AgendamentoResponse response = service.concluir(agendamento.getId(), empresa.getId(), null);
+
+            assertEquals(FormaPagamento.PIX, response.formaPagamento());
         }
 
         @ParameterizedTest
@@ -502,7 +532,7 @@ class AgendamentoServiceTest {
             UUID agendamentoId = agendamento.getId();
             UUID empresaId = empresa.getId();
 
-            assertThrows(RegraDeNegocioException.class, () -> service.concluir(agendamentoId, empresaId));
+            assertThrows(RegraDeNegocioException.class, () -> service.concluir(agendamentoId, empresaId, null));
 
             assertEquals(status, agendamento.getStatus());
             verify(agendamentoRepository, never()).save(any());
@@ -516,7 +546,7 @@ class AgendamentoServiceTest {
             when(agendamentoRepository.findById(id)).thenReturn(Optional.empty());
             UUID empresaId = empresa.getId();
 
-            assertThrows(RecursoNaoEncontradoException.class, () -> service.concluir(id, empresaId));
+            assertThrows(RecursoNaoEncontradoException.class, () -> service.concluir(id, empresaId, null));
         }
 
         @Test
@@ -528,10 +558,11 @@ class AgendamentoServiceTest {
             when(agendamentoRepository.findById(agendamentoId)).thenReturn(Optional.of(agendamento));
 
             RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
-                    () -> service.concluir(agendamentoId, outraEmpresa));
+                    () -> service.concluir(agendamentoId, outraEmpresa, FormaPagamento.PIX));
 
             assertEquals("Este atendimento não pertence ao seu estabelecimento", ex.getMessage());
             assertEquals(StatusAgendamento.CONFIRMADO, agendamento.getStatus());
+            assertNull(agendamento.getFormaPagamento());
             verify(agendamentoRepository, never()).save(any());
             verifyNoInteractions(eventPublisher);
         }

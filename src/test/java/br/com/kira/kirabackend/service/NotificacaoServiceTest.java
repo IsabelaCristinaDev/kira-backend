@@ -1,12 +1,10 @@
 package br.com.kira.kirabackend.service;
 
-import br.com.kira.kirabackend.domain.entity.Cliente;
 import br.com.kira.kirabackend.domain.entity.DispositivoNotificacao;
 import br.com.kira.kirabackend.dto.request.DispositivoWebRequest;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.DispositivoNotificacaoRepository;
-import br.com.kira.kirabackend.repository.UsuarioRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,11 +23,9 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -50,9 +46,6 @@ class NotificacaoServiceTest {
     private DispositivoNotificacaoRepository dispositivoRepository;
 
     @Mock
-    private UsuarioRepository usuarioRepository;
-
-    @Mock
     private WebPushEnvio webPush;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -63,7 +56,7 @@ class NotificacaoServiceTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        service = new NotificacaoService(dispositivoRepository, usuarioRepository, webPush, objectMapper);
+        service = new NotificacaoService(dispositivoRepository, webPush, objectMapper);
         Base64.Encoder base64 = Base64.getUrlEncoder().withoutPadding();
         chaveValida = base64.encodeToString(WebPushEnvio.codificarPonto((ECPublicKey) WebPushEnvio.gerarChaves().getPublic()));
         segredoValido = base64.encodeToString(new byte[16]);
@@ -90,31 +83,12 @@ class NotificacaoServiceTest {
     @Test
     @DisplayName("Registra o navegador da pessoa")
     void registra() {
-        Cliente usuario = new Cliente();
-        when(dispositivoRepository.findByEndpoint(ENDERECO)).thenReturn(Optional.empty());
-        when(usuarioRepository.getReferenceById(usuarioId)).thenReturn(usuario);
         when(dispositivoRepository.findByUsuarioIdOrderByDataCriacaoAsc(usuarioId)).thenReturn(List.of());
 
         service.registrar(usuarioId, request(ENDERECO));
 
-        ArgumentCaptor<DispositivoNotificacao> captor = ArgumentCaptor.forClass(DispositivoNotificacao.class);
-        verify(dispositivoRepository).save(captor.capture());
-        assertSame(usuario, captor.getValue().getUsuario());
-        assertEquals(ENDERECO, captor.getValue().getEndpoint());
-    }
-
-    @Test
-    @DisplayName("Navegador usado antes por outra conta passa para a conta atual, sem duplicar")
-    void navegadorMudaDeConta() {
-        DispositivoNotificacao existente = dispositivo();
-        Cliente usuarioAtual = new Cliente();
-        when(dispositivoRepository.findByEndpoint(ENDERECO)).thenReturn(Optional.of(existente));
-        when(usuarioRepository.getReferenceById(usuarioId)).thenReturn(usuarioAtual);
-
-        service.registrar(usuarioId, request(ENDERECO));
-
-        assertSame(usuarioAtual, existente.getUsuario());
-        verify(dispositivoRepository).save(existente);
+        verify(dispositivoRepository).salvarPeloEndereco(any(), eq(usuarioId), eq(ENDERECO), eq(chaveValida),
+                eq(segredoValido), any());
     }
 
     @Test
@@ -124,13 +98,11 @@ class NotificacaoServiceTest {
         for (int i = 0; i < 11; i++) {
             dispositivos.add(dispositivo());
         }
-        when(dispositivoRepository.findByEndpoint(ENDERECO)).thenReturn(Optional.empty());
-        when(usuarioRepository.getReferenceById(usuarioId)).thenReturn(new Cliente());
         when(dispositivoRepository.findByUsuarioIdOrderByDataCriacaoAsc(usuarioId)).thenReturn(dispositivos);
 
         service.registrar(usuarioId, request(ENDERECO));
 
-        verify(dispositivoRepository).deleteAll(dispositivos.subList(0, 1));
+        verify(dispositivoRepository).deleteAllByIdInBatch(List.of(dispositivos.get(0).getId()));
     }
 
     @ParameterizedTest
@@ -162,13 +134,11 @@ class NotificacaoServiceTest {
     })
     @DisplayName("Aceita os serviços de push do Chrome, Firefox, Safari e Edge")
     void enderecoPermitido(String endereco) {
-        when(dispositivoRepository.findByEndpoint(endereco)).thenReturn(Optional.empty());
-        when(usuarioRepository.getReferenceById(usuarioId)).thenReturn(new Cliente());
         when(dispositivoRepository.findByUsuarioIdOrderByDataCriacaoAsc(usuarioId)).thenReturn(List.of());
 
         service.registrar(usuarioId, request(endereco));
 
-        verify(dispositivoRepository).save(any());
+        verify(dispositivoRepository).salvarPeloEndereco(any(), eq(usuarioId), eq(endereco), any(), any(), any());
     }
 
     @Test

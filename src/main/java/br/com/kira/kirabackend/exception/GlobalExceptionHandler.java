@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -88,11 +90,6 @@ public class GlobalExceptionHandler {
                 "Não foi possível gerar a prévia agora. Tente novamente", request);
     }
 
-    @ExceptionHandler(MaxUploadSizeExceededException.class)
-    public ResponseEntity<ErroResponse> handleArquivoGrande(Exception ex, HttpServletRequest request) {
-        return resposta(HttpStatus.PAYLOAD_TOO_LARGE, "ARQUIVO_MUITO_GRANDE", "O arquivo enviado é grande demais", request);
-    }
-
     @ExceptionHandler(EmailJaCadastradoException.class)
     public ResponseEntity<ErroResponse> handleEmailJaCadastrado(
             EmailJaCadastradoException ex,
@@ -146,10 +143,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({
             HttpMessageNotReadableException.class,
             MethodArgumentTypeMismatchException.class,
-            MissingServletRequestParameterException.class
+            MissingServletRequestParameterException.class,
+            MissingServletRequestPartException.class,
+            MultipartException.class
     })
     public ResponseEntity<ErroResponse> handleRequisicaoInvalida(Exception ex, HttpServletRequest request) {
         return resposta(HttpStatus.BAD_REQUEST, "REQUISICAO_INVALIDA", "Os dados enviados são inválidos", request);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErroResponse> handleArquivoGrande(Exception ex, HttpServletRequest request) {
+        return resposta(HttpStatus.PAYLOAD_TOO_LARGE, "ARQUIVO_GRANDE", "O arquivo pode ter no máximo 5 MB", request);
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

@@ -44,6 +44,6 @@ class GlobalExceptionHandlerProvadorTest {
                 handler.handleArquivoGrande(new MaxUploadSizeExceededException(6L), request);
 
         assertEquals(HttpStatus.PAYLOAD_TOO_LARGE, resposta.getStatusCode());
-        assertEquals("ARQUIVO_MUITO_GRANDE", resposta.getBody().erro());
+        assertEquals("ARQUIVO_GRANDE", resposta.getBody().erro());
     }
 }

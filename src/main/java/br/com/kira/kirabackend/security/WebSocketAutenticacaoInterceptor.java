@@ -24,7 +24,8 @@ import java.util.regex.Pattern;
  * CONNECT exige um token válido, SUBSCRIBE só vale para a conversa de um agendamento de que a pessoa
  * participa e para o canal da própria pessoa, e SEND é sempre recusado, senão daria para publicar
  * mensagem falsa direto no tópico.
- * Qualquer recusa aqui encerra a conexão com um frame ERROR.
+ * Qualquer recusa aqui encerra a conexão com um frame ERROR. Depois de aberta, a conexão é
+ * acompanhada por {@link ConexoesAoVivo}.
  */
 @Component
 @RequiredArgsConstructor
@@ -38,6 +39,7 @@ public class WebSocketAutenticacaoInterceptor implements ChannelInterceptor {
     private final JwtTokenProvider jwtTokenProvider;
     private final CustomUserDetailsService userDetailsService;
     private final MensagemService mensagemService;
+    private final ConexoesAoVivo conexoesAoVivo;
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -69,6 +71,10 @@ public class WebSocketAutenticacaoInterceptor implements ChannelInterceptor {
         if (!usuario.isEnabled()) {
             throw new MessageDeliveryException("Conta desativada");
         }
+        if (!(usuario instanceof Usuario conta)) {
+            throw new MessageDeliveryException("Conexão sem autenticação");
+        }
+        conexoesAoVivo.registrar(stomp.getSessionId(), conta.getId(), jwtTokenProvider.extrairExpiracao(token));
         return new UsernamePasswordAuthenticationToken(usuario, null, usuario.getAuthorities());
     }
 
