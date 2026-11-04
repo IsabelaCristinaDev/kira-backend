@@ -5,7 +5,7 @@ import br.com.kira.kirabackend.dto.request.DispositivoWebRequest;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.DispositivoNotificacaoRepository;
-import br.com.kira.kirabackend.repository.UsuarioRepository;
+import br.com.kira.kirabackend.util.KiraTimeZone;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.GeneralSecurityException;
+import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -37,7 +38,6 @@ public class NotificacaoService {
             "fcm.googleapis.com", "push.services.mozilla.com", "push.apple.com", "notify.windows.com");
 
     private final DispositivoNotificacaoRepository dispositivoRepository;
-    private final UsuarioRepository usuarioRepository;
     private final WebPushEnvio webPush;
     private final ObjectMapper objectMapper;
 
@@ -51,18 +51,10 @@ public class NotificacaoService {
         validarChaves(request);
 
         // Se outra conta usou o mesmo navegador antes, ele passa a ser desta
-        DispositivoNotificacao dispositivo = dispositivoRepository.findByEndpoint(request.endpoint())
-                .orElseGet(DispositivoNotificacao::new);
-        boolean novo = dispositivo.getId() == null;
-        dispositivo.setUsuario(usuarioRepository.getReferenceById(usuarioId));
-        dispositivo.setEndpoint(request.endpoint());
-        dispositivo.setP256dh(request.p256dh());
-        dispositivo.setAuth(request.auth());
-        dispositivoRepository.save(dispositivo);
+        dispositivoRepository.salvarPeloEndereco(UUID.randomUUID(), usuarioId, request.endpoint(),
+                request.p256dh(), request.auth(), LocalDateTime.now(KiraTimeZone.DEFAULT));
 
-        if (novo) {
-            removerOsMaisAntigos(usuarioId);
-        }
+        removerOsMaisAntigos(usuarioId);
     }
 
     @Transactional
@@ -111,7 +103,9 @@ public class NotificacaoService {
         List<DispositivoNotificacao> dispositivos = dispositivoRepository.findByUsuarioIdOrderByDataCriacaoAsc(usuarioId);
         int excesso = dispositivos.size() - MAXIMO_POR_USUARIO;
         if (excesso > 0) {
-            dispositivoRepository.deleteAll(dispositivos.subList(0, excesso));
+            // Direto no banco: outro registro ao mesmo tempo pode já ter removido o mesmo navegador
+            dispositivoRepository.deleteAllByIdInBatch(
+                    dispositivos.subList(0, excesso).stream().map(DispositivoNotificacao::getId).toList());
         }
     }
 
