@@ -2,6 +2,8 @@ package br.com.kira.kirabackend.controller;
 
 import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.dto.request.AgendamentoRequest;
+import br.com.kira.kirabackend.domain.enums.FormaPagamento;
+import br.com.kira.kirabackend.dto.request.ConcluirAtendimentoRequest;
 import br.com.kira.kirabackend.dto.request.ReagendamentoRequest;
 import br.com.kira.kirabackend.dto.response.AgendamentoResponse;
 import br.com.kira.kirabackend.service.AgendamentoService;
@@ -55,8 +57,10 @@ public class AgendamentoController {
     @PatchMapping("/{id}/concluir")
     public ResponseEntity<AgendamentoResponse> concluir(
             @PathVariable UUID id,
-            @AuthenticationPrincipal Usuario usuario) {
-        return ResponseEntity.ok(agendamentoService.concluir(id, usuario.getId()));
+            @AuthenticationPrincipal Usuario usuario,
+            @RequestBody(required = false) ConcluirAtendimentoRequest request) {
+        FormaPagamento formaPagamento = request != null ? request.formaPagamento() : null;
+        return ResponseEntity.ok(agendamentoService.concluir(id, usuario.getId(), formaPagamento));
     }
 
     @PatchMapping("/{id}/reagendar/cliente")

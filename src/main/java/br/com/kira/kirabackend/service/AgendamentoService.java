@@ -2,6 +2,7 @@ package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.*;
 import br.com.kira.kirabackend.domain.enums.DiaSemana;
+import br.com.kira.kirabackend.domain.enums.FormaPagamento;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import br.com.kira.kirabackend.domain.enums.TipoUsuario;
 import br.com.kira.kirabackend.dto.request.AgendamentoRequest;
@@ -151,7 +152,8 @@ public class AgendamentoService {
         return toResponse(salvo);
     }
 
-    public AgendamentoResponse concluir(UUID agendamentoId, UUID empresaId) {
+    /** Sem forma informada, fica a que veio no agendamento, se houver. */
+    public AgendamentoResponse concluir(UUID agendamentoId, UUID empresaId, FormaPagamento formaPagamento) {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
         validarEmpresaDoAgendamento(agendamento, empresaId);
@@ -161,6 +163,9 @@ public class AgendamentoService {
             throw new RegraDeNegocioException("Não é possível concluir este agendamento");
         }
 
+        if (formaPagamento != null) {
+            agendamento.setFormaPagamento(formaPagamento);
+        }
         agendamento.setStatus(StatusAgendamento.CONCLUIDO);
         Agendamento salvo = agendamentoRepository.save(agendamento);
         eventPublisher.publishEvent(new AtendimentoConcluidoEvent(this, salvo));
