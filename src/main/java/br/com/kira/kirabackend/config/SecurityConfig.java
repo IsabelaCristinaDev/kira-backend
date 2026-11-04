@@ -67,6 +67,8 @@ public class SecurityConfig {
                         // O perfil tem e-mail e documentos: também exige login
                         .requestMatchers(HttpMethod.GET, "/api/empresas/*/perfil").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/empresas/**").permitAll()
+                        // A foto de perfil aparece na vitrine, sem login. O nome do arquivo é aleatório
+                        .requestMatchers(HttpMethod.GET, "/api/arquivos/*").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
                         // O navegador não manda header na abertura do WebSocket: o token é conferido
                         // no CONNECT do STOMP (WebSocketAutenticacaoInterceptor)

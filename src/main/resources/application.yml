@@ -6,6 +6,10 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   jpa:
     hibernate:
       ddl-auto: update
@@ -46,6 +50,9 @@ jwt:
 kira:
   # Endereço do app web, usado no link do e-mail de recuperação de senha
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  arquivos:
+    # Pasta das fotos enviadas. Fora do Git (.gitignore)
+    pasta: ${KIRA_ARQUIVOS_PASTA:./uploads}
   notificacoes:
     web:
       # Sem as chaves no .env, as notificações ficam desligadas e o resto funciona

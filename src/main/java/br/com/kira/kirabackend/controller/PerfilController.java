@@ -5,17 +5,23 @@ import br.com.kira.kirabackend.dto.request.ClientePerfilRequest;
 import br.com.kira.kirabackend.dto.request.EmpresaPerfilRequest;
 import br.com.kira.kirabackend.dto.response.ClientePerfilResponse;
 import br.com.kira.kirabackend.dto.response.EmpresaPerfilResponse;
+import br.com.kira.kirabackend.dto.response.FotoPerfilResponse;
 import br.com.kira.kirabackend.security.AcessoEmpresa;
+import br.com.kira.kirabackend.service.FotoPerfilService;
 import br.com.kira.kirabackend.service.PerfilService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.UUID;
 
@@ -25,6 +31,21 @@ public class PerfilController {
 
     private final PerfilService perfilService;
     private final AcessoEmpresa acessoEmpresa;
+    private final FotoPerfilService fotoPerfilService;
+
+    // A foto é sempre a da conta logada, por isso a rota não recebe id
+    @PostMapping("/api/perfil/foto")
+    public ResponseEntity<FotoPerfilResponse> definirFoto(
+            @RequestParam("arquivo") MultipartFile arquivo,
+            @AuthenticationPrincipal Usuario usuario) {
+        return ResponseEntity.ok(fotoPerfilService.definir(usuario.getId(), arquivo));
+    }
+
+    @DeleteMapping("/api/perfil/foto")
+    public ResponseEntity<Void> removerFoto(@AuthenticationPrincipal Usuario usuario) {
+        fotoPerfilService.remover(usuario.getId());
+        return ResponseEntity.noContent().build();
+    }
 
     @GetMapping("/api/clientes/{clienteId}/perfil")
     public ResponseEntity<ClientePerfilResponse> obterCliente(
