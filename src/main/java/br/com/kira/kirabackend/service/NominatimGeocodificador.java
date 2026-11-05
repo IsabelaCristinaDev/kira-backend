@@ -1,14 +1,13 @@
 package br.com.kira.kirabackend.service;
 
+import br.com.kira.kirabackend.config.ClientesHttpConfig;
 import br.com.kira.kirabackend.domain.entity.Endereco;
 import br.com.kira.kirabackend.repository.BuscaEstudioRepository.Coordenadas;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.web.client.ClientHttpRequestFactories;
-import org.springframework.boot.web.client.ClientHttpRequestFactorySettings;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -50,19 +49,13 @@ public class NominatimGeocodificador implements Geocodificador {
     private final long intervaloNanos;
     private long proximaConsultaNanos = System.nanoTime();
 
-    @Autowired
-    public NominatimGeocodificador(
-            RestClient.Builder builder,
+    // Construtor único: o Spring usa este sem precisar de @Autowired, e os testes passam um RestClient simulado
+    NominatimGeocodificador(
+            @Qualifier(ClientesHttpConfig.NOMINATIM) RestClient restClient,
             @Value("${kira.geocodificacao.base-url}") String baseUrl,
             @Value("${kira.geocodificacao.user-agent}") String userAgent,
             @Value("${kira.geocodificacao.ativa:true}") boolean ativa,
-            @Value("${kira.geocodificacao.intervalo-ms:1100}") long intervaloMs,
-            @Value("${kira.geocodificacao.timeout-conexao-ms:2000}") long timeoutConexaoMs,
-            @Value("${kira.geocodificacao.timeout-leitura-ms:3000}") long timeoutLeituraMs) {
-        this(criarRestClient(builder, timeoutConexaoMs, timeoutLeituraMs), baseUrl, userAgent, ativa, intervaloMs);
-    }
-
-    NominatimGeocodificador(RestClient restClient, String baseUrl, String userAgent, boolean ativa, long intervaloMs) {
+            @Value("${kira.geocodificacao.intervalo-ms:1100}") long intervaloMs) {
         this.restClient = restClient;
         this.baseUrl = baseUrl;
         this.userAgent = userAgent;
@@ -159,12 +152,5 @@ public class NominatimGeocodificador implements Geocodificador {
 
     private static boolean vazio(String texto) {
         return texto == null || texto.isBlank();
-    }
-
-    private static RestClient criarRestClient(RestClient.Builder builder, long timeoutConexaoMs, long timeoutLeituraMs) {
-        ClientHttpRequestFactorySettings configuracao = ClientHttpRequestFactorySettings.DEFAULTS
-                .withConnectTimeout(Duration.ofMillis(timeoutConexaoMs))
-                .withReadTimeout(Duration.ofMillis(timeoutLeituraMs));
-        return builder.requestFactory(ClientHttpRequestFactories.get(configuracao)).build();
     }
 }
