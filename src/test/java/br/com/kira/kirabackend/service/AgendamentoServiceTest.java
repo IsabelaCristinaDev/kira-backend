@@ -17,6 +17,7 @@ import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.observer.AgendamentoCanceladoEvent;
 import br.com.kira.kirabackend.observer.AgendamentoCriadoEvent;
+import br.com.kira.kirabackend.observer.AgendamentoConfirmadoEvent;
 import br.com.kira.kirabackend.observer.AtendimentoConcluidoEvent;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.BloqueioHorarioRepository;
@@ -487,6 +488,12 @@ class AgendamentoServiceTest {
 
             assertEquals(StatusAgendamento.CONFIRMADO, response.status());
             assertEquals(StatusAgendamento.CONFIRMADO, agendamento.getStatus());
+            // O evento leva os dados prontos: o aviso à cliente sai em outra thread, sem ler relação LAZY
+            ArgumentCaptor<Object> evento = ArgumentCaptor.forClass(Object.class);
+            verify(eventPublisher).publishEvent(evento.capture());
+            AgendamentoConfirmadoEvent confirmado =
+                    assertInstanceOf(AgendamentoConfirmadoEvent.class, evento.getValue());
+            assertEquals(response, confirmado.agendamento());
         }
 
         @ParameterizedTest
@@ -501,6 +508,7 @@ class AgendamentoServiceTest {
 
             assertEquals(status, agendamento.getStatus());
             verify(agendamentoRepository, never()).save(any());
+            verifyNoInteractions(eventPublisher);
         }
 
         @Test
@@ -514,6 +522,7 @@ class AgendamentoServiceTest {
 
             assertEquals(StatusAgendamento.PENDENTE, agendamento.getStatus());
             verify(agendamentoRepository, never()).save(any());
+            verifyNoInteractions(eventPublisher);
         }
     }
 
