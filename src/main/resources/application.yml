@@ -74,6 +74,20 @@ kira:
       base-url: ${CLOUDFLARE_BASE_URL:https://api.cloudflare.com/client/v4}
       timeout-conexao-ms: ${CLOUDFLARE_TIMEOUT_CONEXAO_MS:5000}
       timeout-leitura-ms: ${CLOUDFLARE_TIMEOUT_LEITURA_MS:90000}
+  verificacao:
+    # Muda quando o texto do consentimento muda: a versão aceita fica gravada em cada tentativa
+    versao-consentimento: ${VERIFICACAO_VERSAO_CONSENTIMENTO:v1}
+    tamanho-maximo-bytes: ${VERIFICACAO_TAMANHO_MAXIMO_BYTES:5242880}
+    # Envios por pessoa. Tentativa sem resposta do serviço (PENDING) não conta
+    limite-tentativas: ${VERIFICACAO_LIMITE_TENTATIVAS:3}
+    servico:
+      # kira-verify-ai (Python). No Docker Compose o endereço é http://kira-verify-ai:8000
+      base-url: ${VERIFY_SERVICE_URL:http://localhost:8000}
+      # Segredo: igual nos dois serviços e só no .env. Sem ela, a verificação responde erro e o resto funciona
+      chave: ${VERIFY_SERVICE_KEY:}
+      timeout-conexao-ms: ${VERIFY_TIMEOUT_CONEXAO_MS:3000}
+      # A comparação facial é pesada: ajustar depois das medidas do serviço
+      timeout-leitura-ms: ${VERIFY_TIMEOUT_LEITURA_MS:30000}
   geocodificacao:
     # Transforma o endereço em coordenadas pelo Nominatim (OpenStreetMap). Sem chave
     ativa: ${GEOCODIFICACAO_ATIVA:true}
