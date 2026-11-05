@@ -5,8 +5,10 @@ import br.com.kira.kirabackend.dto.response.ConsentimentoProvadorResponse;
 import br.com.kira.kirabackend.dto.response.GeracaoProvadorResponse;
 import br.com.kira.kirabackend.exception.ConsentimentoProvadorNecessarioException;
 import br.com.kira.kirabackend.exception.GeracaoProvadorException;
+import br.com.kira.kirabackend.exception.LimiteProvadorException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.ConsentimentoProvadorRepository;
+import br.com.kira.kirabackend.repository.UsoProvadorRepository;
 import br.com.kira.kirabackend.util.KiraTimeZone;
 import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
@@ -16,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.UUID;
@@ -34,19 +37,25 @@ public class ProvadorService {
     private static final long BYTES_POR_MB = 1024L * 1024L;
 
     private final ConsentimentoProvadorRepository consentimentoRepository;
+    private final UsoProvadorRepository usoRepository;
     private final GeradorDeImagem geradorDeImagem;
     private final String versaoAtual;
     private final long tamanhoMaximoBytes;
+    private final int limiteDiario;
 
     public ProvadorService(
             ConsentimentoProvadorRepository consentimentoRepository,
+            UsoProvadorRepository usoRepository,
             GeradorDeImagem geradorDeImagem,
             @Value("${kira.provador.versao-consentimento:v1}") String versaoAtual,
-            @Value("${kira.provador.tamanho-maximo-bytes:5242880}") long tamanhoMaximoBytes) {
+            @Value("${kira.provador.tamanho-maximo-bytes:5242880}") long tamanhoMaximoBytes,
+            @Value("${kira.provador.limite-diario:5}") int limiteDiario) {
         this.consentimentoRepository = consentimentoRepository;
+        this.usoRepository = usoRepository;
         this.geradorDeImagem = geradorDeImagem;
         this.versaoAtual = versaoAtual;
         this.tamanhoMaximoBytes = tamanhoMaximoBytes;
+        this.limiteDiario = limiteDiario;
     }
 
     public ConsentimentoProvadorResponse consultarConsentimento(UUID usuarioId) {
@@ -93,9 +102,20 @@ public class ProvadorService {
         byte[] cliente = lerImagem(fotoCliente, "Envie a sua foto");
         byte[] referencia = lerImagem(fotoReferencia, "Envie a foto de referência");
 
-        byte[] previa = geradorDeImagem.gerar(cliente, referencia);
+        // Reserva antes de chamar o gerador, para pedidos ao mesmo tempo não passarem do limite
+        LocalDate hoje = LocalDate.now(KiraTimeZone.DEFAULT);
+        if (usoRepository.reservar(usuarioId, hoje, limiteDiario) == 0) {
+            throw new LimiteProvadorException(limiteDiario);
+        }
 
-        return new GeracaoProvadorResponse(montarDataUri(previa), LocalDateTime.now(KiraTimeZone.DEFAULT));
+        try {
+            byte[] previa = geradorDeImagem.gerar(cliente, referencia);
+            return new GeracaoProvadorResponse(montarDataUri(previa), LocalDateTime.now(KiraTimeZone.DEFAULT));
+        } catch (RuntimeException e) {
+            // Sem prévia, a tentativa não conta para a pessoa
+            usoRepository.devolver(usuarioId, hoje);
+            throw e;
+        }
     }
 
     // O modelo escolhe o formato da saída, então o tipo informado ao app vem dos primeiros bytes da prévia
