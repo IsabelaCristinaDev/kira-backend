@@ -90,6 +90,13 @@ public class GlobalExceptionHandler {
                 "Não foi possível gerar a prévia agora. Tente novamente", request);
     }
 
+    @ExceptionHandler(LimiteProvadorException.class)
+    public ResponseEntity<ErroResponse> handleLimiteProvador(
+            LimiteProvadorException ex,
+            HttpServletRequest request) {
+        return resposta(HttpStatus.TOO_MANY_REQUESTS, "PROVADOR_LIMITE_DIARIO", ex.getMessage(), request);
+    }
+
     @ExceptionHandler(EmailJaCadastradoException.class)
     public ResponseEntity<ErroResponse> handleEmailJaCadastrado(
             EmailJaCadastradoException ex,
