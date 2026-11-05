@@ -97,6 +97,24 @@ public class GlobalExceptionHandler {
         return resposta(HttpStatus.TOO_MANY_REQUESTS, "PROVADOR_LIMITE_DIARIO", ex.getMessage(), request);
     }
 
+    // 503: o serviço de verificação está fora do ar ou demorou. A tentativa continua pendente e o app pode reenviar
+    @ExceptionHandler(VerificacaoIndisponivelException.class)
+    public ResponseEntity<ErroResponse> handleVerificacaoIndisponivel(
+            VerificacaoIndisponivelException ex,
+            HttpServletRequest request) {
+        return resposta(HttpStatus.SERVICE_UNAVAILABLE, "VERIFICACAO_INDISPONIVEL",
+                "A verificação está indisponível agora. Tente novamente em instantes", request);
+    }
+
+    // 502: o serviço de verificação recusou o pedido (ex.: chave errada). O detalhe fica só no log
+    @ExceptionHandler(FalhaVerificacaoException.class)
+    public ResponseEntity<ErroResponse> handleFalhaVerificacao(
+            FalhaVerificacaoException ex,
+            HttpServletRequest request) {
+        return resposta(HttpStatus.BAD_GATEWAY, "VERIFICACAO_FALHOU",
+                "Não foi possível verificar sua identidade agora. Tente novamente mais tarde", request);
+    }
+
     @ExceptionHandler(EmailJaCadastradoException.class)
     public ResponseEntity<ErroResponse> handleEmailJaCadastrado(
             EmailJaCadastradoException ex,
