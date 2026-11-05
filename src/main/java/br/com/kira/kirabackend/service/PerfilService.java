@@ -29,6 +29,7 @@ import java.util.UUID;
 public class PerfilService {
 
     private final UsuarioRepository usuarioRepository;
+    private final CoordenadasService coordenadasService;
 
     public ClientePerfilResponse obterCliente(UUID clienteId, UUID usuarioId) {
         return toResponse(buscarCliente(clienteId, usuarioId));
@@ -42,8 +43,7 @@ public class PerfilService {
         cliente.setDataNascimento(request.dataNascimento());
         cliente.setGenero(request.genero());
         cliente.setEndereco(paraEndereco(request.endereco()));
-        cliente.setLatitude(request.latitude());
-        cliente.setLongitude(request.longitude());
+        coordenadasService.atualizarCliente(cliente, cliente.getEndereco(), request.latitude(), request.longitude());
         return toResponse(usuarioRepository.save(cliente));
     }
 
@@ -60,9 +60,9 @@ public class PerfilService {
         empresa.setDescricao(request.descricao());
         empresa.setEspecialidades(juntarEspecialidades(request.especialidades()));
         empresa.setDataNascimento(request.dataNascimento());
-        empresa.setEndereco(paraEndereco(request.endereco()));
-        empresa.setLatitude(request.latitude());
-        empresa.setLongitude(request.longitude());
+        Endereco novoEndereco = paraEndereco(request.endereco());
+        coordenadasService.atualizarEstudio(empresa, novoEndereco, request.latitude(), request.longitude());
+        empresa.setEndereco(novoEndereco);
         empresa.setTipoEstabelecimento(request.tipoEstabelecimento());
         return toResponse(usuarioRepository.save(empresa));
     }

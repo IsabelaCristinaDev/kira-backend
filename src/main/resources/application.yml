@@ -74,6 +74,16 @@ kira:
       base-url: ${CLOUDFLARE_BASE_URL:https://api.cloudflare.com/client/v4}
       timeout-conexao-ms: ${CLOUDFLARE_TIMEOUT_CONEXAO_MS:5000}
       timeout-leitura-ms: ${CLOUDFLARE_TIMEOUT_LEITURA_MS:90000}
+  geocodificacao:
+    # Transforma o endereço em coordenadas pelo Nominatim (OpenStreetMap). Sem chave
+    ativa: ${GEOCODIFICACAO_ATIVA:true}
+    base-url: ${GEOCODIFICACAO_BASE_URL:https://nominatim.openstreetmap.org}
+    # O serviço exige que o sistema se identifique
+    user-agent: ${GEOCODIFICACAO_USER_AGENT:KiraBackend/1.0 (TCC SENAI FATESG)}
+    # O serviço público aceita no máximo uma consulta por segundo
+    intervalo-ms: ${GEOCODIFICACAO_INTERVALO_MS:1100}
+    timeout-conexao-ms: ${GEOCODIFICACAO_TIMEOUT_CONEXAO_MS:2000}
+    timeout-leitura-ms: ${GEOCODIFICACAO_TIMEOUT_LEITURA_MS:3000}
   lembrete:
     antecedencia-horas: ${LEMBRETE_ANTECEDENCIA_HORAS:24}
     cron: ${LEMBRETE_CRON:0 0 * * * *}
