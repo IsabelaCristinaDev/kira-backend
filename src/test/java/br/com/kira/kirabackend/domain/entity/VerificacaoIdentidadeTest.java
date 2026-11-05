@@ -11,6 +11,7 @@ import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class VerificacaoIdentidadeTest {
@@ -65,7 +66,7 @@ class VerificacaoIdentidadeTest {
         for (Field campo : VerificacaoIdentidade.class.getDeclaredFields()) {
             String nome = campo.getName().toLowerCase(Locale.ROOT);
             assertTrue(proibidos.stream().noneMatch(nome::contains), "Campo proibido: " + campo.getName());
-            assertTrue(campo.getType() != byte[].class, "Campo binário proibido: " + campo.getName());
+            assertNotSame(byte[].class, campo.getType(), "Campo binário proibido: " + campo.getName());
         }
     }
 }

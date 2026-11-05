@@ -294,8 +294,11 @@ class VerificacaoServiceTest {
     @NullSource
     @ValueSource(booleans = false)
     void semConsentimento(Boolean consentimento) {
+        MockMultipartFile documento = foto("document", JPEG);
+        MockMultipartFile selfie = foto("selfie", JPEG);
+
         assertThrows(RegraDeNegocioException.class,
-                () -> service.enviar(cliente, foto("document", JPEG), foto("selfie", JPEG), "CNH", consentimento));
+                () -> service.enviar(cliente, documento, selfie, "CNH", consentimento));
 
         verifyNoInteractions(repository, verificador);
     }
@@ -306,8 +309,11 @@ class VerificacaoServiceTest {
         Admin admin = new Admin();
         admin.setId(UUID.randomUUID());
 
+        MockMultipartFile documento = foto("document", JPEG);
+        MockMultipartFile selfie = foto("selfie", JPEG);
+
         assertThrows(RegraDeNegocioException.class,
-                () -> service.enviar(admin, foto("document", JPEG), foto("selfie", JPEG), "CNH", true));
+                () -> service.enviar(admin, documento, selfie, "CNH", true));
 
         verifyNoInteractions(repository, verificador);
     }
@@ -316,8 +322,11 @@ class VerificacaoServiceTest {
     @NullSource
     @ValueSource(strings = {"", "  ", "PASSAPORTE"})
     void tipoDocumentoInvalido(String tipo) {
+        MockMultipartFile documento = foto("document", JPEG);
+        MockMultipartFile selfie = foto("selfie", JPEG);
+
         assertThrows(RegraDeNegocioException.class,
-                () -> service.enviar(cliente, foto("document", JPEG), foto("selfie", JPEG), tipo, true));
+                () -> service.enviar(cliente, documento, selfie, tipo, true));
 
         verifyNoInteractions(repository, verificador);
     }
@@ -325,10 +334,12 @@ class VerificacaoServiceTest {
     @Test
     @DisplayName("Sem a foto do documento ou sem a selfie é recusado")
     void semFoto() {
+        MockMultipartFile documento = foto("document", JPEG);
+        MockMultipartFile selfie = foto("selfie", JPEG);
         MockMultipartFile vazia = foto("selfie", new byte[0]);
 
-        assertThrows(RegraDeNegocioException.class, () -> service.enviar(cliente, null, foto("selfie", JPEG), "CNH", true));
-        assertThrows(RegraDeNegocioException.class, () -> service.enviar(cliente, foto("document", JPEG), vazia, "CNH", true));
+        assertThrows(RegraDeNegocioException.class, () -> service.enviar(cliente, null, selfie, "CNH", true));
+        assertThrows(RegraDeNegocioException.class, () -> service.enviar(cliente, documento, vazia, "CNH", true));
 
         verifyNoInteractions(repository, verificador);
     }
@@ -339,8 +350,11 @@ class VerificacaoServiceTest {
         byte[] grande = new byte[(int) LIMITE_BYTES + 1];
         System.arraycopy(JPEG, 0, grande, 0, JPEG.length);
 
+        MockMultipartFile documento = foto("document", grande);
+        MockMultipartFile selfie = foto("selfie", JPEG);
+
         assertThrows(RegraDeNegocioException.class,
-                () -> service.enviar(cliente, foto("document", grande), foto("selfie", JPEG), "CNH", true));
+                () -> service.enviar(cliente, documento, selfie, "CNH", true));
 
         verifyNoInteractions(repository, verificador);
     }
@@ -350,8 +364,11 @@ class VerificacaoServiceTest {
     void formatoInvalido() {
         byte[] gif = {'G', 'I', 'F', '8', '9', 'a', 0, 0, 0};
 
+        MockMultipartFile documento = foto("document", gif);
+        MockMultipartFile selfie = foto("selfie", JPEG);
+
         assertThrows(RegraDeNegocioException.class,
-                () -> service.enviar(cliente, foto("document", gif), foto("selfie", JPEG), "CNH", true));
+                () -> service.enviar(cliente, documento, selfie, "CNH", true));
 
         verifyNoInteractions(repository, verificador);
     }
