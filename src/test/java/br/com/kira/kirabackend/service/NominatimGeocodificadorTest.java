@@ -11,7 +11,12 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
@@ -229,6 +234,33 @@ class NominatimGeocodificadorTest {
         long passadosMs = (System.nanoTime() - inicio) / 1_000_000;
 
         assertTrue(passadosMs >= 200, "passaram só " + passadosMs + " ms");
+        servidor.verify();
+    }
+
+    @Test
+    @DisplayName("Consultas ao mesmo tempo também respeitam o intervalo, uma depois da outra")
+    void intervaloComConsultasSimultaneas() throws Exception {
+        NominatimGeocodificador comIntervalo = new NominatimGeocodificador(builder.build(), BASE, AGENTE, true, 200);
+        for (int i = 0; i < 3; i++) {
+            servidor.expect(anything()).andRespond(withSuccess(GOIANIA_GO, MediaType.APPLICATION_JSON));
+        }
+        // Java 17: o ExecutorService ainda não fecha sozinho no try-with-resources
+        ExecutorService executor = Executors.newFixedThreadPool(3);
+        try {
+            long inicio = System.nanoTime();
+            List<Future<Optional<Coordenadas>>> consultas = new ArrayList<>();
+            for (int i = 0; i < 3; i++) {
+                consultas.add(executor.submit(() -> comIntervalo.localizar(endereco())));
+            }
+            for (Future<Optional<Coordenadas>> consulta : consultas) {
+                assertTrue(consulta.get().isPresent());
+            }
+            long passadosMs = (System.nanoTime() - inicio) / 1_000_000;
+
+            assertTrue(passadosMs >= 400, "três consultas com 200 ms entre elas levaram só " + passadosMs + " ms");
+        } finally {
+            executor.shutdownNow();
+        }
         servidor.verify();
     }
 }

@@ -132,9 +132,9 @@ public class NominatimGeocodificador implements Geocodificador {
         }
     }
 
-    // Uma pessoa por vez: quem chega durante a espera aguarda a sua vez na fila
-    private synchronized void aguardarVez() {
-        long esperaNanos = proximaConsultaNanos - System.nanoTime();
+    // Cada consulta reserva o seu horário e espera fora do bloqueio, sem travar quem chega depois
+    private void aguardarVez() {
+        long esperaNanos = reservarHorario();
         if (esperaNanos > 0) {
             try {
                 Thread.sleep(Duration.ofNanos(esperaNanos).toMillis() + 1);
@@ -142,7 +142,13 @@ public class NominatimGeocodificador implements Geocodificador {
                 Thread.currentThread().interrupt();
             }
         }
-        proximaConsultaNanos = System.nanoTime() + intervaloNanos;
+    }
+
+    private synchronized long reservarHorario() {
+        long agora = System.nanoTime();
+        long horario = Math.max(agora, proximaConsultaNanos);
+        proximaConsultaNanos = horario + intervaloNanos;
+        return horario - agora;
     }
 
     private static String semAcento(String texto) {
