@@ -24,7 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -135,7 +134,7 @@ class FotoPerfilServiceTest {
     @DisplayName("Falha ao apagar a foto anterior não desfaz a troca")
     void falhaAoApagarNaoDesfaz() {
         usuario.setFotoUrl("/api/arquivos/antiga.png");
-        doThrow(new IllegalStateException("disco")).when(armazenamento).apagar(eq("antiga.png"));
+        doThrow(new IllegalStateException("disco")).when(armazenamento).apagar("antiga.png");
 
         assertEquals("/api/arquivos/novo.png", service.definir(usuarioId, arquivo(PNG)).fotoUrl());
     }

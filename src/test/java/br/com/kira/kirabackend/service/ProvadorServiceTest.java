@@ -152,9 +152,11 @@ class ProvadorServiceTest {
     @DisplayName("Gerar sem consentimento não chama o gerador")
     void gerarSemConsentimento() {
         when(repository.findByUsuarioId(usuarioId)).thenReturn(Optional.empty());
+        MockMultipartFile cliente = foto("cliente", JPEG);
+        MockMultipartFile referencia = foto("referencia", JPEG);
 
         assertThrows(ConsentimentoProvadorNecessarioException.class,
-                () -> service.gerar(usuarioId, foto("cliente", JPEG), foto("referencia", JPEG)));
+                () -> service.gerar(usuarioId, cliente, referencia));
 
         verify(gerador, never()).gerar(any(), any());
     }
@@ -164,9 +166,11 @@ class ProvadorServiceTest {
     void gerarComConsentimentoRevogado() {
         when(repository.findByUsuarioId(usuarioId))
                 .thenReturn(Optional.of(consentimento(VERSAO, LocalDateTime.now())));
+        MockMultipartFile cliente = foto("cliente", JPEG);
+        MockMultipartFile referencia = foto("referencia", JPEG);
 
         assertThrows(ConsentimentoProvadorNecessarioException.class,
-                () -> service.gerar(usuarioId, foto("cliente", JPEG), foto("referencia", JPEG)));
+                () -> service.gerar(usuarioId, cliente, referencia));
 
         verify(gerador, never()).gerar(any(), any());
     }
@@ -175,9 +179,11 @@ class ProvadorServiceTest {
     @DisplayName("Gerar com o termo aceito em versão antiga exige aceitar de novo")
     void gerarComVersaoAntiga() {
         when(repository.findByUsuarioId(usuarioId)).thenReturn(Optional.of(consentimento("v0", null)));
+        MockMultipartFile cliente = foto("cliente", JPEG);
+        MockMultipartFile referencia = foto("referencia", JPEG);
 
         assertThrows(ConsentimentoProvadorNecessarioException.class,
-                () -> service.gerar(usuarioId, foto("cliente", JPEG), foto("referencia", JPEG)));
+                () -> service.gerar(usuarioId, cliente, referencia));
     }
 
     @Test
@@ -212,19 +218,22 @@ class ProvadorServiceTest {
         when(repository.findByUsuarioId(usuarioId)).thenReturn(Optional.of(consentimento(VERSAO, null)));
         comVagaNoDia();
         when(gerador.gerar(JPEG, PNG)).thenReturn(new byte[]{1, 2, 3, 4});
+        MockMultipartFile cliente = foto("cliente", JPEG);
+        MockMultipartFile referencia = foto("referencia", PNG);
 
         assertThrows(GeracaoProvadorException.class,
-                () -> service.gerar(usuarioId, foto("cliente", JPEG), foto("referencia", PNG)));
+                () -> service.gerar(usuarioId, cliente, referencia));
     }
 
     @Test
     @DisplayName("Foto ausente ou vazia é recusada")
     void fotoAusente() {
         when(repository.findByUsuarioId(usuarioId)).thenReturn(Optional.of(consentimento(VERSAO, null)));
+        MockMultipartFile clienteVazia = foto("cliente", new byte[0]);
+        MockMultipartFile referencia = foto("referencia", JPEG);
 
-        assertThrows(RegraDeNegocioException.class, () -> service.gerar(usuarioId, null, foto("referencia", JPEG)));
-        assertThrows(RegraDeNegocioException.class,
-                () -> service.gerar(usuarioId, foto("cliente", new byte[0]), foto("referencia", JPEG)));
+        assertThrows(RegraDeNegocioException.class, () -> service.gerar(usuarioId, null, referencia));
+        assertThrows(RegraDeNegocioException.class, () -> service.gerar(usuarioId, clienteVazia, referencia));
 
         verify(gerador, never()).gerar(any(), any());
     }
@@ -233,10 +242,11 @@ class ProvadorServiceTest {
     @DisplayName("Arquivo que não é JPG nem PNG é recusado, mesmo com tipo de imagem informado")
     void formatoInvalido() {
         when(repository.findByUsuarioId(usuarioId)).thenReturn(Optional.of(consentimento(VERSAO, null)));
-        byte[] texto = "isto nao e uma imagem".getBytes();
+        MockMultipartFile cliente = foto("cliente", "isto nao e uma imagem".getBytes());
+        MockMultipartFile referencia = foto("referencia", JPEG);
 
         RegraDeNegocioException erro = assertThrows(RegraDeNegocioException.class,
-                () -> service.gerar(usuarioId, foto("cliente", texto), foto("referencia", JPEG)));
+                () -> service.gerar(usuarioId, cliente, referencia));
 
         assertTrue(erro.getMessage().contains("JPG ou PNG"));
         verify(gerador, never()).gerar(any(), any());
@@ -248,9 +258,11 @@ class ProvadorServiceTest {
         when(repository.findByUsuarioId(usuarioId)).thenReturn(Optional.of(consentimento(VERSAO, null)));
         byte[] grande = new byte[(int) LIMITE + 1];
         System.arraycopy(JPEG, 0, grande, 0, JPEG.length);
+        MockMultipartFile cliente = foto("cliente", grande);
+        MockMultipartFile referencia = foto("referencia", JPEG);
 
         assertThrows(RegraDeNegocioException.class,
-                () -> service.gerar(usuarioId, foto("cliente", grande), foto("referencia", JPEG)));
+                () -> service.gerar(usuarioId, cliente, referencia));
 
         verify(gerador, never()).gerar(any(), any());
     }

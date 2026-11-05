@@ -3,7 +3,10 @@ package br.com.kira.kirabackend.service;
 import br.com.kira.kirabackend.exception.GeracaoProvadorException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -11,6 +14,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import java.util.Base64;
+import java.util.stream.Stream;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.startsWith;
@@ -61,30 +65,20 @@ class CloudflareGeradorDeImagemTest {
         servidor.verify();
     }
 
-    @Test
-    @DisplayName("Resposta com success falso vira erro de geração")
-    void successFalso() {
-        servidor.expect(requestTo(URL)).andRespond(withSuccess(
-                "{\"success\":false,\"errors\":[{\"code\":1000,\"message\":\"x\"}],\"result\":null}",
-                MediaType.APPLICATION_JSON));
-
-        assertThrows(GeracaoProvadorException.class, () -> gerador.gerar(FOTO, FOTO));
+    static Stream<Named<String>> respostasSemImagemValida() {
+        return Stream.of(
+                Named.of("Resposta com success falso",
+                        "{\"success\":false,\"errors\":[{\"code\":1000,\"message\":\"x\"}],\"result\":null}"),
+                Named.of("Resposta sem result.image",
+                        "{\"success\":true,\"result\":{}}"),
+                Named.of("Imagem que não é base64 válido",
+                        "{\"success\":true,\"result\":{\"image\":\"%%%nao-e-base64%%%\"}}"));
     }
 
-    @Test
-    @DisplayName("Resposta sem result.image vira erro de geração")
-    void semImagem() {
-        servidor.expect(requestTo(URL)).andRespond(withSuccess(
-                "{\"success\":true,\"result\":{}}", MediaType.APPLICATION_JSON));
-
-        assertThrows(GeracaoProvadorException.class, () -> gerador.gerar(FOTO, FOTO));
-    }
-
-    @Test
-    @DisplayName("Imagem que não é base64 válido vira erro de geração")
-    void base64Invalido() {
-        servidor.expect(requestTo(URL)).andRespond(withSuccess(
-                "{\"success\":true,\"result\":{\"image\":\"%%%nao-e-base64%%%\"}}", MediaType.APPLICATION_JSON));
+    @ParameterizedTest(name = "{0} vira erro de geração")
+    @MethodSource("respostasSemImagemValida")
+    void respostaSemImagemValida(String corpo) {
+        servidor.expect(requestTo(URL)).andRespond(withSuccess(corpo, MediaType.APPLICATION_JSON));
 
         assertThrows(GeracaoProvadorException.class, () -> gerador.gerar(FOTO, FOTO));
     }
