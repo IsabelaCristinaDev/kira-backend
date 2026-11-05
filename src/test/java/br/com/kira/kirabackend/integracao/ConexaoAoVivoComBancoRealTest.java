@@ -27,13 +27,14 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
  * Abre uma conexão de verdade no /ws e confere que o servidor a encerra sozinho.
@@ -117,11 +118,10 @@ class ConexaoAoVivoComBancoRealTest {
         return new Conexao(sessao, recusa);
     }
 
-    private void esperarFechar(StompSession sessao) throws InterruptedException {
-        for (int i = 0; i < 50 && sessao.isConnected(); i++) {
-            TimeUnit.MILLISECONDS.sleep(100);
-        }
-        assertFalse(sessao.isConnected());
+    private void esperarFechar(StompSession sessao) {
+        await().atMost(Duration.ofSeconds(5))
+                .pollInterval(Duration.ofMillis(100))
+                .until(() -> !sessao.isConnected());
     }
 
     @Test

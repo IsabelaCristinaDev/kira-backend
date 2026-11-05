@@ -13,7 +13,7 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ArmazenamentoLocalTest {
@@ -44,7 +44,7 @@ class ArmazenamentoLocalTest {
     @Test
     @DisplayName("Dois envios iguais geram nomes diferentes")
     void nomesDiferentes() {
-        assertFalse(armazenamento.salvar(new byte[]{1}, "png").equals(armazenamento.salvar(new byte[]{1}, "png")));
+        assertNotEquals(armazenamento.salvar(new byte[]{1}, "png"), armazenamento.salvar(new byte[]{1}, "png"));
     }
 
     @Test
