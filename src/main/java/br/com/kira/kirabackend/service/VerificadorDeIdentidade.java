@@ -10,7 +10,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.http.MediaType;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Quem compara o documento com a selfie. Hoje é o kira-verify-ai (serviço Python da Wanessa);
@@ -28,6 +30,25 @@ public interface VerificadorDeIdentidade {
 
     /** Imagem já validada pelo backend. O tipo vai junto porque o serviço confere o formato. */
     record Imagem(byte[] conteudo, MediaType tipo) {
+
+        // O record compararia só a referência do array: aqui vale o conteúdo da imagem
+        @Override
+        public boolean equals(Object outro) {
+            return outro instanceof Imagem imagem
+                    && Arrays.equals(conteudo, imagem.conteudo)
+                    && Objects.equals(tipo, imagem.tipo);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Arrays.hashCode(conteudo) + Objects.hashCode(tipo);
+        }
+
+        // Só o tamanho e o tipo: os bytes da foto nunca devem ir parar num log
+        @Override
+        public String toString() {
+            return "Imagem[" + (conteudo == null ? 0 : conteudo.length) + " bytes, " + tipo + "]";
+        }
     }
 
     /** O que o backend guarda da resposta. Os campos lidos pelo OCR nunca entram aqui. */
