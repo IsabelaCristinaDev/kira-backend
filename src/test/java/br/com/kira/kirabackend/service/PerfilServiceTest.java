@@ -12,6 +12,7 @@ import br.com.kira.kirabackend.dto.response.ClientePerfilResponse;
 import br.com.kira.kirabackend.dto.response.EmpresaPerfilResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
+import br.com.kira.kirabackend.repository.BuscaEstudioRepository.Coordenadas;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
@@ -42,6 +44,13 @@ class PerfilServiceTest {
 
     @Mock
     private UsuarioRepository usuarioRepository;
+
+    @Mock
+    private Geocodificador geocodificador;
+
+    // A regra das coordenadas é a de verdade; só o serviço externo é simulado
+    @Spy
+    private CoordenadasService coordenadasService = new CoordenadasService(e -> geocodificador.localizar(e));
 
     @InjectMocks
     private PerfilService service;
@@ -102,6 +111,21 @@ class PerfilServiceTest {
             assertEquals("ana@kira.com", r.email());
             assertEquals("12345678900", r.cpf());
             verify(usuarioRepository).save(cliente);
+        }
+
+        @Test
+        @DisplayName("Sem GPS no pedido, as coordenadas vêm do endereço novo")
+        void coordenadasDoEndereco() {
+            when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
+            when(usuarioRepository.save(any(Cliente.class))).thenAnswer(i -> i.getArgument(0));
+            when(geocodificador.localizar(any())).thenReturn(Optional.of(new Coordenadas(-23.5, -46.6)));
+            ClientePerfilRequest semGps = new ClientePerfilRequest("Ana", "11988887777", LocalDate.of(1995, 3, 10),
+                    Genero.values()[0], ENDERECO, null, null);
+
+            ClientePerfilResponse r = service.atualizarCliente(cliente.getId(), cliente.getId(), semGps);
+
+            assertEquals(-23.5, r.latitude());
+            assertEquals(-46.6, r.longitude());
         }
 
         @Test
@@ -189,6 +213,20 @@ class PerfilServiceTest {
             assertEquals("São Paulo", r.endereco().cidade());
             assertEquals("studio@kira.com", r.email());
             assertEquals("12345678000199", r.cnpj());
+        }
+
+        @Test
+        @DisplayName("As coordenadas do endereço valem mais que as enviadas pelo celular")
+        void coordenadasDoEndereco() {
+            when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+            when(usuarioRepository.save(any(Empresa.class))).thenAnswer(i -> i.getArgument(0));
+            when(geocodificador.localizar(any())).thenReturn(Optional.of(new Coordenadas(-23.5, -46.6)));
+
+            EmpresaPerfilResponse r = service.atualizarEmpresa(empresa.getId(), request(List.of("Unha")));
+
+            assertEquals(-23.5, r.latitude());
+            assertEquals(-46.6, r.longitude());
+            assertEquals("São Paulo", r.endereco().cidade());
         }
 
         @Test

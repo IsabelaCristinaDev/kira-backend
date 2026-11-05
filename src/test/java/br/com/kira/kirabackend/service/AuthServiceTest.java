@@ -10,6 +10,7 @@ import br.com.kira.kirabackend.domain.enums.Genero;
 import br.com.kira.kirabackend.domain.enums.TipoEstabelecimento;
 import br.com.kira.kirabackend.dto.request.ClienteRegistroRequest;
 import br.com.kira.kirabackend.dto.request.EmpresaRegistroRequest;
+import br.com.kira.kirabackend.dto.request.EnderecoRequest;
 import br.com.kira.kirabackend.dto.request.LoginRequest;
 import br.com.kira.kirabackend.dto.request.RefreshTokenRequest;
 import br.com.kira.kirabackend.dto.request.ServicoRegistroRequest;
@@ -17,6 +18,7 @@ import br.com.kira.kirabackend.dto.response.LoginResponse;
 import br.com.kira.kirabackend.exception.DocumentoJaCadastradoException;
 import br.com.kira.kirabackend.exception.EmailJaCadastradoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
+import br.com.kira.kirabackend.repository.BuscaEstudioRepository.Coordenadas;
 import br.com.kira.kirabackend.repository.RefreshTokenRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
@@ -35,6 +37,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -95,6 +98,11 @@ class AuthServiceTest {
 
     @Mock
     private EmailService emailService;
+
+    // A regra das coordenadas é a de verdade; só o serviço externo é simulado
+    @Spy
+    private CoordenadasService coordenadasService =
+            new CoordenadasService(e -> Optional.of(new Coordenadas(-16.68, -49.25)));
 
     @InjectMocks
     private AuthService service;
@@ -596,6 +604,51 @@ class AuthServiceTest {
             Servico servico = assertTimeoutPreemptively(Duration.ofSeconds(1),
                     () -> registrarEmpresaComUmServico("50", bruto));
             assertEquals(0, servico.getDuracaoMinutos());
+        }
+    }
+
+    @Nested
+    @DisplayName("Coordenadas no cadastro")
+    class CoordenadasNoCadastro {
+
+        private final EnderecoRequest endereco =
+                new EnderecoRequest("74000000", "Avenida Goiás", "10", null, "Centro", "Goiânia", "GO");
+
+        @Test
+        @DisplayName("Cliente sem GPS recebe as coordenadas do endereço")
+        void clienteSemGps() {
+            service.registrarCliente(new ClienteRegistroRequest("Ana", "ana@teste.com", "senha12345", "11999999999",
+                    "123.456.789-00", LocalDate.of(1995, 5, 10), Genero.FEMININO, endereco, null, null));
+
+            ArgumentCaptor<Cliente> captor = ArgumentCaptor.forClass(Cliente.class);
+            verify(usuarioRepository).save(captor.capture());
+            assertEquals(-16.68, captor.getValue().getLatitude());
+            assertEquals(-49.25, captor.getValue().getLongitude());
+        }
+
+        @Test
+        @DisplayName("Cliente com GPS mantém o GPS")
+        void clienteComGps() {
+            service.registrarCliente(new ClienteRegistroRequest("Ana", "ana@teste.com", "senha12345", "11999999999",
+                    "123.456.789-00", LocalDate.of(1995, 5, 10), Genero.FEMININO, endereco, -1.0, -2.0));
+
+            ArgumentCaptor<Cliente> captor = ArgumentCaptor.forClass(Cliente.class);
+            verify(usuarioRepository).save(captor.capture());
+            assertEquals(-1.0, captor.getValue().getLatitude());
+            assertEquals(-2.0, captor.getValue().getLongitude());
+        }
+
+        @Test
+        @DisplayName("Estúdio recebe as coordenadas do endereço, mesmo enviando as do celular")
+        void estudio() {
+            service.registrarEmpresa(new EmpresaRegistroRequest("Estúdio Kira", "estudio@teste.com", "senha12345",
+                    "11988888888", "12.345.678/0001-90", null, "Estúdio de beleza", null, endereco, -1.0, -2.0,
+                    null, null, TipoEstabelecimento.ESTABELECIMENTO));
+
+            ArgumentCaptor<Empresa> captor = ArgumentCaptor.forClass(Empresa.class);
+            verify(usuarioRepository).save(captor.capture());
+            assertEquals(-16.68, captor.getValue().getLatitude());
+            assertEquals(-49.25, captor.getValue().getLongitude());
         }
     }
 }

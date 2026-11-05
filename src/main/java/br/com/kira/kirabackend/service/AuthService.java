@@ -2,6 +2,7 @@ package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.Cliente;
 import br.com.kira.kirabackend.domain.entity.Empresa;
+import br.com.kira.kirabackend.domain.entity.Endereco;
 import br.com.kira.kirabackend.domain.entity.RefreshToken;
 import br.com.kira.kirabackend.domain.entity.Servico;
 import br.com.kira.kirabackend.domain.enums.CategoriaServico;
@@ -43,6 +44,7 @@ import java.util.regex.Pattern;
 public class AuthService {
 
     private final UsuarioRepository usuarioRepository;
+    private final CoordenadasService coordenadasService;
     private final ServicoRepository servicoRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
@@ -134,13 +136,12 @@ public class AuthService {
         cliente.setCpf(data.cpf());
         cliente.setDataNascimento(data.dataNascimento());
         cliente.setGenero(data.genero());
-        cliente.setLatitude(data.latitude());
-        cliente.setLongitude(data.longitude());
 
         if (data.endereco() != null) {
             cliente.setEndereco(data.endereco().paraEndereco());
 
         }
+        coordenadasService.atualizarCliente(cliente, cliente.getEndereco(), data.latitude(), data.longitude());
         usuarioRepository.save(cliente);
         emailService.enviarEmailBoasVindas(cliente.getEmail(), cliente.getNome());
 
@@ -172,17 +173,15 @@ public class AuthService {
         empresa.setCpf(cpf);
         empresa.setDescricao(data.descricao());
         empresa.setDataNascimento(data.dataNascimento());
-        empresa.setLatitude(data.latitude());
-        empresa.setLongitude(data.longitude());
         empresa.setTipoEstabelecimento(data.tipoEstabelecimento());
 
         if (data.especialidades() != null && !data.especialidades().isEmpty()) {
             empresa.setEspecialidades(String.join(", ", data.especialidades()));
         }
 
-        if (data.endereco() != null) {
-            empresa.setEndereco(data.endereco().paraEndereco());
-        }
+        Endereco endereco = data.endereco() != null ? data.endereco().paraEndereco() : null;
+        coordenadasService.atualizarEstudio(empresa, endereco, data.latitude(), data.longitude());
+        empresa.setEndereco(endereco);
 
         usuarioRepository.save(empresa);
         emailService.enviarEmailBoasVindas(empresa.getEmail(), empresa.getNome());
