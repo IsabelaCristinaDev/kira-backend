@@ -469,6 +469,54 @@ class AgendamentoServiceTest {
         }
     }
 
+    // ---------- confirmar ----------
+
+    @Nested
+    @DisplayName("confirmar")
+    class Confirmar {
+
+        @ParameterizedTest
+        @EnumSource(value = StatusAgendamento.class, names = {"PENDENTE", "REAGENDADO"})
+        @DisplayName("Confirmar um agendamento novo ou remarcado muda o status")
+        void deveConfirmar(StatusAgendamento status) {
+            Agendamento agendamento = agendamentoExistente(status);
+            when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+            mockarSaveDevolvendoArgumento();
+
+            AgendamentoResponse response = service.confirmar(agendamento.getId(), empresa.getId());
+
+            assertEquals(StatusAgendamento.CONFIRMADO, response.status());
+            assertEquals(StatusAgendamento.CONFIRMADO, agendamento.getStatus());
+        }
+
+        @ParameterizedTest
+        @EnumSource(value = StatusAgendamento.class, names = {"CONFIRMADO", "CANCELADO", "CONCLUIDO"})
+        @DisplayName("Não confirma agendamento já confirmado, cancelado ou concluído")
+        void naoConfirmaOutroStatus(StatusAgendamento status) {
+            Agendamento agendamento = agendamentoExistente(status);
+            when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+
+            assertThrows(RegraDeNegocioException.class,
+                    () -> service.confirmar(agendamento.getId(), empresa.getId()));
+
+            assertEquals(status, agendamento.getStatus());
+            verify(agendamentoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Outro estúdio não confirma")
+        void outroEstudioNaoConfirma() {
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.PENDENTE);
+            when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+
+            assertThrows(RegraDeNegocioException.class,
+                    () -> service.confirmar(agendamento.getId(), UUID.randomUUID()));
+
+            assertEquals(StatusAgendamento.PENDENTE, agendamento.getStatus());
+            verify(agendamentoRepository, never()).save(any());
+        }
+    }
+
     // ---------- concluir ----------
 
     @Nested
