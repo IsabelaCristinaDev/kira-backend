@@ -152,6 +152,21 @@ public class AgendamentoService {
         return toResponse(salvo);
     }
 
+    /** O estúdio confirma um agendamento novo ou remarcado. */
+    public AgendamentoResponse confirmar(UUID agendamentoId, UUID empresaId) {
+        Agendamento agendamento = agendamentoRepository.findById(agendamentoId)
+                .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
+        validarEmpresaDoAgendamento(agendamento, empresaId);
+
+        if (agendamento.getStatus() != StatusAgendamento.PENDENTE &&
+                agendamento.getStatus() != StatusAgendamento.REAGENDADO) {
+            throw new RegraDeNegocioException("Não é possível confirmar este agendamento");
+        }
+
+        agendamento.setStatus(StatusAgendamento.CONFIRMADO);
+        return toResponse(agendamentoRepository.save(agendamento));
+    }
+
     /** Sem forma informada, fica a que veio no agendamento, se houver. */
     public AgendamentoResponse concluir(UUID agendamentoId, UUID empresaId, FormaPagamento formaPagamento) {
         Agendamento agendamento = agendamentoRepository.findById(agendamentoId)

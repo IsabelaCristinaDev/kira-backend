@@ -54,6 +54,13 @@ public class AgendamentoController {
         return ResponseEntity.ok(agendamentoService.cancelarPeloCliente(id, usuario.getId()));
     }
 
+    @PatchMapping("/{id}/confirmar")
+    public ResponseEntity<AgendamentoResponse> confirmar(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Usuario usuario) {
+        return ResponseEntity.ok(agendamentoService.confirmar(id, usuario.getId()));
+    }
+
     @PatchMapping("/{id}/concluir")
     public ResponseEntity<AgendamentoResponse> concluir(
             @PathVariable UUID id,

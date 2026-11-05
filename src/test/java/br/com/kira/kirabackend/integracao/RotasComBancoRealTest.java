@@ -329,6 +329,9 @@ class RotasComBancoRealTest {
         LocalDate ontem = hoje.minusDays(1);
         jdbc.update("update agendamento set data_hora_inicio = ?::timestamp, data_hora_fim = ?::timestamp where id = ?::uuid",
                 ontem + " 10:00:00", ontem + " 11:00:00", concluido);
+        JsonNode confirmado = chamar("PATCH", "/api/agendamentos/" + concluido + "/confirmar", null, estudio, 200);
+        assertEquals("CONFIRMADO", confirmado.get("status").asText());
+        chamar("PATCH", "/api/agendamentos/" + concluido + "/confirmar", null, estudio, 400);
         chamar("PATCH", "/api/agendamentos/" + concluido + "/concluir", null, estudio, 200);
         assertEquals(1, get("/api/agendamentos/cliente/" + anaId + "/historico", ana).size());
 
