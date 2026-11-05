@@ -57,8 +57,9 @@ import static org.mockito.Mockito.verifyNoInteractions;
 @ExtendWith(MockitoExtension.class)
 class DisponibilidadeServiceTest {
 
-    /** 19/10/2026 é uma segunda-feira. O serviço não valida datas passadas, então uma data fixa é segura. */
+    /** 19/10/2026 é uma segunda-feira. Os testes fixam o "agora" na véspera, então a data fixa é segura. */
     private static final LocalDate SEGUNDA = LocalDate.of(2026, 10, 19);
+    private static final LocalDateTime VESPERA = SEGUNDA.minusDays(1).atStartOfDay();
 
     @Mock
     private DisponibilidadeEstudioRepository disponibilidadeRepository;
@@ -134,7 +135,7 @@ class DisponibilidadeServiceTest {
     }
 
     private List<SlotDisponivel> calcular() {
-        return service.calcularSlotsDisponiveis(empresa.getId(), servico.getId(), SEGUNDA, null);
+        return service.calcularSlotsDisponiveis(empresa.getId(), servico.getId(), SEGUNDA, null, VESPERA);
     }
 
     private static List<LocalTime> horariosDeInicio(List<SlotDisponivel> slots) {
@@ -165,6 +166,31 @@ class DisponibilidadeServiceTest {
                     new SlotDisponivel(SEGUNDA.atTime(10, 0), SEGUNDA.atTime(11, 0)),
                     new SlotDisponivel(SEGUNDA.atTime(11, 0), SEGUNDA.atTime(12, 0))
             ), slots);
+        }
+
+        private List<SlotDisponivel> calcularAs(LocalDateTime agora) {
+            mockarServico(60);
+            mockarExpediente(DiaSemana.SEGUNDA, hora(9, 0), hora(12, 0));
+            mockarAgendamentos();
+            return service.calcularSlotsDisponiveis(empresa.getId(), servico.getId(), SEGUNDA, null, agora);
+        }
+
+        @Test
+        @DisplayName("No dia de hoje, os horários que já passaram não aparecem")
+        void hojeEscondeHorariosPassados() {
+            assertEquals(List.of(hora(11, 0)), horariosDeInicio(calcularAs(SEGUNDA.atTime(10, 30))));
+        }
+
+        @Test
+        @DisplayName("Horário que começa agora não aparece, como no agendamento")
+        void horarioQueComecaAgoraNaoAparece() {
+            assertEquals(List.of(hora(11, 0)), horariosDeInicio(calcularAs(SEGUNDA.atTime(10, 0))));
+        }
+
+        @Test
+        @DisplayName("Dia que já passou fica sem horários")
+        void diaPassadoFicaSemHorarios() {
+            assertEquals(List.of(), calcularAs(SEGUNDA.plusDays(1).atTime(8, 0)));
         }
 
         @Test
@@ -542,7 +568,7 @@ class DisponibilidadeServiceTest {
             semBloqueios();
 
             List<SlotDisponivel> slots = service.calcularSlotsDisponiveis(
-                    empresa.getId(), servico.getId(), SEGUNDA, ana.getId());
+                    empresa.getId(), servico.getId(), SEGUNDA, ana.getId(), VESPERA);
 
             assertEquals(List.of(hora(10, 0)), horariosDeInicio(slots));
         }
@@ -571,7 +597,7 @@ class DisponibilidadeServiceTest {
             UUID outra = UUID.randomUUID();
 
             RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
-                    () -> service.calcularSlotsDisponiveis(empresaId, servicoId, SEGUNDA, outra));
+                    () -> service.calcularSlotsDisponiveis(empresaId, servicoId, SEGUNDA, outra, VESPERA));
             assertEquals("Funcionária não atende neste estabelecimento", ex.getMessage());
         }
     }
@@ -585,7 +611,7 @@ class DisponibilidadeServiceTest {
 
         assertThrows(RecursoNaoEncontradoException.class, () -> service.listarPorEmpresa(empresaId));
         assertThrows(RecursoNaoEncontradoException.class,
-                () -> service.calcularSlotsDisponiveis(empresaId, servicoId, SEGUNDA, null));
+                () -> service.calcularSlotsDisponiveis(empresaId, servicoId, SEGUNDA, null, VESPERA));
         verifyNoInteractions(disponibilidadeRepository, servicoRepository, agendamentoRepository);
     }
 }
