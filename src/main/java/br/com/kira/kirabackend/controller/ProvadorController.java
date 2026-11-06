@@ -2,8 +2,10 @@ package br.com.kira.kirabackend.controller;
 
 import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.dto.request.ConsentimentoProvadorRequest;
+import br.com.kira.kirabackend.dto.response.CompatibilidadeEstudioResponse;
 import br.com.kira.kirabackend.dto.response.ConsentimentoProvadorResponse;
 import br.com.kira.kirabackend.dto.response.GeracaoProvadorResponse;
+import br.com.kira.kirabackend.service.CompatibilidadePortfolioService;
 import br.com.kira.kirabackend.service.ProvadorService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -13,12 +15,15 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/provador")
 public class ProvadorController {
 
     private final ProvadorService provadorService;
+    private final CompatibilidadePortfolioService compatibilidadeService;
 
     @GetMapping("/consentimento")
     public ResponseEntity<ConsentimentoProvadorResponse> consultarConsentimento(
@@ -46,6 +51,14 @@ public class ProvadorController {
             @RequestParam(value = "cliente", required = false) MultipartFile cliente,
             @RequestParam(value = "referencia", required = false) MultipartFile referencia) {
         return ResponseEntity.ok(provadorService.gerar(usuario.getId(), cliente, referencia));
+    }
+
+    // Estúdios de cabelo do mais ao menos parecido com a referência. Só vai a referência: a foto da cliente não sai do app.
+    // A parte é opcional pelo mesmo motivo de /geracoes: a validação do serviço responde com mensagem clara
+    @PostMapping(value = "/ranking", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<List<CompatibilidadeEstudioResponse>> ranking(
+            @RequestParam(value = "referencia", required = false) MultipartFile referencia) {
+        return ResponseEntity.ok(compatibilidadeService.ranquear(referencia));
     }
 
     // Nenhuma foto fica guardada (veja ProvadorService), então não há o que apagar. Existe para manter o contrato do app.

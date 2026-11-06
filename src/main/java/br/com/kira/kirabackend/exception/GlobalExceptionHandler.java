@@ -97,6 +97,15 @@ public class GlobalExceptionHandler {
         return resposta(HttpStatus.TOO_MANY_REQUESTS, "PROVADOR_LIMITE_DIARIO", ex.getMessage(), request);
     }
 
+    // 503: a IA de compatibilidade está fora do ar. O app segue com a ordem que já calcula
+    @ExceptionHandler(CompatibilidadeIndisponivelException.class)
+    public ResponseEntity<ErroResponse> handleCompatibilidadeIndisponivel(
+            CompatibilidadeIndisponivelException ex,
+            HttpServletRequest request) {
+        return resposta(HttpStatus.SERVICE_UNAVAILABLE, "PROVADOR_RANKING_INDISPONIVEL",
+                "Não foi possível comparar com os portfólios agora", request);
+    }
+
     @ExceptionHandler(EmailJaCadastradoException.class)
     public ResponseEntity<ErroResponse> handleEmailJaCadastrado(
             EmailJaCadastradoException ex,

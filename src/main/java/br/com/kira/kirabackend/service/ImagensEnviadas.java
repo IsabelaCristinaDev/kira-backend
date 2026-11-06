@@ -8,11 +8,16 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Optional;
 
-/** Confere e guarda as imagens enviadas pelas contas. É usada pela foto de perfil e pelo portfólio. */
+/**
+ * Confere e guarda as imagens enviadas pelas contas. É usada pela foto de perfil, pelo portfólio e
+ * pela compatibilidade do Provador.
+ */
 @Component
 @RequiredArgsConstructor
 public class ImagensEnviadas {
@@ -29,6 +34,29 @@ public class ImagensEnviadas {
     public String guardar(MultipartFile arquivo) {
         byte[] conteudo = lerConteudo(arquivo);
         return PREFIXO_URL + armazenamento.salvar(conteudo, extensaoDaImagem(conteudo));
+    }
+
+    /** Confere a imagem enviada e devolve o conteúdo, sem guardar nada. */
+    public byte[] lerImagem(MultipartFile arquivo) {
+        byte[] conteudo = lerConteudo(arquivo);
+        extensaoDaImagem(conteudo);
+        return conteudo;
+    }
+
+    /** Conteúdo de uma imagem já guardada aqui. Vazio se o endereço for de fora ou o arquivo não puder ser lido. */
+    public Optional<byte[]> lerGuardada(String url) {
+        if (url == null || !url.startsWith(PREFIXO_URL)) {
+            return Optional.empty();
+        }
+        String nome = url.substring(PREFIXO_URL.length());
+        return armazenamento.abrir(nome).flatMap(arquivo -> {
+            try (InputStream conteudo = arquivo.getInputStream()) {
+                return Optional.of(conteudo.readAllBytes());
+            } catch (IOException e) {
+                log.warn("Não foi possível ler o arquivo {}", nome, e);
+                return Optional.empty();
+            }
+        });
     }
 
     /** Usada depois que a troca já valeu: sobrar um arquivo na pasta não deve virar erro para a pessoa. */

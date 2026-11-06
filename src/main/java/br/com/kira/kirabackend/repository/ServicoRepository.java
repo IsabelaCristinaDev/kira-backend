@@ -18,4 +18,7 @@ import java.util.UUID;
         List<Servico> findByEmpresaIdInAndAtivoTrue(Collection<UUID> empresaIds);
 
         List<Servico> findByCategoriaIsNull();
+
+        // Serviços que a cliente pode contratar hoje: o serviço e o estúdio estão ativos
+        List<Servico> findByAtivoTrueAndEmpresaAtivoTrue();
     }
