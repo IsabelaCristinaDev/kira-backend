@@ -11,6 +11,7 @@ import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.DisponibilidadeEstudioRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
+import br.com.kira.kirabackend.util.KiraTimeZone;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -127,12 +128,24 @@ public class DisponibilidadeService {
     /**
      * Horários livres do dia para o serviço. Com {@code funcionariaId}, só os horários em que ela
      * está livre; sem, os horários em que alguma funcionária (ou o estúdio, se não tiver) está livre.
+     * Horário que já começou fica de fora, porque o agendamento recusaria.
      */
     public List<SlotDisponivel> calcularSlotsDisponiveis(
             UUID empresaId,
             UUID servicoId,
             LocalDate data,
             UUID funcionariaId) {
+        return calcularSlotsDisponiveis(empresaId, servicoId, data, funcionariaId,
+                LocalDateTime.now(KiraTimeZone.DEFAULT));
+    }
+
+    /** Recebe o momento atual para os testes não dependerem do relógio. */
+    List<SlotDisponivel> calcularSlotsDisponiveis(
+            UUID empresaId,
+            UUID servicoId,
+            LocalDate data,
+            UUID funcionariaId,
+            LocalDateTime agora) {
         exigirEmpresaAtiva(empresaId);
 
         var servico = servicoRepository.findById(servicoId)
@@ -166,7 +179,8 @@ public class DisponibilidadeService {
             LocalDateTime slotInicio = cursor;
             LocalDateTime slotFim = slotInicio.plusMinutes(duracaoMinutos);
 
-            if (quadro.livre(funcionariaId, slotInicio, slotFim)) {
+            // Mesmo critério do agendamento: precisa começar depois de agora
+            if (slotInicio.isAfter(agora) && quadro.livre(funcionariaId, slotInicio, slotFim)) {
                 slots.add(new SlotDisponivel(slotInicio, slotFim));
             }
 
