@@ -22,6 +22,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -40,6 +41,8 @@ class KiraAiComparadorTest {
 
     private static final byte[] REFERENCIA = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 1};
     private static final Foto FOTO_1 = new Foto("foto-1.jpg", new byte[]{1});
+    // Fora do lambda do assertThrows: lá dentro só fica a chamada testada
+    private static final List<Foto> SO_FOTO_1 = List.of(FOTO_1);
     private static final Foto FOTO_2 = new Foto("foto-2.png", new byte[]{2});
 
     private MockRestServiceServer servidor;
@@ -124,7 +127,7 @@ class KiraAiComparadorTest {
         servidor.expect(requestTo(URL)).andRespond(withException(new ConnectException("Connection refused")));
 
         assertThrows(CompatibilidadeIndisponivelException.class,
-                () -> comparador.comparar(REFERENCIA, List.of(FOTO_1)));
+                () -> comparador.comparar(REFERENCIA, SO_FOTO_1));
     }
 
     @Test
@@ -133,7 +136,7 @@ class KiraAiComparadorTest {
         servidor.expect(requestTo(URL)).andRespond(withException(new SocketTimeoutException("Read timed out")));
 
         assertThrows(CompatibilidadeIndisponivelException.class,
-                () -> comparador.comparar(REFERENCIA, List.of(FOTO_1)));
+                () -> comparador.comparar(REFERENCIA, SO_FOTO_1));
     }
 
     @ParameterizedTest(name = "HTTP {0}")
@@ -146,7 +149,7 @@ class KiraAiComparadorTest {
                 .body("{\"detail\":\"Uma das imagens enviadas é inválida.\"}"));
 
         CompatibilidadeIndisponivelException erro = assertThrows(CompatibilidadeIndisponivelException.class,
-                () -> comparador.comparar(REFERENCIA, List.of(FOTO_1)));
+                () -> comparador.comparar(REFERENCIA, SO_FOTO_1));
 
         assertFalse(erro.getMessage().contains("inválida"));
     }
@@ -157,7 +160,7 @@ class KiraAiComparadorTest {
         servidor.expect(requestTo(URL)).andRespond(withSuccess("isto não é json", MediaType.APPLICATION_JSON));
 
         assertThrows(CompatibilidadeIndisponivelException.class,
-                () -> comparador.comparar(REFERENCIA, List.of(FOTO_1)));
+                () -> comparador.comparar(REFERENCIA, SO_FOTO_1));
     }
 
     @Test
@@ -166,12 +169,23 @@ class KiraAiComparadorTest {
         servidor.expect(requestTo(URL)).andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
         assertThrows(CompatibilidadeIndisponivelException.class,
-                () -> comparador.comparar(REFERENCIA, List.of(FOTO_1)));
+                () -> comparador.comparar(REFERENCIA, SO_FOTO_1));
     }
 
     @Test
     @DisplayName("O toString da foto não mostra os bytes da imagem")
     void fotoSemBytesNoLog() {
         assertEquals("Foto[foto-1.jpg, 1 bytes]", FOTO_1.toString());
+    }
+
+    @Test
+    @DisplayName("Duas fotos com o mesmo nome e o mesmo conteúdo são iguais")
+    void fotoIgualPeloConteudo() {
+        Foto copia = new Foto("foto-1.jpg", new byte[]{1});
+        Foto outra = new Foto("foto-1.jpg", new byte[]{2});
+
+        assertEquals(FOTO_1, copia);
+        assertEquals(FOTO_1.hashCode(), copia.hashCode());
+        assertNotEquals(FOTO_1, outra);
     }
 }
