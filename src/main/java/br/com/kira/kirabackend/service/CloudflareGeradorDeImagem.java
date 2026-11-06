@@ -1,13 +1,12 @@
 package br.com.kira.kirabackend.service;
 
+import br.com.kira.kirabackend.config.ClientesHttpConfig;
 import br.com.kira.kirabackend.exception.GeracaoProvadorException;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.web.client.ClientHttpRequestFactories;
-import org.springframework.boot.web.client.ClientHttpRequestFactorySettings;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
@@ -25,7 +24,6 @@ import org.springframework.web.client.RestClientResponseException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.Base64;
 
 /**
@@ -50,19 +48,13 @@ public class CloudflareGeradorDeImagem implements GeradorDeImagem {
     private final String baseUrl;
     private final String prompt;
 
-    @Autowired
-    public CloudflareGeradorDeImagem(
-            RestClient.Builder builder,
+    // Construtor único: o Spring usa este sem precisar de @Autowired, e os testes passam um RestClient simulado
+    CloudflareGeradorDeImagem(
+            @Qualifier(ClientesHttpConfig.CLOUDFLARE) RestClient restClient,
             @Value("${kira.provador.cloudflare.account-id:}") String accountId,
             @Value("${kira.provador.cloudflare.api-token:}") String apiToken,
             @Value("${kira.provador.cloudflare.modelo}") String modelo,
-            @Value("${kira.provador.cloudflare.base-url}") String baseUrl,
-            @Value("${kira.provador.cloudflare.timeout-conexao-ms:5000}") long timeoutConexaoMs,
-            @Value("${kira.provador.cloudflare.timeout-leitura-ms:90000}") long timeoutLeituraMs) {
-        this(criarRestClient(builder, timeoutConexaoMs, timeoutLeituraMs), accountId, apiToken, modelo, baseUrl);
-    }
-
-    CloudflareGeradorDeImagem(RestClient restClient, String accountId, String apiToken, String modelo, String baseUrl) {
+            @Value("${kira.provador.cloudflare.base-url}") String baseUrl) {
         this.restClient = restClient;
         this.accountId = accountId;
         this.apiToken = apiToken;
@@ -141,13 +133,6 @@ public class CloudflareGeradorDeImagem implements GeradorDeImagem {
         HttpHeaders cabecalhos = new HttpHeaders();
         cabecalhos.setContentType(MediaType.APPLICATION_OCTET_STREAM);
         return new HttpEntity<>(arquivo, cabecalhos);
-    }
-
-    private static RestClient criarRestClient(RestClient.Builder builder, long timeoutConexaoMs, long timeoutLeituraMs) {
-        ClientHttpRequestFactorySettings configuracao = ClientHttpRequestFactorySettings.DEFAULTS
-                .withConnectTimeout(Duration.ofMillis(timeoutConexaoMs))
-                .withReadTimeout(Duration.ofMillis(timeoutLeituraMs));
-        return builder.requestFactory(ClientHttpRequestFactories.get(configuracao)).build();
     }
 
     private static String lerPrompt() {
