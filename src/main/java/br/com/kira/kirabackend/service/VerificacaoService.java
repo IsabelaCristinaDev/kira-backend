@@ -12,6 +12,7 @@ import br.com.kira.kirabackend.domain.enums.TipoUsuario;
 import br.com.kira.kirabackend.dto.response.VerificacaoResponse;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.VerificacaoIdentidadeRepository;
+import br.com.kira.kirabackend.service.VerificadorDeIdentidade.DadosDoCadastro;
 import br.com.kira.kirabackend.service.VerificadorDeIdentidade.Imagem;
 import br.com.kira.kirabackend.service.VerificadorDeIdentidade.Resultado;
 import br.com.kira.kirabackend.util.KiraTimeZone;
@@ -92,7 +93,7 @@ public class VerificacaoService {
 
         // Se o serviço falhar, a exceção sobe e a tentativa continua PENDING para a pessoa tentar de novo
         Resultado resultado = verificador.verificar(imagemDocumento, imagemVerso, imagemSelfie, tipo,
-                cpfDoCadastro(usuario));
+                dadosDoCadastro(usuario));
 
         verificacao.setStatus(statusDa(resultado.decisao()));
         verificacao.setMotivos(resultado.motivos());
@@ -142,6 +143,8 @@ public class VerificacaoService {
             case APPROVED -> StatusVerificacao.VERIFIED;
             case REVIEW -> StatusVerificacao.IN_REVIEW;
             case REJECTED -> StatusVerificacao.REJECTED;
+            // Foto inutilizável: continua PENDING, que não conta como tentativa, e a pessoa manda outra
+            case RETRY -> StatusVerificacao.PENDING;
         };
     }
 
@@ -158,15 +161,16 @@ public class VerificacaoService {
                 : "Este tipo de conta não faz verificação de identidade");
     }
 
-    // O serviço confere o CPF do documento com o do cadastro. Estabelecimento com CNPJ não tem CPF para conferir
-    private static String cpfDoCadastro(Usuario usuario) {
+    // O serviço confere esses dados com o documento. No estabelecimento, o nome da conta é o do estúdio,
+    // não o da pessoa do documento, então vai só o CPF (nulo com CNPJ) e o nascimento
+    private static DadosDoCadastro dadosDoCadastro(Usuario usuario) {
         if (usuario instanceof Cliente cliente) {
-            return cliente.getCpf();
+            return new DadosDoCadastro(cliente.getCpf(), cliente.getNome(), cliente.getDataNascimento());
         }
         if (usuario instanceof Empresa empresa) {
-            return empresa.getCpf();
+            return new DadosDoCadastro(empresa.getCpf(), null, empresa.getDataNascimento());
         }
-        return null;
+        return new DadosDoCadastro(null, null, null);
     }
 
     private static TipoDocumentoIdentidade lerTipoDocumento(String valor) {

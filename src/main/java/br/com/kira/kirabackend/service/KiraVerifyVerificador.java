@@ -1,10 +1,13 @@
 package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.config.ClientesHttpConfig;
+import br.com.kira.kirabackend.domain.enums.DecisaoVerificacaoIa;
 import br.com.kira.kirabackend.domain.enums.TipoDocumentoIdentidade;
 import br.com.kira.kirabackend.exception.FalhaVerificacaoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.exception.VerificacaoIndisponivelException;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -23,17 +26,22 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.math.BigDecimal;
 import java.net.ConnectException;
+import java.util.List;
+import java.util.Objects;
 
 /**
- * Chama o kira-verify-ai em POST /v1/verify: multipart com document, selfie, document_type e,
- * se houver, document_back (verso do documento) e expected_cpf. Toda chamada leva o header X-Service-Key.
+ * Chama o kira-verify-ai (módulo do kira-ai) em POST /verify/identity: multipart com document_image,
+ * selfie_image e os dados do cadastro que houver (expected_cpf, expected_name, expected_birth_date).
+ * O verso do documento não é enviado: o serviço trabalha só com a frente. O header X-Service-Key só
+ * vai quando a chave estiver configurada; o kira-ai de hoje não pede chave.
  *
  * Tenta de novo no máximo uma vez, e só quando o serviço não chegou a receber o pedido (conexão
  * recusada) ou disse que está ocupado (503). Erro 4xx não se repete: o resultado seria o mesmo.
  * Timeout de leitura também não se repete, para o app não esperar o dobro.
  *
- * Imagens, CPF e a chave nunca vão para o log: só o status HTTP e o request_id.
+ * Imagens, dados do cadastro e a chave nunca vão para o log: só o status HTTP e a decisão.
  */
 @Service
 public class KiraVerifyVerificador implements VerificadorDeIdentidade {
@@ -41,7 +49,7 @@ public class KiraVerifyVerificador implements VerificadorDeIdentidade {
     private static final Logger log = LoggerFactory.getLogger(KiraVerifyVerificador.class);
 
     static final String CABECALHO_CHAVE = "X-Service-Key";
-    private static final String CAMINHO = "/v1/verify";
+    private static final String CAMINHO = "/verify/identity";
     private static final int MAXIMO_TENTATIVAS = 2;
 
     private final RestClient restClient;
@@ -60,21 +68,16 @@ public class KiraVerifyVerificador implements VerificadorDeIdentidade {
 
     @Override
     public Resultado verificar(Imagem documento, Imagem versoDocumento, Imagem selfie,
-                               TipoDocumentoIdentidade tipoDocumento, String cpfEsperado) {
-        if (chaveServico.isBlank()) {
-            log.error("Verificação: VERIFY_SERVICE_KEY não configurada");
-            throw new FalhaVerificacaoException("Chave do serviço de verificação não configurada");
-        }
-
+                               TipoDocumentoIdentidade tipoDocumento, DadosDoCadastro esperado) {
         MultiValueMap<String, Object> corpo = new LinkedMultiValueMap<>();
-        corpo.add("document", parteDeImagem(documento, "document"));
-        if (versoDocumento != null) {
-            corpo.add("document_back", parteDeImagem(versoDocumento, "document_back"));
-        }
-        corpo.add("selfie", parteDeImagem(selfie, "selfie"));
-        corpo.add("document_type", tipoDocumento.name());
-        if (cpfEsperado != null && !cpfEsperado.isBlank()) {
-            corpo.add("expected_cpf", cpfEsperado);
+        corpo.add("document_image", parteDeImagem(documento, "document_image"));
+        corpo.add("selfie_image", parteDeImagem(selfie, "selfie_image"));
+        if (esperado != null) {
+            adicionarSePreenchido(corpo, "expected_cpf", esperado.cpf());
+            adicionarSePreenchido(corpo, "expected_name", esperado.nome());
+            if (esperado.dataNascimento() != null) {
+                corpo.add("expected_birth_date", esperado.dataNascimento().toString());
+            }
         }
 
         Resultado resultado = enviarComNovaTentativa(corpo);
@@ -82,8 +85,14 @@ public class KiraVerifyVerificador implements VerificadorDeIdentidade {
             log.error("Verificação: resposta do serviço sem status");
             throw new FalhaVerificacaoException("O serviço de verificação devolveu uma resposta fora do contrato");
         }
-        log.info("Verificação: serviço respondeu {} (request_id {})", resultado.decisao(), resultado.requestId());
+        log.info("Verificação: serviço respondeu {}", resultado.decisao());
         return resultado;
+    }
+
+    private static void adicionarSePreenchido(MultiValueMap<String, Object> corpo, String campo, String valor) {
+        if (valor != null && !valor.isBlank()) {
+            corpo.add(campo, valor);
+        }
     }
 
     private Resultado enviarComNovaTentativa(MultiValueMap<String, Object> corpo) {
@@ -101,13 +110,18 @@ public class KiraVerifyVerificador implements VerificadorDeIdentidade {
 
     private Resultado enviar(MultiValueMap<String, Object> corpo) {
         try {
-            return restClient.post()
+            RespostaServico resposta = restClient.post()
                     .uri(baseUrl + CAMINHO)
-                    .header(CABECALHO_CHAVE, chaveServico)
+                    .headers(cabecalhos -> {
+                        if (!chaveServico.isBlank()) {
+                            cabecalhos.set(CABECALHO_CHAVE, chaveServico);
+                        }
+                    })
                     .contentType(MediaType.MULTIPART_FORM_DATA)
                     .body(corpo)
                     .retrieve()
-                    .body(Resultado.class);
+                    .body(RespostaServico.class);
+            return resposta == null ? null : resposta.paraResultado();
         } catch (RestClientResponseException e) {
             throw traduzirErroHttp(e);
         } catch (ResourceAccessException e) {
@@ -161,6 +175,29 @@ public class KiraVerifyVerificador implements VerificadorDeIdentidade {
         HttpHeaders cabecalhos = new HttpHeaders();
         cabecalhos.setContentType(imagem.tipo());
         return new HttpEntity<>(arquivo, cabecalhos);
+    }
+
+    /** Resposta do POST /verify/identity. Só o que o backend usa; o resto (OCR, documento) é ignorado. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record RespostaServico(
+            @JsonProperty("status") DecisaoVerificacaoIa status,
+            @JsonProperty("reasons") List<Motivo> reasons,
+            @JsonProperty("face") Rosto face) {
+
+        @JsonIgnoreProperties(ignoreUnknown = true)
+        record Motivo(@JsonProperty("code") String code) {
+        }
+
+        @JsonIgnoreProperties(ignoreUnknown = true)
+        record Rosto(@JsonProperty("similarity") BigDecimal similarity) {
+        }
+
+        Resultado paraResultado() {
+            List<String> motivos = reasons == null ? List.of()
+                    : reasons.stream().filter(Objects::nonNull).map(Motivo::code).filter(Objects::nonNull).toList();
+            BigDecimal similaridade = face == null ? null : face.similarity();
+            return new Resultado(status, motivos, similaridade, null, null);
+        }
     }
 
     private static String nomeDaCausa(Exception e) {
