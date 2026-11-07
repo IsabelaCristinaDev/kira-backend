@@ -14,6 +14,7 @@ import br.com.kira.kirabackend.dto.request.EnderecoRequest;
 import br.com.kira.kirabackend.dto.request.LoginRequest;
 import br.com.kira.kirabackend.dto.request.RefreshTokenRequest;
 import br.com.kira.kirabackend.dto.request.ServicoRegistroRequest;
+import br.com.kira.kirabackend.dto.request.TrocaSenhaRequest;
 import br.com.kira.kirabackend.dto.response.LoginResponse;
 import br.com.kira.kirabackend.exception.DocumentoJaCadastradoException;
 import br.com.kira.kirabackend.exception.EmailJaCadastradoException;
@@ -649,6 +650,84 @@ class AuthServiceTest {
             verify(usuarioRepository).save(captor.capture());
             assertEquals(-16.68, captor.getValue().getLatitude());
             assertEquals(-49.25, captor.getValue().getLongitude());
+        }
+    }
+
+    @Nested
+    @DisplayName("trocarSenha")
+    class TrocarSenha {
+
+        @Test
+        @DisplayName("Com a senha atual certa, grava a nova, derruba as outras sessões e devolve tokens novos")
+        void trocaComSenhaCerta() {
+            Cliente cliente = cliente();
+            cliente.setSenhaHash("hash-atual");
+            when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
+            when(passwordEncoder.matches("Atual1234", "hash-atual")).thenReturn(true);
+            when(passwordEncoder.matches("Nova12345", "hash-atual")).thenReturn(false);
+            when(passwordEncoder.encode("Nova12345")).thenReturn("hash-novo");
+            when(jwtTokenProvider.gerarToken(cliente, "CLIENTE")).thenReturn("jwt-novo");
+
+            LoginResponse response = service.trocarSenha(cliente, new TrocaSenhaRequest("Atual1234", "Nova12345"));
+
+            assertEquals("hash-novo", cliente.getSenhaHash());
+            verify(usuarioRepository).save(cliente);
+            InOrder ordem = inOrder(refreshTokenRepository);
+            ordem.verify(refreshTokenRepository).deleteByUsuarioId(cliente.getId());
+            ordem.verify(refreshTokenRepository).save(any(RefreshToken.class));
+            assertEquals("jwt-novo", response.token());
+            assertNotNull(response.refreshToken());
+            assertEquals("CLIENTE", response.tipo());
+            assertEquals(cliente.getId(), response.id());
+        }
+
+        @Test
+        @DisplayName("Empresa também troca a senha e recebe o tipo EMPRESA")
+        void empresaTroca() {
+            Empresa empresa = empresa();
+            empresa.setSenhaHash("hash-atual");
+            when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+            when(passwordEncoder.matches("Atual1234", "hash-atual")).thenReturn(true);
+            when(passwordEncoder.matches("Nova12345", "hash-atual")).thenReturn(false);
+            when(passwordEncoder.encode("Nova12345")).thenReturn("hash-novo");
+            when(jwtTokenProvider.gerarToken(empresa, "EMPRESA")).thenReturn("jwt-novo");
+
+            LoginResponse response = service.trocarSenha(empresa, new TrocaSenhaRequest("Atual1234", "Nova12345"));
+
+            assertEquals("EMPRESA", response.tipo());
+            assertEquals("hash-novo", empresa.getSenhaHash());
+        }
+
+        @Test
+        @DisplayName("Senha atual errada dá erro e não muda nada")
+        void senhaAtualErrada() {
+            Cliente cliente = cliente();
+            cliente.setSenhaHash("hash-atual");
+            when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
+            when(passwordEncoder.matches("Errada123", "hash-atual")).thenReturn(false);
+            TrocaSenhaRequest request = new TrocaSenhaRequest("Errada123", "Nova12345");
+
+            RegraDeNegocioException erro = assertThrows(RegraDeNegocioException.class,
+                    () -> service.trocarSenha(cliente, request));
+
+            assertEquals("Senha atual incorreta", erro.getMessage());
+            assertEquals("hash-atual", cliente.getSenhaHash());
+            verify(usuarioRepository, never()).save(any());
+            verifyNoInteractions(refreshTokenRepository);
+        }
+
+        @Test
+        @DisplayName("Nova senha igual à atual dá erro")
+        void novaIgualAtual() {
+            Cliente cliente = cliente();
+            cliente.setSenhaHash("hash-atual");
+            when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
+            when(passwordEncoder.matches("Atual1234", "hash-atual")).thenReturn(true);
+            TrocaSenhaRequest request = new TrocaSenhaRequest("Atual1234", "Atual1234");
+
+            assertThrows(RegraDeNegocioException.class, () -> service.trocarSenha(cliente, request));
+            verify(usuarioRepository, never()).save(any());
+            verifyNoInteractions(refreshTokenRepository);
         }
     }
 }

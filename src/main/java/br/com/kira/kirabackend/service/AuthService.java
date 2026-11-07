@@ -12,9 +12,11 @@ import br.com.kira.kirabackend.dto.request.EmpresaRegistroRequest;
 import br.com.kira.kirabackend.dto.request.LoginRequest;
 import br.com.kira.kirabackend.dto.request.RefreshTokenRequest;
 import br.com.kira.kirabackend.dto.request.ServicoRegistroRequest;
+import br.com.kira.kirabackend.dto.request.TrocaSenhaRequest;
 import br.com.kira.kirabackend.dto.response.LoginResponse;
 import br.com.kira.kirabackend.exception.DocumentoJaCadastradoException;
 import br.com.kira.kirabackend.exception.EmailJaCadastradoException;
+import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.RefreshTokenRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
@@ -101,6 +103,33 @@ public class AuthService {
                     refreshTokenEntity.setRevogado(true);
                     refreshTokenRepository.save(refreshTokenEntity);
                 });
+    }
+
+    /**
+     * Troca a senha da conta logada. Confere a senha atual, grava a nova e apaga os refresh tokens
+     * da conta, para as outras sessões não renovarem mais. Quem trocou recebe uma sessão nova.
+     */
+    @Transactional
+    public LoginResponse trocarSenha(Usuario logado, TrocaSenhaRequest data) {
+        Usuario usuario = usuarioRepository.findById(logado.getId())
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
+
+        if (!passwordEncoder.matches(data.senhaAtual(), usuario.getSenhaHash())) {
+            throw new RegraDeNegocioException("Senha atual incorreta");
+        }
+        if (passwordEncoder.matches(data.novaSenha(), usuario.getSenhaHash())) {
+            throw new RegraDeNegocioException("A nova senha deve ser diferente da atual");
+        }
+
+        usuario.setSenhaHash(passwordEncoder.encode(data.novaSenha()));
+        usuarioRepository.save(usuario);
+
+        String tipoUsuario = Hibernate.getClass(usuario).getSimpleName().toUpperCase();
+        var token = jwtTokenProvider.gerarToken(usuario, tipoUsuario);
+        // Apaga todos os refresh tokens da conta antes de criar o desta sessão
+        var refreshToken = gerarERegistrarRefreshToken(usuario);
+
+        return new LoginResponse(token, refreshToken, tipoUsuario, usuario.getNome(), usuario.getEmail(), usuario.getId());
     }
 
     private String gerarERegistrarRefreshToken(Usuario usuario) {
