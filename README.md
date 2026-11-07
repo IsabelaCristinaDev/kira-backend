@@ -180,6 +180,15 @@ Os números ficam em `kira.security.rate-limit` no `application.yml`. Os contado
 - A verificação extra é a interface `VerificacaoHumana`. Hoje ela sempre aprova. Para usar um CAPTCHA, basta criar outra implementação.
 - O log registra o IP e o e-mail mascarado (`is***@gmail.com`), nunca a senha.
 
+**Limitações conhecidas:**
+
+- **O atraso progressivo ocupa uma thread durante a espera.** Cada login atrasado segura uma das threads do Tomcat (200 por padrão) por até 8 s. Um ataque vindo de muitos IPs, errando muitas contas ao mesmo tempo, poderia esgotá-las e deixar a API lenta para todos. O limite de 20 falhas por IP reduz bastante esse risco, mas não o elimina. O atraso acontece fora da transação, então não segura conexões do banco.
+- **Os contadores ficam na memória de cada instância.** Com mais de uma instância da API, cada uma conta separado. Para um limite compartilhado, seria preciso um armazenamento comum, como o Redis.
+
+**Pendência:**
+
+- **CAPTCHA:** quando for integrado, a API deve devolver um código próprio (por exemplo, `CAPTCHA_OBRIGATORIO`) quando a verificação extra for exigida, para o front saber que precisa mostrar o desafio. Hoje ela responderia o mesmo `401` da senha errada. O ponto exato está marcado com `TODO(CAPTCHA)` no `ProtecaoLogin`.
+
 ### Recuperação de senha
 
 - O pedido (`POST /api/auth/recuperar-senha`) sempre responde `200` com "Se o e-mail estiver cadastrado, enviaremos as instruções.", no mesmo tempo, exista a conta ou não. A busca da conta e o envio rodam em segundo plano.

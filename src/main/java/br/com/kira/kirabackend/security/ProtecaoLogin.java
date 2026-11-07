@@ -60,7 +60,9 @@ public class ProtecaoLogin {
 
         try {
             if (limite.exigeVerificacao(conta) && !verificacaoHumana.aprovada(ip, conta)) {
-                // Mesma resposta da senha errada: quem tenta não descobre o motivo
+                // TODO(CAPTCHA): ao integrar o CAPTCHA, trocar por uma exceção própria que responda um código
+                //  como CAPTCHA_OBRIGATORIO, para o front saber que precisa mostrar o desafio. Hoje a resposta é
+                //  a mesma da senha errada (401), o que só funciona porque a SemVerificacaoHumana sempre aprova.
                 throw new BadCredentialsException("Verificação extra reprovada");
             }
             T resultado = login.get();
