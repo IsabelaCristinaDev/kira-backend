@@ -20,6 +20,9 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID> 
 
     List<Agendamento> findByEmpresaId(UUID empresaId);
 
+    /** Se a cliente tem ao menos um agendamento com a empresa, em qualquer status. */
+    boolean existsByClienteIdAndEmpresaId(UUID clienteId, UUID empresaId);
+
     List<Agendamento> findByFuncionariaId(UUID funcionariaId);
 
     List<Agendamento> findByEmpresaIdAndStatus(UUID empresaId, StatusAgendamento status);

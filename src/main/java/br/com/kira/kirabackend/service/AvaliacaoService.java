@@ -98,8 +98,12 @@ public class AvaliacaoService {
                 .toList();
     }
 
-    public List<AvaliacaoResponse> listarAvaliacoesCliente(UUID clienteId, UUID usuarioId) {
-        if (!clienteId.equals(usuarioId)) {
+    /**
+     * As avaliações que a cliente recebeu dos estúdios. Veem a própria cliente e os estúdios
+     * com quem ela tem ao menos um agendamento, em qualquer status.
+     */
+    public List<AvaliacaoResponse> listarAvaliacoesCliente(UUID clienteId, Usuario usuario) {
+        if (!podeVerAvaliacoesDaCliente(clienteId, usuario)) {
             throw new AcessoNegadoException("Você só pode ver as suas avaliações");
         }
         return avaliacaoRepository
@@ -118,6 +122,14 @@ public class AvaliacaoService {
                 ? avaliacaoRepository.findByEmpresaIdAndTipoAvaliador(usuario.getId(), TipoAvaliador.EMPRESA)
                 : avaliacaoRepository.findByClienteIdAndTipoAvaliador(usuario.getId(), TipoAvaliador.CLIENTE);
         return feitas.stream().map(this::toResponse).toList();
+    }
+
+    private boolean podeVerAvaliacoesDaCliente(UUID clienteId, Usuario usuario) {
+        if (clienteId.equals(usuario.getId())) {
+            return true;
+        }
+        return usuario instanceof Empresa
+                && agendamentoRepository.existsByClienteIdAndEmpresaId(clienteId, usuario.getId());
     }
 
     public Double mediaAvaliacaoEmpresa(UUID empresaId) {
