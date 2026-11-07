@@ -23,6 +23,21 @@ public class ArmazenamentoLocal implements ArmazenamentoArquivos {
 
     public ArmazenamentoLocal(@Value("${kira.arquivos.pasta}") String pasta) {
         this.pasta = Path.of(pasta).toAbsolutePath().normalize();
+        prepararPasta();
+    }
+
+    // Confere na subida: sem isso, o erro só aparece no primeiro envio de foto, como um 500
+    private void prepararPasta() {
+        try {
+            Files.createDirectories(pasta);
+        } catch (IOException e) {
+            throw new IllegalStateException(
+                    "Não foi possível criar a pasta de arquivos " + pasta + ". Confira KIRA_ARQUIVOS_PASTA", e);
+        }
+        if (!Files.isWritable(pasta)) {
+            throw new IllegalStateException(
+                    "Sem permissão para gravar na pasta de arquivos " + pasta + ". Confira KIRA_ARQUIVOS_PASTA");
+        }
     }
 
     @Override
