@@ -460,6 +460,41 @@ class RotasComBancoRealTest {
     }
 
     @Test
+    @DisplayName("Depois de concluir, só o estúdio dono corrige a forma de pagamento")
+    void corrigirFormaDePagamento() throws IOException, InterruptedException {
+        String concluido = agendamentoNoPassado(7, 10);
+        String aberto = agendamentoNoPassado(7, 12);
+        String corrigir = "/api/agendamentos/%s/forma-pagamento";
+        chamar("PATCH", "/api/agendamentos/" + concluido + "/concluir", Map.of("formaPagamento", "PIX"),
+                salao.token(), 200);
+
+        // Recusados: nada muda
+        chamar("PATCH", corrigir.formatted(concluido), Map.of("formaPagamento", "DINHEIRO"), null, 401);
+        chamar("PATCH", corrigir.formatted(concluido), Map.of("formaPagamento", "DINHEIRO"), outroEstudio.token(), 400);
+        chamar("PATCH", corrigir.formatted(concluido), Map.of("formaPagamento", "DINHEIRO"), cliente.token(), 400);
+        chamar("PATCH", corrigir.formatted(concluido), Map.of("formaPagamento", "CHEQUE"), salao.token(), 400);
+        chamar("PATCH", corrigir.formatted(concluido), Map.of(), salao.token(), 400);
+        chamar("PATCH", corrigir.formatted(aberto), Map.of("formaPagamento", "DINHEIRO"), salao.token(), 400);
+        chamar("PATCH", corrigir.formatted(UUID.randomUUID()), Map.of("formaPagamento", "DINHEIRO"), salao.token(), 404);
+        assertEquals("PIX", formaNaLista(concluido));
+
+        JsonNode corrigido = chamar("PATCH", corrigir.formatted(concluido), Map.of("formaPagamento", "CARTAO_CREDITO"),
+                salao.token(), 200);
+        assertEquals("CARTAO_CREDITO", corrigido.get("formaPagamento").asText());
+        assertEquals("CONCLUIDO", corrigido.get("status").asText());
+        assertEquals("CARTAO_CREDITO", formaNaLista(concluido));
+    }
+
+    private String formaNaLista(String agendamentoId) throws IOException, InterruptedException {
+        for (JsonNode linha : get("/api/agendamentos/empresa/" + salao.id(), salao.token())) {
+            if (agendamentoId.equals(linha.get("id").asText())) {
+                return linha.get("formaPagamento").asText();
+            }
+        }
+        throw new AssertionError("Agendamento fora da lista do estúdio");
+    }
+
+    @Test
     @DisplayName("Foto de perfil: envia, abre sem login, troca, recusa o que não é imagem e remove")
     void fotoDePerfil() throws IOException, InterruptedException {
         String token = outraCliente.token();

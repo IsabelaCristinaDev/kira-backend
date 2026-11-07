@@ -198,6 +198,26 @@ public class AgendamentoService {
         return toResponse(salvo);
     }
 
+    /**
+     * O estúdio corrige a forma registrada de um atendimento já concluído.
+     * Não dispara evento: a comissão não depende da forma de pagamento.
+     */
+    public AgendamentoResponse corrigirFormaPagamento(UUID agendamentoId, UUID empresaId,
+                                                      FormaPagamento formaPagamento) {
+        Agendamento agendamento = buscarAgendamento(agendamentoId);
+        validarEmpresaDoAgendamento(agendamento, empresaId);
+
+        if (agendamento.getStatus() != StatusAgendamento.CONCLUIDO) {
+            throw new RegraDeNegocioException("Só é possível corrigir a forma de pagamento de um atendimento concluído");
+        }
+        if (formaPagamento == null) {
+            throw new RegraDeNegocioException("Forma de pagamento é obrigatória");
+        }
+
+        agendamento.setFormaPagamento(formaPagamento);
+        return toResponse(agendamentoRepository.save(agendamento));
+    }
+
     /** Só a empresa dona do atendimento pode concluí-lo ou cancelá-lo como empresa. */
     private static void validarEmpresaDoAgendamento(Agendamento agendamento, UUID empresaId) {
         if (!agendamento.getEmpresa().getId().equals(empresaId)) {
