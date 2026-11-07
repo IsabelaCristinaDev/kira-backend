@@ -9,14 +9,14 @@ API REST da KIRA, plataforma de agendamento de serviços de beleza. Projeto dese
 
 - **Contas:** cadastro de cliente e de empresa, login com JWT, renovação de sessão e recuperação de senha por e-mail.
 - **Vitrine:** busca de estúdios, portfólio e avaliações, abertos sem login.
-- **Agendamentos:** criação, cancelamento e conclusão de atendimentos, com registro da forma e do status do pagamento.
+- **Agendamentos:** criação, cancelamento e conclusão de atendimentos, com registro da forma de pagamento.
 - **Gestão da empresa:** serviços, funcionárias, disponibilidade, bloqueios de horário, agenda, comissões e painel com indicadores.
 - **Comunicação:** mensagens em tempo real por WebSocket, notificações do navegador e lembrete de agendamento por e-mail.
 - **Cliente:** favoritas, contatos de emergência e foto de perfil.
 - **Provador virtual:** simulação de resultado com IA (Cloudflare Workers AI), condicionada ao consentimento da usuária, que pode ser revogado.
 - **Verificação de identidade:** compara a foto do documento com a selfie pelo kira-verify-ai e guarda só o resultado. Pode ser exigida para agendar e para aparecer na vitrine.
 
-> O pagamento é apenas registrado no sistema (dinheiro, cartão ou Pix). Não há integração com gateway de pagamento.
+> O pagamento é feito no estúdio. O sistema só registra a forma (dinheiro, cartão de crédito ou de débito, ou Pix), informada ao agendar ou ao concluir o atendimento. Não há integração com gateway de pagamento.
 
 ## Perfis de usuário
 
