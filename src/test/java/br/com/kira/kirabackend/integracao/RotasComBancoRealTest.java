@@ -397,7 +397,15 @@ class RotasComBancoRealTest {
                 Map.of("agendamentoId", concluido, "nota", 5, "comentario", "Ótimo"), bia.token(), 201);
         chamar("POST", "/api/avaliacoes/empresa", Map.of("agendamentoId", concluido, "nota", 4), estudio.token(), 201);
         get("/api/avaliacoes/cliente/" + bia.id(), bia.token());
-        chamar("GET", "/api/avaliacoes/cliente/" + bia.id(), null, estudio.token(), 403);
+        // O estúdio que atende a cliente vê as avaliações dela; um estúdio sem agendamento com ela, não
+        JsonNode daCliente = get("/api/avaliacoes/cliente/" + bia.id(), estudio.token());
+        assertEquals(1, daCliente.size());
+        assertEquals(4, daCliente.get(0).get("nota").asInt());
+        assertEquals("EMPRESA", daCliente.get(0).get("tipoAvaliador").asText());
+        JsonNode negado = chamar("GET", "/api/avaliacoes/cliente/" + bia.id(), null, outroEstudio.token(), 403);
+        assertEquals("ACESSO_NEGADO", negado.get("erro").asText());
+        chamar("GET", "/api/avaliacoes/cliente/" + bia.id(), null, ana.token(), 403);
+        chamar("GET", "/api/avaliacoes/cliente/" + bia.id(), null, null, 401);
         assertEquals(5, get("/api/avaliacoes/minhas", bia.token()).get(0).get("nota").asInt());
         // O estúdio vê as que ele fez, para saber quais atendimentos já avaliou
         JsonNode doEstudio = get("/api/avaliacoes/minhas", estudio.token());
