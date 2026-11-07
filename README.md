@@ -92,6 +92,7 @@ O arquivo `.env` é carregado automaticamente e nunca deve ir para o repositóri
 | Verificação de identidade | `VERIFY_SERVICE_KEY`, `VERIFY_SERVICE_URL` | Para usar a verificação |
 | Exigir a verificação | `VERIFICACAO_OBRIGATORIA` | Não, o padrão é `false` |
 | Servidor e front-end | `SERVER_PORT`, `FRONTEND_URL` | Não, têm valor padrão |
+| Log do SQL | `MOSTRAR_SQL` | Não, o padrão é `false` |
 | Lembrete | `LEMBRETE_ANTECEDENCIA_HORAS`, `LEMBRETE_CRON`, `LEMBRETE_RETRY_*` | Não, têm valor padrão |
 
 ### Exigir a identidade verificada
