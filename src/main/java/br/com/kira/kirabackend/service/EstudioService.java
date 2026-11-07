@@ -5,7 +5,7 @@ import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.domain.enums.TipoEstabelecimento;
 import br.com.kira.kirabackend.dto.response.EnderecoResponse;
 import br.com.kira.kirabackend.dto.response.EstudioResponse;
-import br.com.kira.kirabackend.dto.response.FuncionariaResponse;
+import br.com.kira.kirabackend.dto.response.FuncionariaPublicaResponse;
 import br.com.kira.kirabackend.dto.response.ServicoResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.repository.AvaliacaoRepository;
@@ -72,17 +72,11 @@ public class EstudioService {
                 .toList();
     }
 
-    public List<FuncionariaResponse> listarFuncionarias(UUID empresaId) {
+    public List<FuncionariaPublicaResponse> listarFuncionarias(UUID empresaId) {
         exigirEmpresaAtiva(empresaId);
         return funcionariaRepository.findByEmpresaIdAndAtivoTrue(empresaId)
                 .stream()
-                .map(f -> new FuncionariaResponse(
-                        f.getId(),
-                        f.getNome(),
-                        f.getFotoUrl(),
-                        f.getEspecialidades(),
-                        f.getAtivo(),
-                        f.getComissaoPercentual()))
+                .map(FuncionariaPublicaResponse::from)
                 .toList();
     }
 

@@ -7,7 +7,7 @@ import br.com.kira.kirabackend.dto.request.BuscaEstudioFiltro;
 import br.com.kira.kirabackend.dto.response.AvaliacaoResponse;
 import br.com.kira.kirabackend.dto.response.EstudioBuscaResponse;
 import br.com.kira.kirabackend.dto.response.EstudioResponse;
-import br.com.kira.kirabackend.dto.response.FuncionariaResponse;
+import br.com.kira.kirabackend.dto.response.FuncionariaPublicaResponse;
 import br.com.kira.kirabackend.dto.response.PaginaResponse;
 import br.com.kira.kirabackend.dto.response.ServicoResponse;
 import br.com.kira.kirabackend.service.AvaliacaoService;
@@ -69,7 +69,7 @@ public class EstudioController {
     }
 
     @GetMapping("/{id}/funcionarias")
-    public ResponseEntity<List<FuncionariaResponse>> listarFuncionarias(
+    public ResponseEntity<List<FuncionariaPublicaResponse>> listarFuncionarias(
             @PathVariable UUID id) {
         return ResponseEntity.ok(estudioService.listarFuncionarias(id));
     }
