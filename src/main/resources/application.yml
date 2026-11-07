@@ -14,7 +14,8 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    # Desligado por padrão: no servidor, o SQL de cada requisição enche o log. No local, ligue com MOSTRAR_SQL=true
+    show-sql: ${MOSTRAR_SQL:false}
     open-in-view: false
   mail:
     host: smtp.gmail.com

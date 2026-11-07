@@ -89,6 +89,7 @@ O arquivo `.env` é carregado automaticamente e nunca deve ir para o repositóri
 | Notificações do navegador | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Para usar as notificações |
 | Provador virtual | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | Para usar o provador |
 | Servidor e front-end | `SERVER_PORT`, `FRONTEND_URL` | Não, têm valor padrão |
+| Log do SQL | `MOSTRAR_SQL` | Não, o padrão é `false` |
 | Lembrete | `LEMBRETE_ANTECEDENCIA_HORAS`, `LEMBRETE_CRON`, `LEMBRETE_RETRY_*` | Não, têm valor padrão |
 
 Para gerar uma chave JWT forte:
