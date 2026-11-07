@@ -19,8 +19,9 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: ${MAIL_USERNAME:seuemail@gmail.com}
-    password: ${MAIL_PASSWORD:suasenha}
+    # Sem valor padrão: segredo vem só do .env. Vazias, a API sobe e avisa no log que o e-mail está desligado
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
