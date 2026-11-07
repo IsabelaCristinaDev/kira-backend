@@ -39,20 +39,36 @@ public class ContatoEmergenciaService {
         }
         ContatoEmergencia contato = new ContatoEmergencia();
         contato.setCliente(cliente);
-        contato.setNome(request.nome().trim());
-        contato.setTelefone(request.telefone().trim());
-        contato.setParentesco(request.parentesco() == null || request.parentesco().isBlank()
-                ? null : request.parentesco().trim());
+        preencher(contato, request);
         return ContatoEmergenciaResponse.from(contatoRepository.save(contato));
+    }
+
+    @Transactional
+    public ContatoEmergenciaResponse atualizar(Usuario usuario, UUID contatoId, ContatoEmergenciaRequest request) {
+        exigirCliente(usuario);
+        // Editar não muda a quantidade, então o limite não se aplica aqui
+        ContatoEmergencia contato = buscarDaCliente(usuario, contatoId);
+        preencher(contato, request);
+        return ContatoEmergenciaResponse.from(contato);
     }
 
     @Transactional
     public void remover(Usuario usuario, UUID contatoId) {
         exigirCliente(usuario);
+        contatoRepository.delete(buscarDaCliente(usuario, contatoId));
+    }
+
+    private ContatoEmergencia buscarDaCliente(Usuario usuario, UUID contatoId) {
         // Contato de outra pessoa responde como inexistente
-        ContatoEmergencia contato = contatoRepository.findByIdAndClienteId(contatoId, usuario.getId())
+        return contatoRepository.findByIdAndClienteId(contatoId, usuario.getId())
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Contato de emergência não encontrado"));
-        contatoRepository.delete(contato);
+    }
+
+    private static void preencher(ContatoEmergencia contato, ContatoEmergenciaRequest request) {
+        contato.setNome(request.nome().trim());
+        contato.setTelefone(request.telefone().trim());
+        contato.setParentesco(request.parentesco() == null || request.parentesco().isBlank()
+                ? null : request.parentesco().trim());
     }
 
     private static Cliente exigirCliente(Usuario usuario) {

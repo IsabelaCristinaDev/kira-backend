@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,6 +38,14 @@ public class ContatoEmergenciaController {
             @AuthenticationPrincipal Usuario usuario,
             @RequestBody @Valid ContatoEmergenciaRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(contatoService.cadastrar(usuario, request));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ContatoEmergenciaResponse> atualizar(
+            @AuthenticationPrincipal Usuario usuario,
+            @PathVariable UUID id,
+            @RequestBody @Valid ContatoEmergenciaRequest request) {
+        return ResponseEntity.ok(contatoService.atualizar(usuario, id, request));
     }
 
     @DeleteMapping("/{id}")

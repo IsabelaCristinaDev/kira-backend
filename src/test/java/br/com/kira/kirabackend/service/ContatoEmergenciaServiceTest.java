@@ -79,6 +79,38 @@ class ContatoEmergenciaServiceTest {
     }
 
     @Test
+    @DisplayName("Edita o contato da própria cliente, sem espaços sobrando")
+    void edita() {
+        ContatoEmergencia contato = new ContatoEmergencia();
+        contato.setId(UUID.randomUUID());
+        contato.setCliente(cliente);
+        contato.setNome("Rosa");
+        contato.setTelefone("62988887777");
+        contato.setParentesco("Mãe");
+        when(contatoRepository.findByIdAndClienteId(contato.getId(), cliente.getId())).thenReturn(Optional.of(contato));
+
+        ContatoEmergenciaResponse resposta = service.atualizar(
+                cliente, contato.getId(), new ContatoEmergenciaRequest(" Rosa Lima ", " 62911112222 ", " "));
+
+        assertEquals(contato.getId(), resposta.id());
+        assertEquals("Rosa Lima", resposta.nome());
+        assertEquals("62911112222", resposta.telefone());
+        assertNull(resposta.parentesco());
+        assertEquals("Rosa Lima", contato.getNome());
+    }
+
+    @Test
+    @DisplayName("Editar contato de outra cliente responde como inexistente")
+    void editaContatoDeOutra() {
+        UUID id = UUID.randomUUID();
+        when(contatoRepository.findByIdAndClienteId(id, cliente.getId())).thenReturn(Optional.empty());
+        ContatoEmergenciaRequest request = new ContatoEmergenciaRequest("Rosa", "62988887777", null);
+
+        assertThrows(RecursoNaoEncontradoException.class, () -> service.atualizar(cliente, id, request));
+        verify(contatoRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("Quem não é cliente não tem contatos de emergência")
     void soCliente() {
         Empresa empresa = new Empresa();
@@ -88,6 +120,7 @@ class ContatoEmergenciaServiceTest {
         assertThrows(RegraDeNegocioException.class, () -> service.listar(empresa));
         assertThrows(RegraDeNegocioException.class, () -> service.cadastrar(empresa, request));
         assertThrows(RegraDeNegocioException.class, () -> service.remover(empresa, id));
+        assertThrows(RegraDeNegocioException.class, () -> service.atualizar(empresa, id, request));
         verifyNoInteractions(contatoRepository);
     }
 }
