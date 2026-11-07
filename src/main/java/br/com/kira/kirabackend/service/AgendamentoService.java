@@ -10,6 +10,7 @@ import br.com.kira.kirabackend.dto.request.AgendamentoRequest;
 import br.com.kira.kirabackend.dto.request.ReagendamentoRequest;
 import br.com.kira.kirabackend.dto.response.AgendamentoResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
+import br.com.kira.kirabackend.exception.AcessoNegadoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.observer.AgendamentoCanceladoEvent;
 import br.com.kira.kirabackend.observer.AgendamentoCriadoEvent;
@@ -221,21 +222,21 @@ public class AgendamentoService {
     /** Só a empresa dona do atendimento pode concluí-lo ou cancelá-lo como empresa. */
     private static void validarEmpresaDoAgendamento(Agendamento agendamento, UUID empresaId) {
         if (!agendamento.getEmpresa().getId().equals(empresaId)) {
-            throw new RegraDeNegocioException("Este atendimento não pertence ao seu estabelecimento");
+            throw new AcessoNegadoException("Este atendimento não pertence ao seu estabelecimento");
         }
     }
 
     /** Só a cliente do atendimento pode cancelá-lo ou reagendá-lo como cliente. */
     private static void validarClienteDoAgendamento(Agendamento agendamento, UUID clienteId) {
         if (!agendamento.getCliente().getId().equals(clienteId)) {
-            throw new RegraDeNegocioException("Você não participou deste atendimento");
+            throw new AcessoNegadoException("Você não participou deste atendimento");
         }
     }
 
     /** O id da rota precisa ser o do usuário logado. */
     private static void exigirProprioUsuario(UUID idDaRota, UUID usuarioId, String mensagem) {
         if (!idDaRota.equals(usuarioId)) {
-            throw new RegraDeNegocioException(mensagem);
+            throw new AcessoNegadoException(mensagem);
         }
     }
 

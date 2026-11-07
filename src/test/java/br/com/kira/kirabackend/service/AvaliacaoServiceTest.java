@@ -9,6 +9,7 @@ import br.com.kira.kirabackend.domain.enums.TipoAvaliador;
 import br.com.kira.kirabackend.dto.request.AvaliacaoRequest;
 import br.com.kira.kirabackend.dto.response.AvaliacaoResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
+import br.com.kira.kirabackend.exception.AcessoNegadoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.AvaliacaoRepository;
@@ -176,7 +177,7 @@ class AvaliacaoServiceTest {
             UUID idDeFora = UUID.randomUUID();
             AvaliacaoRequest req = request(1);
 
-            assertThrows(RegraDeNegocioException.class,
+            assertThrows(AcessoNegadoException.class,
                     () -> service.avaliarComoCliente(idDeFora, req));
             verify(avaliacaoRepository, never()).save(any());
         }
@@ -253,7 +254,7 @@ class AvaliacaoServiceTest {
             UUID idDeFora = UUID.randomUUID();
             AvaliacaoRequest req = request(1);
 
-            assertThrows(RegraDeNegocioException.class,
+            assertThrows(AcessoNegadoException.class,
                     () -> service.avaliarComoEmpresa(idDeFora, req));
             verify(avaliacaoRepository, never()).save(any());
         }
@@ -300,7 +301,7 @@ class AvaliacaoServiceTest {
         UUID clienteId = cliente.getId();
         UUID outraConta = UUID.randomUUID();
 
-        assertThrows(RegraDeNegocioException.class, () -> service.listarAvaliacoesCliente(clienteId, outraConta));
+        assertThrows(AcessoNegadoException.class, () -> service.listarAvaliacoesCliente(clienteId, outraConta));
         verifyNoInteractions(avaliacaoRepository);
     }
 

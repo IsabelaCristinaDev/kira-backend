@@ -11,7 +11,7 @@ import br.com.kira.kirabackend.dto.request.EnderecoRequest;
 import br.com.kira.kirabackend.dto.response.ClientePerfilResponse;
 import br.com.kira.kirabackend.dto.response.EmpresaPerfilResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
-import br.com.kira.kirabackend.exception.RegraDeNegocioException;
+import br.com.kira.kirabackend.exception.AcessoNegadoException;
 import br.com.kira.kirabackend.repository.BuscaEstudioRepository.Coordenadas;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -144,10 +144,10 @@ class PerfilServiceTest {
             UUID outro = UUID.randomUUID();
             ClientePerfilRequest request = request(ENDERECO);
 
-            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+            AcessoNegadoException ex = assertThrows(AcessoNegadoException.class,
                     () -> service.obterCliente(clienteId, outro));
             assertEquals("Você só pode acessar o seu próprio perfil", ex.getMessage());
-            assertThrows(RegraDeNegocioException.class,
+            assertThrows(AcessoNegadoException.class,
                     () -> service.atualizarCliente(clienteId, outro, request));
             verifyNoInteractions(usuarioRepository);
         }

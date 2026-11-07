@@ -58,4 +58,17 @@ class GlobalExceptionHandlerTest {
         assertEquals(HttpStatus.UNSUPPORTED_MEDIA_TYPE,
                 handler.handleFormatoNaoSuportado(new IllegalArgumentException("x"), request).getStatusCode());
     }
+
+    @Test
+    @DisplayName("Recurso de outra conta responde 403 com a mensagem genérica, sem o código da verificação")
+    void acessoNegado() {
+        ResponseEntity<GlobalExceptionHandler.ErroResponse> resposta = handler.handleAcessoNegado(
+                new AcessoNegadoException("Você só pode acessar os dados do seu estabelecimento"), request);
+
+        assertEquals(HttpStatus.FORBIDDEN, resposta.getStatusCode());
+        assertEquals(403, resposta.getBody().status());
+        assertEquals("ACESSO_NEGADO", resposta.getBody().erro());
+        assertEquals("Você só pode acessar os dados do seu estabelecimento", resposta.getBody().mensagem());
+        assertEquals("/api/teste", resposta.getBody().path());
+    }
 }

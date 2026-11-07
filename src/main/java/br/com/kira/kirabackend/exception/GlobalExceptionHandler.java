@@ -72,6 +72,14 @@ public class GlobalExceptionHandler {
                         null));
     }
 
+    // 403: a conta logada não é dona do recurso. O código é outro que o da verificação obrigatória, que também é 403
+    @ExceptionHandler(AcessoNegadoException.class)
+    public ResponseEntity<ErroResponse> handleAcessoNegado(
+            AcessoNegadoException ex,
+            HttpServletRequest request) {
+        return resposta(HttpStatus.FORBIDDEN, "ACESSO_NEGADO", ex.getMessage(), request);
+    }
+
     // 428: falta uma condição prévia (o consentimento). Não é 403, que o app trata como falta de permissão
     @ExceptionHandler(ConsentimentoProvadorNecessarioException.class)
     public ResponseEntity<ErroResponse> handleConsentimentoProvador(
