@@ -6,6 +6,7 @@ import br.com.kira.kirabackend.dto.request.RecuperacaoSenhaRequest;
 import br.com.kira.kirabackend.dto.request.RedefinicaoSenhaRequest;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.exception.TentativasExcedidasException;
+import br.com.kira.kirabackend.observer.SenhaRedefinidaEvent;
 import br.com.kira.kirabackend.repository.RefreshTokenRepository;
 import br.com.kira.kirabackend.repository.TokenRecuperacaoSenhaRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
@@ -14,6 +15,7 @@ import br.com.kira.kirabackend.util.KiraTimeZone;
 import br.com.kira.kirabackend.util.MascaraEmail;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +34,7 @@ public class RecuperacaoSenhaService {
     private final PasswordEncoder passwordEncoder;
     private final LimiteDeTentativas limite;
     private final EnvioRecuperacaoSenha envio;
+    private final ApplicationEventPublisher eventos;
 
     /**
      * Confere o limite agora (pode responder 429) e deixa o resto para o segundo plano. Daqui não se consulta
@@ -74,6 +77,8 @@ public class RecuperacaoSenhaService {
         usuario.setSenhaAlteradaEm(LocalDateTime.now(KiraTimeZone.DEFAULT).truncatedTo(ChronoUnit.SECONDS));
         usuarioRepository.save(usuario);
         refreshTokenRepository.deleteByUsuarioId(usuario.getId());
+        // O chat aberto também cai: o ConexoesAoVivo fecha as conexões depois do commit
+        eventos.publishEvent(new SenhaRedefinidaEvent(this, usuario.getId()));
 
         // Uso único: este fica marcado, os outros links pendentes são apagados
         tokenRecuperacao.setUsado(true);

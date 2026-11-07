@@ -194,7 +194,7 @@ Os números ficam em `kira.security.rate-limit` no `application.yml`. Os contado
 - O pedido (`POST /api/auth/recuperar-senha`) sempre responde `200` com "Se o e-mail estiver cadastrado, enviaremos as instruções.", no mesmo tempo, exista a conta ou não. A busca da conta e o envio rodam em segundo plano.
 - Limites: 3 pedidos por hora por e-mail e 10 por hora por IP. A troca de senha (`POST /api/auth/redefinir-senha`) aceita 10 tentativas a cada 15 min por IP. Passou disso, `429` com `Retry-After`.
 - O token tem 32 bytes do `SecureRandom`, vale 15 minutos e só pode ser usado uma vez. O banco guarda apenas o SHA-256 dele. Um pedido novo invalida os anteriores.
-- Ao redefinir, todas as sessões são encerradas: os refresh tokens são apagados, e o JWT emitido antes da troca (`senhaAlteradaEm`) deixa de valer na API e no WebSocket.
+- Ao redefinir, todas as sessões são encerradas: os refresh tokens são apagados, e o JWT emitido antes da troca (`senhaAlteradaEm`) deixa de valer na API e no WebSocket. O chat que estiver aberto é fechado na hora.
 
 ### Diagnóstico de IP (primeiro deploy)
 

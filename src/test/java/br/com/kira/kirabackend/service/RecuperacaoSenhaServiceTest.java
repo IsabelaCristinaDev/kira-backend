@@ -6,6 +6,7 @@ import br.com.kira.kirabackend.dto.request.RecuperacaoSenhaRequest;
 import br.com.kira.kirabackend.dto.request.RedefinicaoSenhaRequest;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.exception.TentativasExcedidasException;
+import br.com.kira.kirabackend.observer.SenhaRedefinidaEvent;
 import br.com.kira.kirabackend.repository.RefreshTokenRepository;
 import br.com.kira.kirabackend.repository.TokenRecuperacaoSenhaRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
@@ -16,8 +17,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Duration;
@@ -62,13 +65,16 @@ class RecuperacaoSenhaServiceTest {
     @Mock
     private EnvioRecuperacaoSenha envio;
 
+    @Mock
+    private ApplicationEventPublisher eventos;
+
     private RecuperacaoSenhaService service;
     private Cliente usuario;
 
     @BeforeEach
     void setUp() {
         service = new RecuperacaoSenhaService(usuarioRepository, tokenRepository, refreshTokenRepository,
-                passwordEncoder, limite, envio);
+                passwordEncoder, limite, envio, eventos);
         usuario = new Cliente();
         usuario.setId(UUID.randomUUID());
         usuario.setEmail("ana@teste.com");
@@ -158,6 +164,10 @@ class RecuperacaoSenhaServiceTest {
             service.redefinirSenha(new RedefinicaoSenhaRequest(TOKEN, "novaSenha123"), IP);
 
             verify(refreshTokenRepository).deleteByUsuarioId(usuario.getId());
+            // O ConexoesAoVivo escuta este evento e fecha o chat aberto (depois do commit)
+            ArgumentCaptor<SenhaRedefinidaEvent> evento = ArgumentCaptor.forClass(SenhaRedefinidaEvent.class);
+            verify(eventos).publishEvent(evento.capture());
+            assertEquals(usuario.getId(), evento.getValue().getUsuarioId());
             LocalDateTime alteradaEm = usuario.getSenhaAlteradaEm();
             assertNotNull(alteradaEm);
             // Em segundos inteiros, como o "iat" do JWT
@@ -220,7 +230,7 @@ class RecuperacaoSenhaServiceTest {
         private void assertNadaAlterado() {
             assertEquals("hash-antigo", usuario.getSenhaHash());
             assertEquals(null, usuario.getSenhaAlteradaEm());
-            verifyNoInteractions(passwordEncoder, refreshTokenRepository);
+            verifyNoInteractions(passwordEncoder, refreshTokenRepository, eventos);
             verify(usuarioRepository, never()).save(any());
             verify(tokenRepository, never()).save(any());
         }
