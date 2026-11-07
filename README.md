@@ -164,6 +164,31 @@ O código fica em `br.com.kira.kirabackend`, organizado em camadas:
 - O acesso a recursos de outra empresa ou de outra cliente é bloqueado nos services.
 - As senhas são guardadas com BCrypt, e os segredos ficam apenas no `.env`.
 
+### Limite de tentativas de login
+
+Os números ficam em `kira.security.rate-limit` no `application.yml`. Os contadores ficam em memória e zeram quando a API reinicia.
+
+| Chave | Regra | Resposta |
+|---|---|---|
+| IP + conta | 5 senhas erradas em 15 min | `429` com `Retry-After`, só para esse IP nessa conta |
+| IP | 20 senhas erradas em 15 min, em qualquer conta | `429` com `Retry-After` |
+| Conta | a partir de 5 falhas: atraso de 1 s, 2 s, 4 s, até 8 s, e verificação extra | a conta nunca é bloqueada, para ninguém conseguir trancar a conta de outra pessoa |
+| Conta | 10 falhas | e-mail de aviso ao dono, no máximo 1 por hora |
+
+- Login certo zera as falhas daquele IP naquela conta.
+- E-mail sem conta, senha errada e conta inativa recebem a mesma resposta (`401`, "E-mail ou senha inválidos") e levam o mesmo tempo, porque o BCrypt roda nos três casos.
+- A verificação extra é a interface `VerificacaoHumana`. Hoje ela sempre aprova. Para usar um CAPTCHA, basta criar outra implementação.
+- O log registra o IP e o e-mail mascarado (`is***@gmail.com`), nunca a senha.
+
+### Diagnóstico de IP (primeiro deploy)
+
+Atrás de um proxy, o IP que chega à API é o do proxy. O `FORWARD_HEADERS_STRATEGY` diz ao Spring como achar o IP real, e o valor certo depende do proxy. O `X-Forwarded-For` nunca é lido à mão, porque o cliente consegue inventá-lo.
+
+1. Suba com `FORWARD_HEADERS_STRATEGY=none` e `REGISTRAR_HEADERS_IP=true`. Com `framework`, o Spring apaga os headers antes do log, e o diagnóstico não mostra nada.
+2. Faça alguns logins e veja no log as linhas `Diagnóstico de IP`.
+3. Escolha a estratégia (`framework` usa o primeiro IP do `X-Forwarded-For`; `native` usa o último que não é de rede interna). Confirme que um `X-Forwarded-For` inventado pelo cliente não muda o IP usado.
+4. **Desligue o `REGISTRAR_HEADERS_IP` e remova o código marcado com `TODO(LGPD)`**: IP é dado pessoal.
+
 ## Testes
 
 ```bash

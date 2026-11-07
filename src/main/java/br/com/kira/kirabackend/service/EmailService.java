@@ -97,6 +97,28 @@ public class EmailService {
 
     }
 
+    // Avisa o dono quando a conta acumula falhas de login. Não traz IP nem horários do ataque:
+    // só orienta a trocar a senha. Assíncrono e tolerante a falha, como os outros.
+    @Async
+    public void enviarAvisoTentativasSuspeitas(String destinatario, String nome) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(destinatario);
+        message.setSubject("KIRA — Tentativas de acesso à sua conta");
+        message.setText(
+                "Olá, " + nome + "!\n\n" +
+                        "Percebemos várias tentativas de entrar na sua conta KIRA com a senha errada.\n\n" +
+                        "Se foi você, está tudo bem: basta entrar com a senha certa.\n" +
+                        "Se não foi, recomendamos trocar a senha. Abra o app e use \"Esqueci minha senha\":\n\n" +
+                        StringUtils.trimTrailingCharacter(frontendUrl, '/') + "\n\n" +
+                        "Equipe KIRA"
+        );
+        try {
+            mailSender.send(message);
+        } catch (MailException e) {
+            log.warn("Falha ao enviar aviso de tentativas de acesso: {}", e.getMessage());
+        }
+    }
+
     // Assíncrono e tolerante a falha: o cadastro não deve travar nem falhar
     // por indisponibilidade do servidor SMTP.
     @Async

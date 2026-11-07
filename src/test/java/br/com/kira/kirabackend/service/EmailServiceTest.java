@@ -76,6 +76,28 @@ class EmailServiceTest {
     }
 
     @Test
+    @DisplayName("Aviso de tentativas suspeitas vai para o dono da conta, sem dados do ataque")
+    void avisoTentativasSuspeitas() {
+        service.enviarAvisoTentativasSuspeitas("ana@teste.com", "Ana");
+
+        ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender).send(captor.capture());
+        assertArrayEquals(new String[]{"ana@teste.com"}, captor.getValue().getTo());
+        String texto = captor.getValue().getText();
+        assertTrue(texto.contains("Olá, Ana"), texto);
+        assertTrue(texto.contains("https://app.kira.com\n"), texto);
+        assertTrue(texto.contains("Esqueci minha senha"), texto);
+    }
+
+    @Test
+    @DisplayName("Falha do SMTP no aviso de tentativas não derruba nada")
+    void avisoTentativasFalhaSmtp() {
+        doThrow(new MailSendException("SMTP fora do ar")).when(mailSender).send(any(SimpleMailMessage.class));
+
+        assertDoesNotThrow(() -> service.enviarAvisoTentativasSuspeitas("ana@teste.com", "Ana"));
+    }
+
+    @Test
     @DisplayName("E-mail de recuperação traz o link para a tela de nova senha e o código")
     void recuperacaoTrazLinkECodigo() {
         service.enviarEmailRecuperacaoSenha("ana@teste.com", "abc-123");

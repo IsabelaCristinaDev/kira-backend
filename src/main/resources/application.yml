@@ -35,6 +35,9 @@ spring:
 
 server:
   port: ${SERVER_PORT:8081}
+  # Como descobrir o IP real atrás de um proxy: none (local, sem proxy), framework ou native.
+  # Ver o "Diagnóstico de IP" no README antes de escolher o valor do servidor
+  forward-headers-strategy: ${FORWARD_HEADERS_STRATEGY:none}
 
 management:
   endpoints:
@@ -97,6 +100,29 @@ kira:
     intervalo-ms: ${GEOCODIFICACAO_INTERVALO_MS:1100}
     timeout-conexao-ms: ${GEOCODIFICACAO_TIMEOUT_CONEXAO_MS:2000}
     timeout-leitura-ms: ${GEOCODIFICACAO_TIMEOUT_LEITURA_MS:3000}
+  security:
+    rate-limit:
+      login:
+        # Mesmo IP na mesma conta: 5 senhas erradas em 15 min e a 6ª tentativa recebe 429
+        por-ip-e-email:
+          max-falhas: 5
+          janela: 15m
+        # Mesmo IP em qualquer conta: 20 erros em 15 min
+        por-ip:
+          max-falhas: 20
+          janela: 15m
+        # A conta sozinha nunca é bloqueada: a partir de 5 falhas o login fica mais lento (1 s, 2 s, 4 s, até 8 s)
+        # e passa a exigir a verificação extra. Na 10ª falha, o dono recebe um aviso (no máximo 1 por hora)
+        por-email:
+          falhas-para-atraso: 5
+          atraso-inicial: 1s
+          atraso-maximo: 8s
+          janela: 15m
+          falhas-para-aviso: 10
+          intervalo-entre-avisos: 1h
+  diagnostico:
+    # TODO(LGPD): remover depois do primeiro deploy no Render. Liga o log dos headers de IP do login
+    registrar-headers-ip: ${REGISTRAR_HEADERS_IP:false}
   lembrete:
     antecedencia-horas: ${LEMBRETE_ANTECEDENCIA_HORAS:24}
     cron: ${LEMBRETE_CRON:0 0 * * * *}
