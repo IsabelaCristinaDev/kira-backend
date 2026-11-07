@@ -9,7 +9,7 @@ spring:
   servlet:
     multipart:
       max-file-size: 5MB
-      # O Provador envia duas fotos de uma vez
+      # O Provador envia duas fotos de uma vez; a verificação, até três (frente, verso e selfie), e o app as reduz antes
       max-request-size: 11MB
   jpa:
     hibernate:
@@ -81,6 +81,22 @@ kira:
       timeout-conexao-ms: ${KIRA_AI_TIMEOUT_CONEXAO_MS:2000}
       # Cada chamada leva cerca de 2 s em CPU; a primeira carrega o modelo e demora mais
       timeout-leitura-ms: ${KIRA_AI_TIMEOUT_LEITURA_MS:30000}
+  verificacao:
+    # true: cliente sem verificação não agenda, e estúdio sem verificação sai da vitrine e não recebe agendamento
+    obrigatoria: ${VERIFICACAO_OBRIGATORIA:false}
+    # Muda quando o texto do consentimento muda: a versão aceita fica gravada em cada tentativa
+    versao-consentimento: ${VERIFICACAO_VERSAO_CONSENTIMENTO:v1}
+    tamanho-maximo-bytes: ${VERIFICACAO_TAMANHO_MAXIMO_BYTES:5242880}
+    # Envios por pessoa. Tentativa sem resposta do serviço (PENDING) não conta
+    limite-tentativas: ${VERIFICACAO_LIMITE_TENTATIVAS:3}
+    servico:
+      # kira-verify-ai (Python). No Docker Compose o endereço é http://kira-verify-ai:8000
+      base-url: ${VERIFY_SERVICE_URL:http://localhost:8000}
+      # Segredo: igual nos dois serviços e só no .env. Sem ela, a verificação responde erro e o resto funciona
+      chave: ${VERIFY_SERVICE_KEY:}
+      timeout-conexao-ms: ${VERIFY_TIMEOUT_CONEXAO_MS:3000}
+      # A comparação facial é pesada: ajustar depois das medidas do serviço
+      timeout-leitura-ms: ${VERIFY_TIMEOUT_LEITURA_MS:30000}
   geocodificacao:
     # Transforma o endereço em coordenadas pelo Nominatim (OpenStreetMap). Sem chave
     ativa: ${GEOCODIFICACAO_ATIVA:true}

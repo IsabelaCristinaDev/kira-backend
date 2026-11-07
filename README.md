@@ -14,6 +14,7 @@ API REST da KIRA, plataforma de agendamento de serviços de beleza. Projeto dese
 - **Comunicação:** mensagens em tempo real por WebSocket, notificações do navegador e lembrete de agendamento por e-mail.
 - **Cliente:** favoritas, contatos de emergência e foto de perfil.
 - **Provador virtual:** simulação de resultado com IA (Cloudflare Workers AI), condicionada ao consentimento da usuária, que pode ser revogado.
+- **Verificação de identidade:** compara a foto do documento com a selfie pelo kira-verify-ai e guarda só o resultado. Pode ser exigida para agendar e para aparecer na vitrine.
 
 > O pagamento é apenas registrado no sistema (dinheiro, cartão ou Pix). Não há integração com gateway de pagamento.
 
@@ -74,8 +75,20 @@ O arquivo `.env` é carregado automaticamente e nunca deve ir para o repositóri
 | E-mail | `MAIL_USERNAME`, `MAIL_PASSWORD` | Para enviar e-mails |
 | Notificações do navegador | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Para usar as notificações |
 | Provador virtual | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | Para usar o provador |
+| Verificação de identidade | `VERIFY_SERVICE_KEY`, `VERIFY_SERVICE_URL` | Para usar a verificação |
+| Exigir a verificação | `VERIFICACAO_OBRIGATORIA` | Não, o padrão é `false` |
 | Servidor e front-end | `SERVER_PORT`, `FRONTEND_URL` | Não, têm valor padrão |
 | Lembrete | `LEMBRETE_ANTECEDENCIA_HORAS`, `LEMBRETE_CRON`, `LEMBRETE_RETRY_*` | Não, têm valor padrão |
+
+### Exigir a identidade verificada
+
+Com `VERIFICACAO_OBRIGATORIA=true`:
+
+- a cliente sem verificação não agenda: a API responde `403` com o código `VERIFICACAO_OBRIGATORIA`;
+- o estúdio sem verificação sai da vitrine, da busca e do ranking do provador, e não recebe agendamento (`400`). O perfil dele continua abrindo pelo id;
+- `GET /api/verificacao/me` devolve `"required": true`, para o app saber quando pedir a verificação.
+
+Com `false`, o padrão, nada disso vale, e o backend avisa no log ao subir. Só ligue com o kira-verify-ai no ar: sem ele, ninguém consegue se verificar.
 
 Para gerar uma chave JWT forte:
 

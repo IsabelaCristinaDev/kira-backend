@@ -15,6 +15,7 @@ import br.com.kira.kirabackend.dto.request.ReagendamentoRequest;
 import br.com.kira.kirabackend.dto.response.AgendamentoResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
+import br.com.kira.kirabackend.exception.VerificacaoObrigatoriaException;
 import br.com.kira.kirabackend.observer.AgendamentoCanceladoEvent;
 import br.com.kira.kirabackend.observer.AgendamentoCriadoEvent;
 import br.com.kira.kirabackend.observer.AgendamentoConfirmadoEvent;
@@ -96,6 +97,10 @@ class AgendamentoServiceTest {
     @Mock
     private BloqueioHorarioRepository bloqueioHorarioRepository;
 
+    // Mock sem regra: não recusa nada, como com VERIFICACAO_OBRIGATORIA=false
+    @Mock
+    private ExigenciaVerificacao exigenciaVerificacao;
+
     private AgendamentoService service;
 
     private Cliente cliente;
@@ -119,7 +124,8 @@ class AgendamentoServiceTest {
                 disponibilidadeRepository,
                 List.of(cancelamentoClienteStrategy, cancelamentoEmpresaStrategy),
                 eventPublisher,
-                new OcupacaoService(agendamentoRepository, funcionariaRepository, bloqueioHorarioRepository));
+                new OcupacaoService(agendamentoRepository, funcionariaRepository, bloqueioHorarioRepository),
+                exigenciaVerificacao);
 
         cliente = new Cliente();
         cliente.setId(UUID.randomUUID());
@@ -231,6 +237,49 @@ class AgendamentoServiceTest {
             verify(eventPublisher).publishEvent(evento.capture());
             AgendamentoCriadoEvent criado = assertInstanceOf(AgendamentoCriadoEvent.class, evento.getValue());
             assertSame(salvo, criado.getAgendamento());
+        }
+
+        @Test
+        @DisplayName("Com a verificação obrigatória, cliente sem verificação não agenda e nada é salvo")
+        void clienteSemVerificacaoNaoAgenda() {
+            UUID clienteId = cliente.getId();
+            AgendamentoRequest req = request(inicioValido);
+            doThrow(new VerificacaoObrigatoriaException("Verifique sua identidade para agendar"))
+                    .when(exigenciaVerificacao).exigirClienteVerificada(clienteId);
+
+            assertThrows(VerificacaoObrigatoriaException.class, () -> service.criar(clienteId, clienteId, req));
+
+            verify(agendamentoRepository, never()).save(any());
+            verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        @DisplayName("Com a verificação obrigatória, estúdio sem verificação não recebe agendamento")
+        void estudioSemVerificacaoNaoRecebe() {
+            when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
+            when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+            doThrow(new RegraDeNegocioException("Este estúdio ainda não pode receber agendamentos"))
+                    .when(exigenciaVerificacao).exigirEstudioVerificado(empresa.getId());
+            UUID clienteId = cliente.getId();
+            AgendamentoRequest req = request(inicioValido);
+
+            assertThrows(RegraDeNegocioException.class, () -> service.criar(clienteId, clienteId, req));
+
+            verify(agendamentoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Confere a cliente e o estúdio ao agendar")
+        void confereAVerificacao() {
+            mockarEntidadesDaCriacao();
+            mockarExpedientePadrao();
+            mockarAgendamentosNoIntervalo(List.of());
+            mockarSaveDevolvendoArgumento();
+
+            service.criar(cliente.getId(), cliente.getId(), request(inicioValido));
+
+            verify(exigenciaVerificacao).exigirClienteVerificada(cliente.getId());
+            verify(exigenciaVerificacao).exigirEstudioVerificado(empresa.getId());
         }
 
         @Test
