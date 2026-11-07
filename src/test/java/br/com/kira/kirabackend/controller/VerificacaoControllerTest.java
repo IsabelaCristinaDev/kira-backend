@@ -43,7 +43,7 @@ class VerificacaoControllerTest {
         MockMultipartFile documento = new MockMultipartFile("document", "d.jpg", "image/jpeg", new byte[]{1});
         MockMultipartFile verso = new MockMultipartFile("document_back", "v.jpg", "image/jpeg", new byte[]{3});
         MockMultipartFile selfie = new MockMultipartFile("selfie", "s.jpg", "image/jpeg", new byte[]{2});
-        VerificacaoResponse esperado = new VerificacaoResponse(StatusVerificacao.VERIFIED, List.of(), 2);
+        VerificacaoResponse esperado = new VerificacaoResponse(StatusVerificacao.VERIFIED, List.of(), 2, false);
         when(verificacaoService.enviar(usuarioLogado, documento, verso, selfie, "RG", true)).thenReturn(esperado);
 
         var resposta = controller.enviar(usuarioLogado, documento, verso, selfie, "RG", true);
@@ -55,7 +55,7 @@ class VerificacaoControllerTest {
     @Test
     @DisplayName("Consultar usa só o id do usuário logado")
     void consultar() {
-        VerificacaoResponse esperado = new VerificacaoResponse(StatusVerificacao.IN_REVIEW, List.of("LOW_IMAGE_QUALITY"), 2);
+        VerificacaoResponse esperado = new VerificacaoResponse(StatusVerificacao.IN_REVIEW, List.of("LOW_IMAGE_QUALITY"), 2, true);
         when(verificacaoService.consultar(usuarioLogado.getId())).thenReturn(esperado);
 
         assertEquals(esperado, controller.consultar(usuarioLogado).getBody());

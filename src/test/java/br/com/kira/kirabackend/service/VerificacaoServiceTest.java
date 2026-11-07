@@ -36,6 +36,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -72,7 +73,8 @@ class VerificacaoServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new VerificacaoService(repository, verificador, VERSAO, LIMITE_BYTES, LIMITE_TENTATIVAS);
+        service = new VerificacaoService(repository, verificador, VERSAO, LIMITE_BYTES, LIMITE_TENTATIVAS,
+                new ExigenciaVerificacao(repository, false));
         cliente = new Cliente();
         cliente.setId(UUID.randomUUID());
         cliente.setCpf("12345678900");
@@ -445,5 +447,17 @@ class VerificacaoServiceTest {
         assertEquals("Você usou todas as 3 tentativas de verificação", erro.getMessage());
         verify(repository, never()).save(any());
         verifyNoInteractions(verificador);
+    }
+
+    @Test
+    @DisplayName("A situação diz se a verificação é obrigatória, para o app saber quando bloquear")
+    void situacaoDizSeEObrigatoria() {
+        semTentativaAnterior();
+        tentativasUsadas(0);
+        VerificacaoService obrigatoria = new VerificacaoService(repository, verificador, VERSAO, LIMITE_BYTES,
+                LIMITE_TENTATIVAS, new ExigenciaVerificacao(repository, true));
+
+        assertTrue(obrigatoria.consultar(cliente.getId()).obrigatoria());
+        assertFalse(service.consultar(cliente.getId()).obrigatoria());
     }
 }

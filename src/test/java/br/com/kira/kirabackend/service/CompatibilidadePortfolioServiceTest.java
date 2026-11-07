@@ -36,6 +36,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -51,6 +52,8 @@ class CompatibilidadePortfolioServiceTest {
     private ImagensEnviadas imagens;
     @Mock
     private ComparadorDePortfolio comparador;
+    @Mock
+    private ExigenciaVerificacao exigenciaVerificacao;
 
     @InjectMocks
     private CompatibilidadePortfolioService service;
@@ -64,6 +67,8 @@ class CompatibilidadePortfolioServiceTest {
         referencia = new MockMultipartFile("referencia", "ref.jpg", "image/jpeg", BYTES_REFERENCIA);
         bellaFlor = empresa();
         jasmim = empresa();
+        // Como com VERIFICACAO_OBRIGATORIA=false: todos entram no ranking
+        lenient().when(exigenciaVerificacao.naVitrine()).thenReturn(id -> true);
     }
 
     private static Empresa empresa() {
@@ -123,6 +128,24 @@ class CompatibilidadePortfolioServiceTest {
         assertEquals(List.of(
                 new CompatibilidadeEstudioResponse(jasmim.getId(), 80.5),
                 new CompatibilidadeEstudioResponse(bellaFlor.getId(), 77.96)), ranking);
+    }
+
+    @Test
+    @DisplayName("Com a verificação obrigatória, estúdio sem verificação fica fora do ranking e não é comparado")
+    void rankingSoComVerificados() {
+        referenciaValida();
+        when(exigenciaVerificacao.naVitrine()).thenReturn(jasmim.getId()::equals);
+        when(servicoRepository.findByAtivoTrueAndEmpresaAtivoTrue()).thenReturn(List.of(
+                servico(bellaFlor, CategoriaServico.CABELO, "Coloração"),
+                servico(jasmim, CategoriaServico.CABELO, "Box braids")));
+        fotosDe(jasmim, foto(jasmim, "j-1.jpg"));
+        when(comparador.comparar(eq(BYTES_REFERENCIA), fotosChamadas("j-1.jpg")))
+                .thenReturn(List.of(new Semelhanca("j-1.jpg", 80.5)));
+
+        List<CompatibilidadeEstudioResponse> ranking = service.ranquear(referencia);
+
+        assertEquals(List.of(new CompatibilidadeEstudioResponse(jasmim.getId(), 80.5)), ranking);
+        verify(fotoPortfolioRepository, never()).findByEmpresaIdOrderByDataCriacaoDesc(bellaFlor.getId());
     }
 
     @Test

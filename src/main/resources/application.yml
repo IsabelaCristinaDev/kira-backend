@@ -82,6 +82,8 @@ kira:
       # Cada chamada leva cerca de 2 s em CPU; a primeira carrega o modelo e demora mais
       timeout-leitura-ms: ${KIRA_AI_TIMEOUT_LEITURA_MS:30000}
   verificacao:
+    # true: cliente sem verificação não agenda, e estúdio sem verificação sai da vitrine e não recebe agendamento
+    obrigatoria: ${VERIFICACAO_OBRIGATORIA:false}
     # Muda quando o texto do consentimento muda: a versão aceita fica gravada em cada tentativa
     versao-consentimento: ${VERIFICACAO_VERSAO_CONSENTIMENTO:v1}
     tamanho-maximo-bytes: ${VERIFICACAO_TAMANHO_MAXIMO_BYTES:5242880}

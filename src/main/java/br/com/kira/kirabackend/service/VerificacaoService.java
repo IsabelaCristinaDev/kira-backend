@@ -48,25 +48,29 @@ public class VerificacaoService {
     private final String versaoConsentimento;
     private final long tamanhoMaximoBytes;
     private final int limiteTentativas;
+    private final ExigenciaVerificacao exigencia;
 
     public VerificacaoService(
             VerificacaoIdentidadeRepository repository,
             VerificadorDeIdentidade verificador,
             @Value("${kira.verificacao.versao-consentimento:v1}") String versaoConsentimento,
             @Value("${kira.verificacao.tamanho-maximo-bytes:5242880}") long tamanhoMaximoBytes,
-            @Value("${kira.verificacao.limite-tentativas:3}") int limiteTentativas) {
+            @Value("${kira.verificacao.limite-tentativas:3}") int limiteTentativas,
+            ExigenciaVerificacao exigencia) {
         this.repository = repository;
         this.verificador = verificador;
         this.versaoConsentimento = versaoConsentimento;
         this.tamanhoMaximoBytes = tamanhoMaximoBytes;
         this.limiteTentativas = limiteTentativas;
+        this.exigencia = exigencia;
     }
 
     public VerificacaoResponse consultar(UUID usuarioId) {
         int restantes = tentativasRestantes(usuarioId);
         return repository.findFirstByUsuarioIdOrderByDataCriacaoDesc(usuarioId)
-                .map(verificacao -> new VerificacaoResponse(verificacao.getStatus(), verificacao.getMotivos(), restantes))
-                .orElseGet(() -> new VerificacaoResponse(null, List.of(), restantes));
+                .map(verificacao -> new VerificacaoResponse(verificacao.getStatus(), verificacao.getMotivos(), restantes,
+                        exigencia.obrigatoria()))
+                .orElseGet(() -> new VerificacaoResponse(null, List.of(), restantes, exigencia.obrigatoria()));
     }
 
     // Sem @Transactional de propósito: o serviço de IA pode levar até 30 s e não deve segurar uma conexão do banco
@@ -98,7 +102,8 @@ public class VerificacaoService {
         verificacao = repository.save(verificacao);
         log.info("Verificação {}: {} (request_id {})", verificacao.getId(), verificacao.getStatus(), verificacao.getRequestId());
 
-        return new VerificacaoResponse(verificacao.getStatus(), verificacao.getMotivos(), tentativasRestantes(usuario.getId()));
+        return new VerificacaoResponse(verificacao.getStatus(), verificacao.getMotivos(),
+                tentativasRestantes(usuario.getId()), exigencia.obrigatoria());
     }
 
     // Confere a situação atual e grava a tentativa como PENDING antes de chamar o serviço

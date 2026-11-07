@@ -34,4 +34,15 @@ class GlobalExceptionHandlerVerificacaoTest {
         assertEquals("VERIFICACAO_FALHOU", resposta.getBody().erro());
         assertFalse(resposta.getBody().mensagem().toLowerCase().contains("chave"));
     }
+
+    @Test
+    @DisplayName("Conta sem verificação, com a verificação obrigatória, responde 403 com o código próprio")
+    void obrigatoria() {
+        ResponseEntity<GlobalExceptionHandler.ErroResponse> resposta = handler.handleVerificacaoObrigatoria(
+                new VerificacaoObrigatoriaException("Verifique sua identidade para agendar"), request);
+
+        assertEquals(HttpStatus.FORBIDDEN, resposta.getStatusCode());
+        assertEquals("VERIFICACAO_OBRIGATORIA", resposta.getBody().erro());
+        assertEquals("Verifique sua identidade para agendar", resposta.getBody().mensagem());
+    }
 }

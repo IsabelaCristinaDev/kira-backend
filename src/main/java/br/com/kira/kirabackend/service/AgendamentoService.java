@@ -47,6 +47,7 @@ public class AgendamentoService {
     private final List<CancelamentoStrategy> cancelamentoStrategies;
     private final ApplicationEventPublisher eventPublisher;
     private final OcupacaoService ocupacaoService;
+    private final ExigenciaVerificacao exigenciaVerificacao;
 
     private CancelamentoStrategy resolverEstrategiaCancelamento(TipoUsuario tipo) {
         return cancelamentoStrategies.stream()
@@ -58,6 +59,7 @@ public class AgendamentoService {
 
     public AgendamentoResponse criar(UUID clienteId, UUID usuarioId, AgendamentoRequest request) {
         exigirProprioUsuario(clienteId, usuarioId, "Você só pode agendar em seu próprio nome");
+        exigenciaVerificacao.exigirClienteVerificada(clienteId);
         Cliente cliente = (Cliente) usuarioRepository.findById(clienteId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Cliente não encontrado"));
 
@@ -67,6 +69,7 @@ public class AgendamentoService {
                 .map(Empresa.class::cast)
                 .filter(Empresa::isEnabled)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Empresa não encontrada"));
+        exigenciaVerificacao.exigirEstudioVerificado(empresa.getId());
 
         Servico servico = servicoRepository.findById(request.servicoId())
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Serviço não encontrado"));

@@ -115,6 +115,14 @@ public class GlobalExceptionHandler {
                 "A verificação está indisponível agora. Tente novamente em instantes", request);
     }
 
+    // 403: a ação exige a identidade verificada (VERIFICACAO_OBRIGATORIA=true). O app mostra o caminho para verificar
+    @ExceptionHandler(VerificacaoObrigatoriaException.class)
+    public ResponseEntity<ErroResponse> handleVerificacaoObrigatoria(
+            VerificacaoObrigatoriaException ex,
+            HttpServletRequest request) {
+        return resposta(HttpStatus.FORBIDDEN, "VERIFICACAO_OBRIGATORIA", ex.getMessage(), request);
+    }
+
     // 502: o serviço de verificação recusou o pedido (ex.: chave errada). O detalhe fica só no log
     @ExceptionHandler(FalhaVerificacaoException.class)
     public ResponseEntity<ErroResponse> handleFalhaVerificacao(
