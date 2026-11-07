@@ -57,4 +57,16 @@ class GlobalExceptionHandlerProvadorTest {
         assertEquals(HttpStatus.PAYLOAD_TOO_LARGE, resposta.getStatusCode());
         assertEquals("ARQUIVO_GRANDE", resposta.getBody().erro());
     }
+
+    @Test
+    @DisplayName("IA de compatibilidade fora do ar responde 503 sem revelar o detalhe")
+    void compatibilidadeIndisponivel() {
+        ResponseEntity<GlobalExceptionHandler.ErroResponse> resposta = handler.handleCompatibilidadeIndisponivel(
+                new CompatibilidadeIndisponivelException("kira-ai respondeu 500 em http://10.0.0.5", null), request);
+
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE, resposta.getStatusCode());
+        assertEquals("PROVADOR_RANKING_INDISPONIVEL", resposta.getBody().erro());
+        assertFalse(resposta.getBody().mensagem().contains("kira-ai"));
+        assertFalse(resposta.getBody().mensagem().contains("10.0.0.5"));
+    }
 }

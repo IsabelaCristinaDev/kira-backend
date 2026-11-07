@@ -2,6 +2,7 @@ package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.DispositivoNotificacao;
 import br.com.kira.kirabackend.dto.request.DispositivoWebRequest;
+import br.com.kira.kirabackend.dto.response.AgendamentoResponse;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.DispositivoNotificacaoRepository;
@@ -20,6 +21,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.GeneralSecurityException;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +38,9 @@ public class NotificacaoService {
     private static final List<Integer> DISPOSITIVO_NAO_EXISTE_MAIS = List.of(404, 410);
     private static final List<String> SERVICOS_DE_PUSH = List.of(
             "fcm.googleapis.com", "push.services.mozilla.com", "push.apple.com", "notify.windows.com");
+    // O app usa o tipo para decidir o que mostrar e o que abrir no toque
+    static final String TIPO_CONFIRMACAO = "AGENDAMENTO_CONFIRMADO";
+    private static final DateTimeFormatter DIA_E_HORA = DateTimeFormatter.ofPattern("dd/MM 'às' HH:mm");
 
     private final DispositivoNotificacaoRepository dispositivoRepository;
     private final WebPushEnvio webPush;
@@ -65,17 +70,33 @@ public class NotificacaoService {
     /** Assíncrono: a mensagem já foi salva e entregue, e o serviço de push pode demorar ou falhar. */
     @Async
     public void notificarMensagem(MensagemResponse mensagem, List<UUID> destinatarios) {
+        // Sem "tipo": é o formato original, e o app trata a falta de tipo como mensagem do chat
+        enviarAosUsuarios(Map.of(
+                "titulo", mensagem.nomeRemetente(),
+                "corpo", resumir(mensagem.conteudo()),
+                "agendamentoId", mensagem.agendamentoId().toString()), destinatarios);
+    }
+
+    /** Avisa a cliente que o estúdio confirmou o horário. Assíncrono pelo mesmo motivo da mensagem. */
+    @Async
+    public void notificarConfirmacao(AgendamentoResponse agendamento) {
+        enviarAosUsuarios(Map.of(
+                "tipo", TIPO_CONFIRMACAO,
+                "titulo", agendamento.nomeEmpresa(),
+                "corpo", "Seu horário de " + agendamento.nomeServico() + " em "
+                        + DIA_E_HORA.format(agendamento.dataHoraInicio()) + " foi confirmado.",
+                "agendamentoId", agendamento.id().toString()), List.of(agendamento.clienteId()));
+    }
+
+    private void enviarAosUsuarios(Map<String, String> notificacao, List<UUID> destinatarios) {
         if (!webPush.ativo() || destinatarios.isEmpty()) {
             return;
         }
         byte[] conteudo;
         try {
-            conteudo = objectMapper.writeValueAsBytes(Map.of(
-                    "titulo", mensagem.nomeRemetente(),
-                    "corpo", resumir(mensagem.conteudo()),
-                    "agendamentoId", mensagem.agendamentoId().toString()));
+            conteudo = objectMapper.writeValueAsBytes(notificacao);
         } catch (JsonProcessingException e) {
-            log.warn("Não foi possível montar a notificação da mensagem {}", mensagem.id());
+            log.warn("Não foi possível montar a notificação do agendamento {}", notificacao.get("agendamentoId"));
             return;
         }
         for (DispositivoNotificacao dispositivo : dispositivoRepository.findByUsuarioIdIn(destinatarios)) {

@@ -2,8 +2,10 @@ package br.com.kira.kirabackend.controller;
 
 import br.com.kira.kirabackend.domain.entity.Cliente;
 import br.com.kira.kirabackend.dto.request.ConsentimentoProvadorRequest;
+import br.com.kira.kirabackend.dto.response.CompatibilidadeEstudioResponse;
 import br.com.kira.kirabackend.dto.response.ConsentimentoProvadorResponse;
 import br.com.kira.kirabackend.dto.response.GeracaoProvadorResponse;
+import br.com.kira.kirabackend.service.CompatibilidadePortfolioService;
 import br.com.kira.kirabackend.service.ProvadorService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -16,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -28,6 +31,9 @@ class ProvadorControllerTest {
 
     @Mock
     private ProvadorService provadorService;
+
+    @Mock
+    private CompatibilidadePortfolioService compatibilidadeService;
 
     @InjectMocks
     private ProvadorController controller;
@@ -91,5 +97,19 @@ class ProvadorControllerTest {
 
         assertEquals(HttpStatus.NO_CONTENT, resposta.getStatusCode());
         assertNull(resposta.getBody());
+    }
+
+    @Test
+    @DisplayName("Ranking repassa a foto de referência e devolve os estúdios na ordem do serviço")
+    void ranking() {
+        MockMultipartFile referencia = new MockMultipartFile("referencia", "r.jpg", "image/jpeg", new byte[]{2});
+        List<CompatibilidadeEstudioResponse> esperado =
+                List.of(new CompatibilidadeEstudioResponse(UUID.randomUUID(), 80.5));
+        when(compatibilidadeService.ranquear(referencia)).thenReturn(esperado);
+
+        var resposta = controller.ranking(referencia);
+
+        assertEquals(HttpStatus.OK, resposta.getStatusCode());
+        assertEquals(esperado, resposta.getBody());
     }
 }

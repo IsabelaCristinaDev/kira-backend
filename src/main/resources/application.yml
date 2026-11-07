@@ -74,6 +74,13 @@ kira:
       base-url: ${CLOUDFLARE_BASE_URL:https://api.cloudflare.com/client/v4}
       timeout-conexao-ms: ${CLOUDFLARE_TIMEOUT_CONEXAO_MS:5000}
       timeout-leitura-ms: ${CLOUDFLARE_TIMEOUT_LEITURA_MS:90000}
+    compatibilidade:
+      # kira-ai (Python, da Wanessa): ordena os estúdios pela semelhança do portfólio com a referência.
+      # Porta 8001 porque a 8000 é do kira-verify-ai
+      base-url: ${KIRA_AI_URL:http://localhost:8001}
+      timeout-conexao-ms: ${KIRA_AI_TIMEOUT_CONEXAO_MS:2000}
+      # Cada chamada leva cerca de 2 s em CPU; a primeira carrega o modelo e demora mais
+      timeout-leitura-ms: ${KIRA_AI_TIMEOUT_LEITURA_MS:30000}
   verificacao:
     # Muda quando o texto do consentimento muda: a versão aceita fica gravada em cada tentativa
     versao-consentimento: ${VERIFICACAO_VERSAO_CONSENTIMENTO:v1}

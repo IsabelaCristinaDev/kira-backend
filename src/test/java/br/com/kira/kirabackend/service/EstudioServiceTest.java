@@ -3,8 +3,10 @@ package br.com.kira.kirabackend.service;
 import br.com.kira.kirabackend.domain.entity.Cliente;
 import br.com.kira.kirabackend.domain.entity.Empresa;
 import br.com.kira.kirabackend.domain.entity.Endereco;
+import br.com.kira.kirabackend.domain.entity.Funcionaria;
 import br.com.kira.kirabackend.domain.enums.TipoEstabelecimento;
 import br.com.kira.kirabackend.dto.response.EstudioResponse;
+import br.com.kira.kirabackend.dto.response.FuncionariaPublicaResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.repository.AvaliacaoRepository;
 import br.com.kira.kirabackend.repository.FuncionariaRepository;
@@ -20,6 +22,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -235,5 +239,22 @@ class EstudioServiceTest {
 
         assertTrue(service.listarFuncionarias(empresaId).isEmpty());
         assertTrue(service.listarServicos(empresaId).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Funcionárias da vitrine trazem só o que a cliente precisa para escolher, sem a comissão")
+    void funcionariasDaVitrineSemDadosInternos() {
+        UUID empresaId = espacoCilios.getId();
+        Funcionaria bia = new Funcionaria(UUID.randomUUID(), "Bia", "/api/arquivos/bia.jpg", "Corte",
+                true, new BigDecimal("35.00"), null);
+        when(usuarioRepository.existsEmpresaAtivaById(empresaId)).thenReturn(true);
+        when(funcionariaRepository.findByEmpresaIdAndAtivoTrue(empresaId)).thenReturn(List.of(bia));
+
+        List<FuncionariaPublicaResponse> lista = service.listarFuncionarias(empresaId);
+
+        assertEquals(List.of(new FuncionariaPublicaResponse(bia.getId(), "Bia", "/api/arquivos/bia.jpg", "Corte")),
+                lista);
+        assertEquals(List.of("id", "nome", "fotoUrl", "especialidades"),
+                Arrays.stream(FuncionariaPublicaResponse.class.getRecordComponents()).map(c -> c.getName()).toList());
     }
 }

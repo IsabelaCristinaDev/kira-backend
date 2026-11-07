@@ -12,7 +12,7 @@ import java.time.Duration;
 /**
  * Clientes HTTP dos serviços externos, um por serviço, cada um com os próprios timeouts.
  *
- * Ficam aqui para cada client (Cloudflare, Nominatim, kira-verify-ai) ter um construtor só, sem @Autowired,
+ * Ficam aqui para cada client (Cloudflare, Nominatim, kira-ai, kira-verify-ai) ter um construtor só, sem @Autowired,
  * e para os testes poderem passar um RestClient simulado no lugar destes.
  */
 @Configuration
@@ -20,6 +20,7 @@ public class ClientesHttpConfig {
 
     public static final String CLOUDFLARE = "cloudflareRestClient";
     public static final String NOMINATIM = "nominatimRestClient";
+    public static final String KIRA_AI = "kiraAiRestClient";
     public static final String VERIFICACAO = "verificacaoRestClient";
 
     // O RestClient.Builder do Spring Boot é prototype: cada método recebe um builder novo, e um não afeta o outro
@@ -36,6 +37,14 @@ public class ClientesHttpConfig {
             RestClient.Builder builder,
             @Value("${kira.geocodificacao.timeout-conexao-ms:2000}") long timeoutConexaoMs,
             @Value("${kira.geocodificacao.timeout-leitura-ms:3000}") long timeoutLeituraMs) {
+        return comTimeouts(builder, timeoutConexaoMs, timeoutLeituraMs);
+    }
+
+    @Bean(KIRA_AI)
+    RestClient kiraAiRestClient(
+            RestClient.Builder builder,
+            @Value("${kira.provador.compatibilidade.timeout-conexao-ms:2000}") long timeoutConexaoMs,
+            @Value("${kira.provador.compatibilidade.timeout-leitura-ms:30000}") long timeoutLeituraMs) {
         return comTimeouts(builder, timeoutConexaoMs, timeoutLeituraMs);
     }
 

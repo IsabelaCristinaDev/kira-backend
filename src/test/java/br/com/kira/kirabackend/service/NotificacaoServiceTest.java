@@ -1,7 +1,9 @@
 package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.DispositivoNotificacao;
+import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import br.com.kira.kirabackend.dto.request.DispositivoWebRequest;
+import br.com.kira.kirabackend.dto.response.AgendamentoResponse;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.DispositivoNotificacaoRepository;
@@ -26,6 +28,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -222,6 +225,55 @@ class NotificacaoServiceTest {
 
         verify(webPush, times(2)).enviar(anyString(), anyString(), anyString(), any());
         verify(dispositivoRepository, never()).deleteById(any());
+    }
+
+    private AgendamentoResponse confirmado() {
+        return new AgendamentoResponse(UUID.randomUUID(), usuarioId, "Camila", UUID.randomUUID(), "Espaço Aurora",
+                null, null, UUID.randomUUID(), "Corte feminino", 60, LocalDateTime.of(2026, 11, 6, 10, 0),
+                LocalDateTime.of(2026, 11, 6, 11, 0), StatusAgendamento.CONFIRMADO, null, null);
+    }
+
+    @Test
+    @DisplayName("Confirmação avisa os navegadores da cliente, com o estúdio, o serviço, o dia e a hora")
+    void avisaConfirmacao() throws Exception {
+        AgendamentoResponse agendamento = confirmado();
+        when(webPush.ativo()).thenReturn(true);
+        when(dispositivoRepository.findByUsuarioIdIn(List.of(usuarioId))).thenReturn(List.of(dispositivo()));
+        when(webPush.enviar(anyString(), anyString(), anyString(), any())).thenReturn(201);
+
+        service.notificarConfirmacao(agendamento);
+
+        ArgumentCaptor<byte[]> conteudo = ArgumentCaptor.forClass(byte[].class);
+        verify(webPush).enviar(eq(ENDERECO), anyString(), anyString(), conteudo.capture());
+        JsonNode json = objectMapper.readTree(conteudo.getValue());
+        assertEquals("AGENDAMENTO_CONFIRMADO", json.get("tipo").asText());
+        assertEquals("Espaço Aurora", json.get("titulo").asText());
+        assertEquals("Seu horário de Corte feminino em 06/11 às 10:00 foi confirmado.", json.get("corpo").asText());
+        assertEquals(agendamento.id().toString(), json.get("agendamentoId").asText());
+    }
+
+    @Test
+    @DisplayName("Confirmação sem chaves configuradas não consulta nem envia nada")
+    void confirmacaoDesligada() {
+        when(webPush.ativo()).thenReturn(false);
+
+        service.notificarConfirmacao(confirmado());
+
+        verifyNoInteractions(dispositivoRepository);
+    }
+
+    @Test
+    @DisplayName("Mensagem do chat não leva tipo: o app trata a falta de tipo como mensagem")
+    void mensagemSemTipo() throws Exception {
+        when(webPush.ativo()).thenReturn(true);
+        when(dispositivoRepository.findByUsuarioIdIn(List.of(usuarioId))).thenReturn(List.of(dispositivo()));
+        when(webPush.enviar(anyString(), anyString(), anyString(), any())).thenReturn(201);
+
+        service.notificarMensagem(mensagem("Oi"), List.of(usuarioId));
+
+        ArgumentCaptor<byte[]> conteudo = ArgumentCaptor.forClass(byte[].class);
+        verify(webPush).enviar(anyString(), anyString(), anyString(), conteudo.capture());
+        assertFalse(objectMapper.readTree(conteudo.getValue()).has("tipo"));
     }
 
     @Test

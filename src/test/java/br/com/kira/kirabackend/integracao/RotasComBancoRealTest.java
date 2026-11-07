@@ -317,7 +317,11 @@ class RotasComBancoRealTest {
         get("/api/studios/tipo?tipo=ESTABELECIMENTO", null);
         get("/api/studios/cidade?cidade=Goiania", null);
         get("/api/studios/" + estudio.id(), null);
-        get("/api/studios/" + estudio.id() + "/funcionarias", null);
+        JsonNode vitrineFuncionarias = get("/api/studios/" + estudio.id() + "/funcionarias", null);
+        JsonNode fran = vitrineFuncionarias.findParents("id").stream()
+                .filter(f -> f.get("id").asText().equals(funcionariaId)).findFirst().orElseThrow();
+        assertEquals("Fran", fran.get("nome").asText());
+        assertFalse(fran.has("comissaoPercentual"), "a vitrine não mostra a comissão da funcionária");
         get("/api/studios/" + estudio.id() + "/servicos", null);
         get(slots, null);
         get(slots + "&funcionariaId=" + funcionariaId, null);

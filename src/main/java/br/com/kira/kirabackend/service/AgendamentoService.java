@@ -12,6 +12,7 @@ import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.observer.AgendamentoCanceladoEvent;
 import br.com.kira.kirabackend.observer.AgendamentoCriadoEvent;
+import br.com.kira.kirabackend.observer.AgendamentoConfirmadoEvent;
 import br.com.kira.kirabackend.observer.AtendimentoConcluidoEvent;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.DisponibilidadeEstudioRepository;
@@ -164,7 +165,9 @@ public class AgendamentoService {
         }
 
         agendamento.setStatus(StatusAgendamento.CONFIRMADO);
-        return toResponse(agendamentoRepository.save(agendamento));
+        AgendamentoResponse resposta = toResponse(agendamentoRepository.save(agendamento));
+        eventPublisher.publishEvent(new AgendamentoConfirmadoEvent(resposta));
+        return resposta;
     }
 
     /** Sem forma informada, fica a que veio no agendamento, se houver. */
