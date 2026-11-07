@@ -2,6 +2,8 @@ package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.Agendamento;
 import br.com.kira.kirabackend.domain.entity.Avaliacao;
+import br.com.kira.kirabackend.domain.entity.Empresa;
+import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import br.com.kira.kirabackend.domain.enums.TipoAvaliador;
 import br.com.kira.kirabackend.dto.request.AvaliacaoRequest;
@@ -107,13 +109,15 @@ public class AvaliacaoService {
                 .toList();
     }
 
-    /** As avaliações que a própria cliente fez. A lista de cima traz as que ela recebeu das empresas. */
-    public List<AvaliacaoResponse> listarMinhasAvaliacoes(UUID clienteId) {
-        return avaliacaoRepository
-                .findByClienteIdAndTipoAvaliador(clienteId, TipoAvaliador.CLIENTE)
-                .stream()
-                .map(this::toResponse)
-                .toList();
+    /**
+     * As avaliações que a conta logada fez: a cliente, as dos estúdios; o estúdio, as das clientes.
+     * Com elas, a tela sabe quais atendimentos já avaliou. As recebidas têm rotas próprias.
+     */
+    public List<AvaliacaoResponse> listarMinhasAvaliacoes(Usuario usuario) {
+        List<Avaliacao> feitas = usuario instanceof Empresa
+                ? avaliacaoRepository.findByEmpresaIdAndTipoAvaliador(usuario.getId(), TipoAvaliador.EMPRESA)
+                : avaliacaoRepository.findByClienteIdAndTipoAvaliador(usuario.getId(), TipoAvaliador.CLIENTE);
+        return feitas.stream().map(this::toResponse).toList();
     }
 
     public Double mediaAvaliacaoEmpresa(UUID empresaId) {
