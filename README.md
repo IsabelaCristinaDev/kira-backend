@@ -76,6 +76,40 @@ docker compose -f docker-compose.servidor.yml up -d --build
 - O banco e as fotos enviadas ficam em volumes do Docker e continuam lá a cada novo deploy. Só `docker compose down -v` os apaga.
 - Além das variáveis obrigatórias da tabela abaixo, o servidor exige `KIRA_CORS_ORIGENS` e `FRONTEND_URL` com o endereço real do app web. As `SPRING_DATASOURCE_*` não são usadas: a API aponta sozinha para o banco do compose.
 
+### Levar os dados locais para o servidor (primeira subida)
+
+O banco e as fotos andam juntos: o banco guarda só o nome de cada foto, e o arquivo fica na pasta `uploads/`. Por isso o dump é gerado na hora, junto com as fotos daquele momento. Um dump antigo aponta para fotos que podem não existir mais.
+
+**1. Na máquina local**, gerar o dump do banco atual (fica fora do Git pelo `.gitignore`):
+
+```bash
+docker exec kira_postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > kira.dump
+```
+
+Copiar para o servidor o `kira.dump` e a pasta `uploads/`, junto com o projeto.
+
+**2. No servidor**, com o `.env` preenchido. A ordem importa: o banco é restaurado **antes** de a API subir, senão o Hibernate cria tabelas vazias e a restauração falha.
+
+```bash
+DC="docker compose -f docker-compose.servidor.yml"
+
+# Sobe só o banco
+$DC up -d --wait postgres
+
+# Restaura. --no-owner: o usuário do banco no servidor pode ter outro nome
+$DC cp kira.dump postgres:/tmp/kira.dump
+$DC exec -T postgres sh -c 'pg_restore --no-owner --no-privileges --single-transaction --exit-on-error -U "$POSTGRES_USER" -d "$POSTGRES_DB" /tmp/kira.dump && rm /tmp/kira.dump'
+
+# Apaga as sessões do ambiente local: um refresh token antigo continuaria valendo no servidor
+$DC exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "TRUNCATE refresh_token, token_recuperacao_senha, dispositivo_notificacao"'
+
+# Sobe a API e copia as fotos para o volume
+$DC up -d --wait --build
+$DC cp uploads/. api:/app/uploads/
+```
+
+Se o banco do servidor já tiver dados, a restauração para no primeiro erro e não altera nada. Depois de conferir, apague o `kira.dump` do servidor: ele tem os dados de todos os usuários.
+
 ## Variáveis de ambiente
 
 O arquivo `.env` é carregado automaticamente e nunca deve ir para o repositório. O modelo completo está em [`.env.example`](.env.example).
