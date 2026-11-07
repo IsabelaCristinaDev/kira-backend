@@ -195,6 +195,6 @@ O código fica em `br.com.kira.kirabackend`, organizado em camadas:
 
 - **Unitários:** services, strategies, segurança e job, com JUnit 5 e Mockito.
 - **Integração:** os testes do pacote `integracao` usam um PostgreSQL real, criado pelo Testcontainers. Sem Docker, eles são ignorados.
-- **`KiraBackendApplicationTests`:** precisa do PostgreSQL do Compose no ar e do `.env` preenchido.
+- **`KiraBackendApplicationTests`:** confere que a aplicação inteira sobe, com um PostgreSQL do Testcontainers. Não precisa do banco local nem das variáveis da máquina; sem Docker, é ignorado.
 
 O relatório de cobertura do JaCoCo é gerado em `target/site/jacoco/index.html`. O GitHub Actions roda os testes em cada pull request e em cada push na `main`.
