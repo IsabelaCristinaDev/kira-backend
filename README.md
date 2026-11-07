@@ -205,6 +205,20 @@ Atrás de um proxy, o IP que chega à API é o do proxy. O `FORWARD_HEADERS_STRA
 3. Escolha a estratégia (`framework` usa o primeiro IP do `X-Forwarded-For`; `native` usa o último que não é de rede interna). Confirme que um `X-Forwarded-For` inventado pelo cliente não muda o IP usado.
 4. **Desligue o `REGISTRAR_HEADERS_IP` e remova o código marcado com `TODO(LGPD)`**: IP é dado pessoal.
 
+## Limitações conhecidas
+
+### Datas sem fuso horário
+
+- **Como está hoje:** as datas são gravadas no horário de Brasília (`LocalDateTime.now(KiraTimeZone.DEFAULT)`), sem a informação de fuso, em colunas `timestamp without time zone` (25 colunas). O Postgres roda em UTC.
+- **Por que funciona:** toda gravação e leitura passa pela API, que sempre usa o horário de Brasília.
+- **Onde atrapalha:**
+  - SQL escrito à mão: o `now()` do banco está 3 horas à frente das datas gravadas (por exemplo, `now() - interval '1 minute'` vira uma data no futuro para a API);
+  - relatórios e integrações precisam saber que as datas estão em horário de Brasília;
+  - se o horário de verão voltar, a hora repetida na virada fica ambígua.
+- **Para avaliar no futuro:** usar `Instant` no código e `timestamptz` no banco, com `hibernate.jdbc.time_zone=UTC`. Os dados existentes seriam convertidos com `ALTER COLUMN ... TYPE timestamptz USING coluna AT TIME ZONE 'America/Sao_Paulo'`.
+
+As limitações do limite de tentativas de login estão na seção [Segurança](#segurança).
+
 ## Testes
 
 ```bash
