@@ -123,7 +123,7 @@ O arquivo `.env` é carregado automaticamente e nunca deve ir para o repositóri
 | E-mail | `MAIL_USERNAME`, `MAIL_PASSWORD` | Para enviar e-mails |
 | Notificações do navegador | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Para usar as notificações |
 | Provador virtual | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | Para usar o provador |
-| Verificação de identidade | `VERIFY_SERVICE_KEY`, `VERIFY_SERVICE_URL` | Para usar a verificação |
+| Verificação de identidade | `VERIFY_SERVICE_URL` (padrão `http://localhost:8001`, o kira-ai) e `VERIFY_SERVICE_KEY` (opcional) | Para usar a verificação |
 | Exigir a verificação | `VERIFICACAO_OBRIGATORIA` | Não, o padrão é `false` |
 | Servidor e front-end | `SERVER_PORT`, `FRONTEND_URL` | Não, têm valor padrão |
 | Log do SQL | `MOSTRAR_SQL` | Não, o padrão é `false` |

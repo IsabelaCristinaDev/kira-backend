@@ -12,6 +12,7 @@ import br.com.kira.kirabackend.dto.response.VerificacaoResponse;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.exception.VerificacaoIndisponivelException;
 import br.com.kira.kirabackend.repository.VerificacaoIdentidadeRepository;
+import br.com.kira.kirabackend.service.VerificadorDeIdentidade.DadosDoCadastro;
 import br.com.kira.kirabackend.service.VerificadorDeIdentidade.Imagem;
 import br.com.kira.kirabackend.service.VerificadorDeIdentidade.Resultado;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +31,7 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -78,6 +80,8 @@ class VerificacaoServiceTest {
         cliente = new Cliente();
         cliente.setId(UUID.randomUUID());
         cliente.setCpf("12345678900");
+        cliente.setNome("Maria da Silva");
+        cliente.setDataNascimento(LocalDate.of(1990, 3, 12));
     }
 
     private static MockMultipartFile foto(String parte, byte[] bytes) {
@@ -153,7 +157,7 @@ class VerificacaoServiceTest {
     // ---- enviar: caminho feliz ----
 
     @ParameterizedTest(name = "Decisão {0} vira status {1}")
-    @CsvSource({"APPROVED, VERIFIED", "REVIEW, IN_REVIEW", "REJECTED, REJECTED"})
+    @CsvSource({"APPROVED, VERIFIED", "REVIEW, IN_REVIEW", "REJECTED, REJECTED", "RETRY, PENDING"})
     void aplicaDecisaoDoServico(DecisaoVerificacaoIa decisao, StatusVerificacao esperado) {
         semTentativaAnterior();
         tentativasUsadas(0);
@@ -164,6 +168,21 @@ class VerificacaoServiceTest {
 
         assertEquals(esperado, resposta.status());
         assertEquals(List.of("LOW_IMAGE_QUALITY"), resposta.motivos());
+    }
+
+    @Test
+    @DisplayName("Foto inutilizável (RETRY): a tentativa fica PENDING, com os motivos, e não é descontada")
+    void retryNaoGastaTentativa() {
+        semTentativaAnterior();
+        tentativasUsadas(0);
+        salvarDevolveOMesmo();
+        servicoResponde(DecisaoVerificacaoIa.RETRY, List.of("selfie_sem_rosto"));
+
+        VerificacaoResponse resposta = enviarCnh();
+
+        assertEquals(StatusVerificacao.PENDING, resposta.status());
+        assertEquals(List.of("selfie_sem_rosto"), resposta.motivos());
+        assertEquals(LIMITE_TENTATIVAS, resposta.tentativasRestantes());
     }
 
     @Test
@@ -191,7 +210,7 @@ class VerificacaoServiceTest {
     }
 
     @Test
-    @DisplayName("Manda ao serviço as imagens com o formato lido dos bytes e o CPF do cadastro")
+    @DisplayName("Manda ao serviço as imagens com o formato lido dos bytes e o CPF, o nome e o nascimento do cadastro")
     void mandaImagensECpf() {
         semTentativaAnterior();
         tentativasUsadas(0);
@@ -203,7 +222,8 @@ class VerificacaoServiceTest {
 
         ArgumentCaptor<Imagem> documento = ArgumentCaptor.forClass(Imagem.class);
         ArgumentCaptor<Imagem> selfie = ArgumentCaptor.forClass(Imagem.class);
-        verify(verificador).verificar(documento.capture(), isNull(), selfie.capture(), eq(TipoDocumentoIdentidade.CNH), eq("12345678900"));
+        verify(verificador).verificar(documento.capture(), isNull(), selfie.capture(), eq(TipoDocumentoIdentidade.CNH),
+                eq(new DadosDoCadastro("12345678900", "Maria da Silva", LocalDate.of(1990, 3, 12))));
         assertEquals(MediaType.IMAGE_JPEG, documento.getValue().tipo());
         assertEquals(MediaType.IMAGE_PNG, selfie.getValue().tipo());
     }
@@ -250,7 +270,7 @@ class VerificacaoServiceTest {
     }
 
     @Test
-    @DisplayName("Empresa é verificada como EMPRESA; sem CPF (CNPJ), o CPF esperado vai nulo")
+    @DisplayName("Empresa é verificada como EMPRESA; sem CPF (CNPJ), vai só o que o cadastro tem")
     void empresaSemCpf() {
         Empresa empresa = new Empresa();
         empresa.setId(UUID.randomUUID());
@@ -264,7 +284,7 @@ class VerificacaoServiceTest {
         ArgumentCaptor<VerificacaoIdentidade> salvo = ArgumentCaptor.forClass(VerificacaoIdentidade.class);
         verify(repository, atLeastOnce()).save(salvo.capture());
         assertEquals(TipoUsuario.EMPRESA, salvo.getValue().getTipoUsuario());
-        verify(verificador).verificar(any(), isNull(), any(), any(), eq(null));
+        verify(verificador).verificar(any(), isNull(), any(), any(), eq(new DadosDoCadastro(null, null, null)));
     }
 
     @Test

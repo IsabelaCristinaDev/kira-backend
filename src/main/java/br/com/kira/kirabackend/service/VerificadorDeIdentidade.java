@@ -5,11 +5,10 @@ import br.com.kira.kirabackend.domain.enums.TipoDocumentoIdentidade;
 import br.com.kira.kirabackend.exception.FalhaVerificacaoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.exception.VerificacaoIndisponivelException;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.http.MediaType;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -21,14 +20,26 @@ import java.util.Objects;
 public interface VerificadorDeIdentidade {
 
     /**
-     * @param versoDocumento verso do documento. Pode ser nulo: o serviço trabalha só com a frente
-     * @param cpfEsperado    CPF do cadastro para o serviço conferir com o documento. Pode ser nulo
+     * @param versoDocumento verso do documento. Pode ser nulo; hoje o serviço trabalha só com a frente
+     * @param esperado       dados do cadastro para o serviço conferir com o documento. Cada campo pode ser nulo
      * @throws VerificacaoIndisponivelException se o serviço não responder a tempo ou estiver fora do ar
      * @throws FalhaVerificacaoException        se a chave estiver errada ou a resposta fugir do contrato
      * @throws RegraDeNegocioException          se o serviço recusar a imagem (tamanho ou formato)
      */
     Resultado verificar(Imagem documento, Imagem versoDocumento, Imagem selfie, TipoDocumentoIdentidade tipoDocumento,
-                        String cpfEsperado);
+                        DadosDoCadastro esperado);
+
+    /**
+     * O que o serviço confere no documento. Sem nenhum dado, ele nunca aprova: só manda para revisão.
+     * O toString esconde os valores para CPF, nome e nascimento nunca irem parar num log.
+     */
+    record DadosDoCadastro(String cpf, String nome, LocalDate dataNascimento) {
+        @Override
+        public String toString() {
+            return "DadosDoCadastro[cpf=" + (cpf != null) + ", nome=" + (nome != null)
+                    + ", dataNascimento=" + (dataNascimento != null) + "]";
+        }
+    }
 
     /** Imagem já validada pelo backend. O tipo vai junto porque o serviço confere o formato. */
     record Imagem(byte[] conteudo, MediaType tipo) {
@@ -53,14 +64,16 @@ public interface VerificadorDeIdentidade {
         }
     }
 
-    /** O que o backend guarda da resposta. Os campos lidos pelo OCR nunca entram aqui. */
-    @JsonIgnoreProperties(ignoreUnknown = true)
+    /**
+     * O que o backend guarda da resposta: a decisão, os códigos dos motivos e a similaridade do rosto.
+     * Os campos lidos pelo OCR nunca entram aqui. confiancaOcr e requestId ficam nulos quando o serviço não manda.
+     */
     record Resultado(
-            @JsonProperty("status") DecisaoVerificacaoIa decisao,
-            @JsonProperty("reasons") List<String> motivos,
-            @JsonProperty("similarity") BigDecimal similaridade,
-            @JsonProperty("ocr_confidence") BigDecimal confiancaOcr,
-            @JsonProperty("request_id") String requestId) {
+            DecisaoVerificacaoIa decisao,
+            List<String> motivos,
+            BigDecimal similaridade,
+            BigDecimal confiancaOcr,
+            String requestId) {
 
         public Resultado {
             motivos = motivos == null ? List.of() : List.copyOf(motivos);
