@@ -2,6 +2,7 @@ package br.com.kira.kirabackend.service;
 
 import jakarta.annotation.PostConstruct;
 import br.com.kira.kirabackend.domain.entity.Agendamento;
+import br.com.kira.kirabackend.util.MascaraEmail;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -68,7 +69,8 @@ public class EmailService {
         try {
             mailSender.send(message);
         } catch (MailException e) {
-            log.warn("Falha ao enviar e-mail de recuperação de senha para {}: {}", destinatario, e.getMessage());
+            log.warn("Falha ao enviar e-mail de recuperação de senha para {}: {}",
+                    MascaraEmail.mascarar(destinatario), MascaraEmail.mascararNoTexto(e.getMessage()));
         }
     }
 
@@ -115,7 +117,7 @@ public class EmailService {
         try {
             mailSender.send(message);
         } catch (MailException e) {
-            log.warn("Falha ao enviar aviso de tentativas de acesso: {}", e.getMessage());
+            log.warn("Falha ao enviar aviso de tentativas de acesso: {}", MascaraEmail.mascararNoTexto(e.getMessage()));
         }
     }
 
@@ -139,7 +141,8 @@ public class EmailService {
         try {
             mailSender.send(message);
         } catch (MailException e) {
-            log.warn("Falha ao enviar e-mail de boas-vindas para {}: {}", destinatario, e.getMessage());
+            log.warn("Falha ao enviar e-mail de boas-vindas para {}: {}",
+                    MascaraEmail.mascarar(destinatario), MascaraEmail.mascararNoTexto(e.getMessage()));
         }
     }
 }

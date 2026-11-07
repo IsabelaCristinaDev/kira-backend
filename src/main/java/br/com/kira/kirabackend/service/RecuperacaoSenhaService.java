@@ -11,6 +11,7 @@ import br.com.kira.kirabackend.repository.TokenRecuperacaoSenhaRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import br.com.kira.kirabackend.security.LimiteDeTentativas;
 import br.com.kira.kirabackend.util.KiraTimeZone;
+import br.com.kira.kirabackend.util.MascaraEmail;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -41,7 +42,7 @@ public class RecuperacaoSenhaService {
         String email = LimiteDeTentativas.normalizar(request.email());
         limite.registrarPedidoDeRecuperacao(ip, email).ifPresent(espera -> {
             log.warn("Recuperação de senha bloqueada por excesso de pedidos: ip={} email={}",
-                    ip, LimiteDeTentativas.mascarar(email));
+                    ip, MascaraEmail.mascarar(email));
             throw new TentativasExcedidasException(espera);
         });
         envio.gerarEEnviar(email);

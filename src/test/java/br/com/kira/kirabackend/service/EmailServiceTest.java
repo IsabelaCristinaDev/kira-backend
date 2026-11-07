@@ -76,6 +76,20 @@ class EmailServiceTest {
     }
 
     @Test
+    @DisplayName("Falhas de envio vão para o log com o e-mail mascarado, inclusive o que vem na mensagem do SMTP")
+    void logDeFalhaMascaraEmail(CapturedOutput saida) {
+        doThrow(new MailSendException("550 <ana.souza@teste.com> recipient rejected"))
+                .when(mailSender).send(any(SimpleMailMessage.class));
+
+        service.enviarEmailRecuperacaoSenha("ana.souza@teste.com", "abc-123");
+        service.enviarEmailBoasVindas("ana.souza@teste.com", "Ana");
+        service.enviarAvisoTentativasSuspeitas("ana.souza@teste.com", "Ana");
+
+        assertTrue(saida.getOut().contains("an***@teste.com"), saida.getOut());
+        assertFalse(saida.getOut().contains("ana.souza@teste.com"), saida.getOut());
+    }
+
+    @Test
     @DisplayName("Aviso de tentativas suspeitas vai para o dono da conta, sem dados do ataque")
     void avisoTentativasSuspeitas() {
         service.enviarAvisoTentativasSuspeitas("ana@teste.com", "Ana");

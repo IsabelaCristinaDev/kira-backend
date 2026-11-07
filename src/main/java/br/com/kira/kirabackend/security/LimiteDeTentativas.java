@@ -135,16 +135,6 @@ public class LimiteDeTentativas {
         return balde.tryConsume(1) ? Optional.empty() : esperaSeVazio(balde);
     }
 
-    /** "isabela@gmail.com" vira "is***@gmail.com": dá para investigar o log sem expor o e-mail. */
-    public static String mascarar(String email) {
-        if (email == null || !email.contains("@")) {
-            return "***";
-        }
-        String usuario = email.substring(0, email.indexOf('@'));
-        int visiveis = usuario.length() > 2 ? 2 : 1;
-        return usuario.substring(0, Math.min(visiveis, usuario.length())) + "***" + email.substring(email.indexOf('@'));
-    }
-
     /** "  Ana@Teste.COM " e "ana@teste.com" são a mesma conta. */
     public static String normalizar(String email) {
         return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);

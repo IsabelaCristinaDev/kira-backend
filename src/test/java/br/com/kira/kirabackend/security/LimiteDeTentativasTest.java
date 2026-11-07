@@ -244,13 +244,4 @@ class LimiteDeTentativasTest {
         assertEquals(Optional.of(Duration.ofMinutes(15)), limite.registrarValidacaoDeToken(IP));
         assertTrue(limite.registrarValidacaoDeToken(OUTRO_IP).isEmpty());
     }
-
-    @Test
-    @DisplayName("O e-mail no log aparece mascarado")
-    void mascaraEmail() {
-        assertEquals("is***@gmail.com", LimiteDeTentativas.mascarar("isabela@gmail.com"));
-        assertEquals("a***@teste.com", LimiteDeTentativas.mascarar("ab@teste.com"));
-        assertEquals("***", LimiteDeTentativas.mascarar("sem-arroba"));
-        assertEquals("***", LimiteDeTentativas.mascarar(null));
-    }
 }

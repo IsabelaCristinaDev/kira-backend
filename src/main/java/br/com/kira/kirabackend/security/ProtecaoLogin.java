@@ -3,6 +3,7 @@ package br.com.kira.kirabackend.security;
 import br.com.kira.kirabackend.exception.TentativasExcedidasException;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import br.com.kira.kirabackend.service.EmailService;
+import br.com.kira.kirabackend.util.MascaraEmail;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
@@ -48,7 +49,7 @@ public class ProtecaoLogin {
         String conta = LimiteDeTentativas.normalizar(email);
 
         limite.bloqueio(ip, conta).ifPresent(espera -> {
-            log.warn("Login bloqueado por excesso de tentativas: ip={} email={}", ip, LimiteDeTentativas.mascarar(conta));
+            log.warn("Login bloqueado por excesso de tentativas: ip={} email={}", ip, MascaraEmail.mascarar(conta));
             throw new TentativasExcedidasException(espera);
         });
 
@@ -77,7 +78,7 @@ public class ProtecaoLogin {
     // A consulta roda tenha a conta ou não: o tempo de resposta não revela se o e-mail existe
     private void avisarDono(String conta) {
         usuarioRepository.findByEmailIgnoreCase(conta).ifPresent(usuario -> {
-            log.warn("Conta com muitas falhas de login, dono avisado por e-mail: email={}", LimiteDeTentativas.mascarar(conta));
+            log.warn("Conta com muitas falhas de login, dono avisado por e-mail: email={}", MascaraEmail.mascarar(conta));
             emailService.enviarAvisoTentativasSuspeitas(usuario.getEmail(), usuario.getNome());
         });
     }
