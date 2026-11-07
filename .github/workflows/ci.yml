@@ -13,28 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
-    # Banco usado pelo KiraBackendApplicationTests. O RotasComBancoRealTest sobe o próprio Postgres.
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: kira_ci
-          POSTGRES_USER: kira_ci
-          POSTGRES_PASSWORD: kira_ci
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd "pg_isready -U kira_ci -d kira_ci"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
-    env:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://127.0.0.1:5433/kira_ci
-      SPRING_DATASOURCE_USERNAME: kira_ci
-      SPRING_DATASOURCE_PASSWORD: kira_ci
-      JWT_REFRESH_EXPIRATION: 604800000
-
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -42,14 +20,11 @@ jobs:
           distribution: temurin
           java-version: 17
           cache: maven
-      # Chave descartável, gerada a cada execução: só existe para a aplicação subir nos testes
-      - name: Gerar a chave JWT dos testes
-        run: echo "JWT_SECRET=$(openssl rand -hex 64)" >> "$GITHUB_ENV"
       - name: Rodar os testes
         run: ./mvnw -B test
-      # Sem Docker o teste é ignorado sem dar erro, e o CI passaria sem testar o banco
+      # Sem Docker esses testes são ignorados sem dar erro, e o CI passaria sem testar o banco nem a subida da aplicação
       - name: Conferir que os testes com banco rodaram
         run: |
-          for teste in RotasComBancoRealTest ConexaoAoVivoComBancoRealTest; do
-            grep -q 'skipped="0"' "target/surefire-reports/TEST-br.com.kira.kirabackend.integracao.$teste.xml"
+          for teste in KiraBackendApplicationTests integracao.RotasComBancoRealTest integracao.ConexaoAoVivoComBancoRealTest; do
+            grep -q 'skipped="0"' "target/surefire-reports/TEST-br.com.kira.kirabackend.$teste.xml"
           done
