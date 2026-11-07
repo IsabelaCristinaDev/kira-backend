@@ -3,7 +3,7 @@ package br.com.kira.kirabackend.security;
 import br.com.kira.kirabackend.domain.entity.Empresa;
 import br.com.kira.kirabackend.domain.entity.Funcionaria;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
-import br.com.kira.kirabackend.exception.RegraDeNegocioException;
+import br.com.kira.kirabackend.exception.AcessoNegadoException;
 import br.com.kira.kirabackend.repository.FuncionariaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -58,7 +58,7 @@ class AcessoEmpresaTest {
     void outraEmpresaRecusada() {
         UUID empresaId = empresa.getId();
 
-        RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+        AcessoNegadoException ex = assertThrows(AcessoNegadoException.class,
                 () -> acesso.exigirEmpresa(empresaId, outraEmpresa));
         assertEquals(AcessoEmpresa.SO_O_SEU_ESTABELECIMENTO, ex.getMessage());
     }
@@ -76,7 +76,7 @@ class AcessoEmpresaTest {
     void funcionariaDeOutraEmpresaRecusada() {
         UUID funcionariaId = funcionariaDe(outraEmpresa).getId();
 
-        assertThrows(RegraDeNegocioException.class,
+        assertThrows(AcessoNegadoException.class,
                 () -> acesso.exigirFuncionariaDaEmpresa(funcionariaId, empresa));
     }
 

@@ -296,6 +296,12 @@ class RotasComBancoRealTest {
         chamar("PUT", funcionarias + "/" + funcionariaId,
                 Map.of("nome", "Elis Souza", "comissaoPercentual", 10), estudio.token(), 200);
         get(funcionarias, estudio.token());
+        // Outra conta: 403 com a mensagem genérica, diferente do 403 da verificação obrigatória
+        JsonNode negado = chamar("PUT", funcionarias + "/" + funcionariaId,
+                Map.of("nome", "Outra", "comissaoPercentual", 50), outroEstudio.token(), 403);
+        assertEquals("ACESSO_NEGADO", negado.get("erro").asText());
+        assertEquals("Você só pode acessar os dados do seu estabelecimento", negado.get("mensagem").asText());
+        chamar("PUT", "/api/empresas/" + estudio.id() + "/disponibilidade", Map.of("dias", List.of()), cliente.token(), 403);
 
         String bloqueios = "/api/funcionarias/" + funcionariaId + "/bloqueios";
         String bloqueioId = chamar("POST", bloqueios, Map.of("dataHoraInicio", adiante.plusDays(2) + "T10:00:00",
@@ -350,7 +356,7 @@ class RotasComBancoRealTest {
         JsonNode conversa = get("/api/mensagens/agendamento/" + remarcado, estudio.token());
         assertEquals("ana", conversa.get(0).get("nomeRemetente").asText());
         chamar("PATCH", "/api/mensagens/" + conversa.get(0).get("id").asText() + "/lida", null, estudio.token(), 204);
-        chamar("GET", "/api/mensagens/agendamento/" + remarcado, null, bia.token(), 400);
+        chamar("GET", "/api/mensagens/agendamento/" + remarcado, null, bia.token(), 403);
 
         chamar("PATCH", "/api/agendamentos/" + remarcado + "/cancelar", null, ana.token(), 200);
         String canceladoPeloEstudio = agendar(ana.id(), ana.token(), estudio.id(), servicoDoEstudio, null, adiante + "T15:00:00");
@@ -391,7 +397,7 @@ class RotasComBancoRealTest {
                 Map.of("agendamentoId", concluido, "nota", 5, "comentario", "Ótimo"), bia.token(), 201);
         chamar("POST", "/api/avaliacoes/empresa", Map.of("agendamentoId", concluido, "nota", 4), estudio.token(), 201);
         get("/api/avaliacoes/cliente/" + bia.id(), bia.token());
-        chamar("GET", "/api/avaliacoes/cliente/" + bia.id(), null, estudio.token(), 400);
+        chamar("GET", "/api/avaliacoes/cliente/" + bia.id(), null, estudio.token(), 403);
         assertEquals(5, get("/api/avaliacoes/minhas", bia.token()).get(0).get("nota").asInt());
         assertEquals("bia", get("/api/avaliacoes/empresa/" + estudio.id(), null).get(0).get("nomeCliente").asText());
         get("/api/avaliacoes/empresa/" + estudio.id() + "/media", null);
@@ -482,8 +488,8 @@ class RotasComBancoRealTest {
 
         // Valor que não existe e estúdio errado não concluem: a chamada certa depois disso ainda funciona
         chamar("PATCH", concluir.formatted(recusado), Map.of("formaPagamento", "CHEQUE"), salao.token(), 400);
-        chamar("PATCH", concluir.formatted(recusado), Map.of("formaPagamento", "PIX"), outroEstudio.token(), 400);
-        chamar("PATCH", concluir.formatted(recusado), Map.of("formaPagamento", "PIX"), cliente.token(), 400);
+        chamar("PATCH", concluir.formatted(recusado), Map.of("formaPagamento", "PIX"), outroEstudio.token(), 403);
+        chamar("PATCH", concluir.formatted(recusado), Map.of("formaPagamento", "PIX"), cliente.token(), 403);
         assertEquals("CARTAO_DEBITO", chamar("PATCH", concluir.formatted(recusado),
                 Map.of("formaPagamento", "CARTAO_DEBITO"), salao.token(), 200).get("formaPagamento").asText());
     }
@@ -499,8 +505,8 @@ class RotasComBancoRealTest {
 
         // Recusados: nada muda
         chamar("PATCH", corrigir.formatted(concluido), Map.of("formaPagamento", "DINHEIRO"), null, 401);
-        chamar("PATCH", corrigir.formatted(concluido), Map.of("formaPagamento", "DINHEIRO"), outroEstudio.token(), 400);
-        chamar("PATCH", corrigir.formatted(concluido), Map.of("formaPagamento", "DINHEIRO"), cliente.token(), 400);
+        chamar("PATCH", corrigir.formatted(concluido), Map.of("formaPagamento", "DINHEIRO"), outroEstudio.token(), 403);
+        chamar("PATCH", corrigir.formatted(concluido), Map.of("formaPagamento", "DINHEIRO"), cliente.token(), 403);
         chamar("PATCH", corrigir.formatted(concluido), Map.of("formaPagamento", "CHEQUE"), salao.token(), 400);
         chamar("PATCH", corrigir.formatted(concluido), Map.of(), salao.token(), 400);
         chamar("PATCH", corrigir.formatted(aberto), Map.of("formaPagamento", "DINHEIRO"), salao.token(), 400);
@@ -576,8 +582,8 @@ class RotasComBancoRealTest {
         assertEquals(0, get(publico, null).size());
 
         assertEquals(401, enviarArquivo(doDono, "arquivo", PNG, null).statusCode());
-        assertEquals(400, enviarArquivo(doDono, "arquivo", PNG, salao.token()).statusCode());
-        assertEquals(400, enviarArquivo(doDono, "arquivo", PNG, cliente.token()).statusCode());
+        assertEquals(403, enviarArquivo(doDono, "arquivo", PNG, salao.token()).statusCode());
+        assertEquals(403, enviarArquivo(doDono, "arquivo", PNG, cliente.token()).statusCode());
 
         HttpResponse<String> enviada = enviarArquivo(doDono, "arquivo", PNG, outroEstudio.token());
         assertEquals(201, enviada.statusCode(), enviada.body());
@@ -587,7 +593,7 @@ class RotasComBancoRealTest {
         assertEquals(200, abrir(url).statusCode());
         assertEquals(url, get(publico, null).get(0).get("url").asText());
 
-        chamar("DELETE", doDono + "/" + fotoId, null, salao.token(), 400);
+        chamar("DELETE", doDono + "/" + fotoId, null, salao.token(), 403);
         chamar("DELETE", "/api/empresas/" + salao.id() + "/portfolio/" + fotoId, null, salao.token(), 404);
         assertEquals(200, abrir(url).statusCode());
 
@@ -632,7 +638,7 @@ class RotasComBancoRealTest {
 
         String lidas = "/api/mensagens/agendamento/" + agendamento + "/lidas";
         chamar("PATCH", lidas, null, null, 401);
-        chamar("PATCH", lidas, null, outraCliente.token(), 400);
+        chamar("PATCH", lidas, null, outraCliente.token(), 403);
         assertEquals(2, conversa(agendamento, salao.token()).get("naoLidas").asInt());
 
         chamar("PATCH", lidas, null, salao.token(), 204);

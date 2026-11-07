@@ -8,6 +8,7 @@ import br.com.kira.kirabackend.dto.request.MensagemRequest;
 import br.com.kira.kirabackend.dto.response.ConversaResponse;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
+import br.com.kira.kirabackend.exception.AcessoNegadoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.observer.ConversaLidaEvent;
 import br.com.kira.kirabackend.observer.MensagemEnviadaEvent;
@@ -111,7 +112,7 @@ public class MensagemService {
         boolean participa = usuarioId.equals(agendamento.getCliente().getId())
                 || usuarioId.equals(agendamento.getEmpresa().getId());
         if (!participa) {
-            throw new RegraDeNegocioException("Você não participa deste agendamento");
+            throw new AcessoNegadoException("Você não participa deste agendamento");
         }
     }
 

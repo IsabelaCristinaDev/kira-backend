@@ -11,6 +11,7 @@ import br.com.kira.kirabackend.dto.request.MensagemRequest;
 import br.com.kira.kirabackend.dto.response.ConversaResponse;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
+import br.com.kira.kirabackend.exception.AcessoNegadoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.observer.ConversaLidaEvent;
 import br.com.kira.kirabackend.observer.MensagemEnviadaEvent;
@@ -184,7 +185,7 @@ class MensagemServiceTest {
             UUID remetenteId = outroCliente.getId();
             MensagemRequest req = request("Oi");
 
-            assertThrows(RegraDeNegocioException.class,
+            assertThrows(AcessoNegadoException.class,
                     () -> service.enviar(remetenteId, req));
             verify(mensagemRepository, never()).save(any());
         }
@@ -198,7 +199,7 @@ class MensagemServiceTest {
             UUID remetenteId = outraEmpresa.getId();
             MensagemRequest req = request("Oi");
 
-            assertThrows(RegraDeNegocioException.class,
+            assertThrows(AcessoNegadoException.class,
                     () -> service.enviar(remetenteId, req));
             verify(mensagemRepository, never()).save(any());
         }
@@ -272,7 +273,7 @@ class MensagemServiceTest {
             UUID outroUsuario = UUID.randomUUID();
             UUID agendamentoId = agendamento.getId();
 
-            assertThrows(RegraDeNegocioException.class,
+            assertThrows(AcessoNegadoException.class,
                     () -> service.listarConversa(agendamentoId, outroUsuario));
             verify(mensagemRepository, never()).findByAgendamentoIdOrderByDataEnvioAsc(any());
         }
@@ -326,7 +327,7 @@ class MensagemServiceTest {
         UUID mensagemId = mensagem.getId();
         UUID outroUsuario = UUID.randomUUID();
 
-        assertThrows(RegraDeNegocioException.class,
+        assertThrows(AcessoNegadoException.class,
                 () -> service.marcarComoLida(mensagemId, outroUsuario));
         assertFalse(mensagem.getLida());
         verify(mensagemRepository, never()).save(any());
@@ -443,7 +444,7 @@ class MensagemServiceTest {
         when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
         UUID agendamentoId = agendamento.getId();
 
-        assertThrows(RegraDeNegocioException.class,
+        assertThrows(AcessoNegadoException.class,
                 () -> service.marcarConversaComoLida(agendamentoId, outroUsuario));
         verify(mensagemRepository, never()).marcarRecebidasComoLidas(any(), any());
     }

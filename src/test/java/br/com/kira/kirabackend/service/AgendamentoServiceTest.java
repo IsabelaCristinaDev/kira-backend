@@ -15,6 +15,7 @@ import br.com.kira.kirabackend.dto.request.AgendamentoRequest;
 import br.com.kira.kirabackend.dto.request.ReagendamentoRequest;
 import br.com.kira.kirabackend.dto.response.AgendamentoResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
+import br.com.kira.kirabackend.exception.AcessoNegadoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.exception.VerificacaoObrigatoriaException;
 import br.com.kira.kirabackend.observer.AgendamentoCanceladoEvent;
@@ -574,7 +575,7 @@ class AgendamentoServiceTest {
             Agendamento agendamento = agendamentoExistente(StatusAgendamento.PENDENTE);
             when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
 
-            assertThrows(RegraDeNegocioException.class,
+            assertThrows(AcessoNegadoException.class,
                     () -> service.confirmar(agendamento.getId(), UUID.randomUUID()));
 
             assertEquals(StatusAgendamento.PENDENTE, agendamento.getStatus());
@@ -671,7 +672,7 @@ class AgendamentoServiceTest {
             UUID outraEmpresa = UUID.randomUUID();
             when(agendamentoRepository.findById(agendamentoId)).thenReturn(Optional.of(agendamento));
 
-            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+            AcessoNegadoException ex = assertThrows(AcessoNegadoException.class,
                     () -> service.concluir(agendamentoId, outraEmpresa, FormaPagamento.PIX));
 
             assertEquals("Este atendimento não pertence ao seu estabelecimento", ex.getMessage());
@@ -772,7 +773,7 @@ class AgendamentoServiceTest {
             UUID outraEmpresa = UUID.randomUUID();
             when(agendamentoRepository.findById(agendamentoId)).thenReturn(Optional.of(agendamento));
 
-            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+            AcessoNegadoException ex = assertThrows(AcessoNegadoException.class,
                     () -> service.corrigirFormaPagamento(agendamentoId, outraEmpresa, FormaPagamento.DINHEIRO));
 
             assertEquals("Este atendimento não pertence ao seu estabelecimento", ex.getMessage());
@@ -1015,7 +1016,7 @@ class AgendamentoServiceTest {
             UUID outraEmpresa = UUID.randomUUID();
             when(agendamentoRepository.findById(agendamentoId)).thenReturn(Optional.of(agendamento));
 
-            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+            AcessoNegadoException ex = assertThrows(AcessoNegadoException.class,
                     () -> service.cancelarPelaEmpresa(agendamentoId, outraEmpresa));
 
             assertEquals("Este atendimento não pertence ao seu estabelecimento", ex.getMessage());
@@ -1050,7 +1051,7 @@ class AgendamentoServiceTest {
             AgendamentoRequest request = request(inicioValido);
             UUID clienteId = cliente.getId();
 
-            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+            AcessoNegadoException ex = assertThrows(AcessoNegadoException.class,
                     () -> service.criar(clienteId, outroUsuario, request));
 
             assertEquals("Você só pode agendar em seu próprio nome", ex.getMessage());
@@ -1063,9 +1064,9 @@ class AgendamentoServiceTest {
             UUID clienteId = cliente.getId();
             UUID empresaId = empresa.getId();
 
-            assertThrows(RegraDeNegocioException.class, () -> service.listarPorCliente(clienteId, outroUsuario));
-            assertThrows(RegraDeNegocioException.class, () -> service.listarPorEmpresa(empresaId, outroUsuario));
-            assertThrows(RegraDeNegocioException.class, () -> service.historicoCliente(clienteId, outroUsuario));
+            assertThrows(AcessoNegadoException.class, () -> service.listarPorCliente(clienteId, outroUsuario));
+            assertThrows(AcessoNegadoException.class, () -> service.listarPorEmpresa(empresaId, outroUsuario));
+            assertThrows(AcessoNegadoException.class, () -> service.historicoCliente(clienteId, outroUsuario));
             verifyNoInteractions(agendamentoRepository);
         }
 
@@ -1076,7 +1077,7 @@ class AgendamentoServiceTest {
             UUID agendamentoId = agendamento.getId();
             when(agendamentoRepository.findById(agendamentoId)).thenReturn(Optional.of(agendamento));
 
-            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+            AcessoNegadoException ex = assertThrows(AcessoNegadoException.class,
                     () -> service.cancelarPeloCliente(agendamentoId, outroUsuario));
 
             assertEquals("Você não participou deste atendimento", ex.getMessage());
@@ -1093,9 +1094,9 @@ class AgendamentoServiceTest {
             var reagendamento = new ReagendamentoRequest(inicioValido.plusDays(1), null);
             when(agendamentoRepository.findById(agendamentoId)).thenReturn(Optional.of(agendamento));
 
-            assertThrows(RegraDeNegocioException.class,
+            assertThrows(AcessoNegadoException.class,
                     () -> service.reagendarPeloCliente(agendamentoId, outroUsuario, reagendamento));
-            assertThrows(RegraDeNegocioException.class,
+            assertThrows(AcessoNegadoException.class,
                     () -> service.reagendarPelaEmpresa(agendamentoId, outroUsuario, reagendamento));
             assertEquals(inicioValido, agendamento.getDataHoraInicio());
             verify(agendamentoRepository, never()).save(any());

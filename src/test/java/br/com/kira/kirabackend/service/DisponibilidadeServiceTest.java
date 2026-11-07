@@ -13,6 +13,7 @@ import br.com.kira.kirabackend.dto.request.DisponibilidadeRequest;
 import br.com.kira.kirabackend.dto.response.DisponibilidadeResponse;
 import br.com.kira.kirabackend.dto.response.SlotDisponivel;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
+import br.com.kira.kirabackend.exception.AcessoNegadoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.BloqueioHorarioRepository;
@@ -345,7 +346,7 @@ class DisponibilidadeServiceTest {
             UUID outroUsuario = UUID.randomUUID();
             DisponibilidadeRequest req = new DisponibilidadeRequest(DiaSemana.SEGUNDA, hora(3, 0), hora(4, 0));
 
-            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+            AcessoNegadoException ex = assertThrows(AcessoNegadoException.class,
                     () -> service.cadastrar(empresaId, outroUsuario, req));
 
             assertEquals("Você só pode alterar o horário do seu estabelecimento", ex.getMessage());
@@ -485,7 +486,7 @@ class DisponibilidadeServiceTest {
             List<DisponibilidadeRequest> dias = List.of();
             UUID empresaId = empresa.getId();
 
-            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+            AcessoNegadoException ex = assertThrows(AcessoNegadoException.class,
                     () -> service.substituirSemana(empresaId, outroUsuario, dias));
             assertEquals("Você só pode alterar o horário do seu estabelecimento", ex.getMessage());
             verify(disponibilidadeRepository, never()).saveAll(any());

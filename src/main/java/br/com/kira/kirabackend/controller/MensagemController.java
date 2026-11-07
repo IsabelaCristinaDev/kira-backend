@@ -4,7 +4,7 @@ import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.dto.request.MensagemRequest;
 import br.com.kira.kirabackend.dto.response.ConversaResponse;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
-import br.com.kira.kirabackend.exception.RegraDeNegocioException;
+import br.com.kira.kirabackend.exception.AcessoNegadoException;
 import br.com.kira.kirabackend.service.MensagemService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +30,7 @@ public class MensagemController {
             @AuthenticationPrincipal Usuario usuario,
             @RequestBody @Valid MensagemRequest request) {
         if (!usuario.getId().equals(remetenteId)) {
-            throw new RegraDeNegocioException("Você só pode enviar mensagens em seu próprio nome");
+            throw new AcessoNegadoException("Você só pode enviar mensagens em seu próprio nome");
         }
         return ResponseEntity
                 .status(HttpStatus.CREATED)
