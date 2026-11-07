@@ -49,10 +49,10 @@ public class AgendamentoEventListener {
         comissaoService.calcularERegistrarComissao(agendamento);
     }
 
-    // Só depois do commit, para a cliente não ser avisada de uma confirmação que acabou não sendo salva.
+    // Só depois do commit, para a cliente não ser avisada de uma mudança que acabou não sendo salva.
     // O evento já traz o DTO, então o envio assíncrono não lê relação LAZY.
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onAgendamentoConfirmado(AgendamentoConfirmadoEvent event) {
-        notificacaoService.notificarConfirmacao(event.agendamento());
+    public void onAvisoAgendamento(AvisoAgendamentoEvent event) {
+        notificacaoService.notificarAgendamento(event.agendamento(), event.tipo());
     }
 }

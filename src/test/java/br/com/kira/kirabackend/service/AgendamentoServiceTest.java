@@ -9,6 +9,7 @@ import br.com.kira.kirabackend.domain.entity.Servico;
 import br.com.kira.kirabackend.domain.enums.DiaSemana;
 import br.com.kira.kirabackend.domain.enums.FormaPagamento;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
+import br.com.kira.kirabackend.domain.enums.TipoAvisoAgendamento;
 import br.com.kira.kirabackend.domain.enums.TipoUsuario;
 import br.com.kira.kirabackend.dto.request.AgendamentoRequest;
 import br.com.kira.kirabackend.dto.request.ReagendamentoRequest;
@@ -18,8 +19,8 @@ import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.exception.VerificacaoObrigatoriaException;
 import br.com.kira.kirabackend.observer.AgendamentoCanceladoEvent;
 import br.com.kira.kirabackend.observer.AgendamentoCriadoEvent;
-import br.com.kira.kirabackend.observer.AgendamentoConfirmadoEvent;
 import br.com.kira.kirabackend.observer.AtendimentoConcluidoEvent;
+import br.com.kira.kirabackend.observer.AvisoAgendamentoEvent;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.BloqueioHorarioRepository;
 import br.com.kira.kirabackend.repository.DisponibilidadeEstudioRepository;
@@ -519,6 +520,17 @@ class AgendamentoServiceTest {
         }
     }
 
+    /** O aviso à cliente vai por publishEvent(Object); os eventos antigos usam publishEvent(ApplicationEvent). */
+    private AvisoAgendamentoEvent avisoPublicado() {
+        ArgumentCaptor<Object> evento = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publishEvent(evento.capture());
+        return assertInstanceOf(AvisoAgendamentoEvent.class, evento.getValue());
+    }
+
+    private void semAviso() {
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
     // ---------- confirmar ----------
 
     @Nested
@@ -538,11 +550,7 @@ class AgendamentoServiceTest {
             assertEquals(StatusAgendamento.CONFIRMADO, response.status());
             assertEquals(StatusAgendamento.CONFIRMADO, agendamento.getStatus());
             // O evento leva os dados prontos: o aviso à cliente sai em outra thread, sem ler relação LAZY
-            ArgumentCaptor<Object> evento = ArgumentCaptor.forClass(Object.class);
-            verify(eventPublisher).publishEvent(evento.capture());
-            AgendamentoConfirmadoEvent confirmado =
-                    assertInstanceOf(AgendamentoConfirmadoEvent.class, evento.getValue());
-            assertEquals(response, confirmado.agendamento());
+            assertEquals(new AvisoAgendamentoEvent(response, TipoAvisoAgendamento.CONFIRMADO), avisoPublicado());
         }
 
         @ParameterizedTest
@@ -692,6 +700,8 @@ class AgendamentoServiceTest {
 
             AgendamentoResponse response = service.reagendarPeloCliente(agendamento.getId(), cliente.getId(),
                     new ReagendamentoRequest(novoInicio, "Imprevisto"));
+            // Quem remarcou foi a própria cliente: não há o que avisar
+            semAviso();
 
             assertEquals(novoInicio, agendamento.getDataHoraInicio());
             assertEquals(novoInicio.plusMinutes(DURACAO_SERVICO), agendamento.getDataHoraFim());
@@ -732,10 +742,12 @@ class AgendamentoServiceTest {
             mockarAgendamentosNoIntervalo(List.of());
             mockarSaveDevolvendoArgumento();
 
-            service.reagendarPelaEmpresa(agendamento.getId(), empresa.getId(),
+            AgendamentoResponse response = service.reagendarPelaEmpresa(agendamento.getId(), empresa.getId(),
                     new ReagendamentoRequest(novoInicio, null));
 
             assertEquals(novoInicio, agendamento.getDataHoraInicio());
+            assertEquals(new AvisoAgendamentoEvent(response, TipoAvisoAgendamento.REMARCADO_PELO_ESTUDIO),
+                    avisoPublicado());
         }
 
         @Test
@@ -843,6 +855,7 @@ class AgendamentoServiceTest {
             verify(cancelamentoEmpresaStrategy, never()).validarCancelamento(any());
             assertEquals(StatusAgendamento.CANCELADO, response.status());
             assertCanceladoComEvento(agendamento);
+            semAviso();
         }
 
         @Test
@@ -872,6 +885,8 @@ class AgendamentoServiceTest {
             verify(cancelamentoClienteStrategy, never()).validarCancelamento(any());
             assertEquals(StatusAgendamento.CANCELADO, response.status());
             assertCanceladoComEvento(agendamento);
+            assertEquals(new AvisoAgendamentoEvent(response, TipoAvisoAgendamento.CANCELADO_PELO_ESTUDIO),
+                    avisoPublicado());
         }
 
         @Test

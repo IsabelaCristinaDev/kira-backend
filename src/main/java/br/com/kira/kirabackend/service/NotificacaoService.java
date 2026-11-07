@@ -1,6 +1,7 @@
 package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.DispositivoNotificacao;
+import br.com.kira.kirabackend.domain.enums.TipoAvisoAgendamento;
 import br.com.kira.kirabackend.dto.request.DispositivoWebRequest;
 import br.com.kira.kirabackend.dto.response.AgendamentoResponse;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
@@ -38,8 +39,6 @@ public class NotificacaoService {
     private static final List<Integer> DISPOSITIVO_NAO_EXISTE_MAIS = List.of(404, 410);
     private static final List<String> SERVICOS_DE_PUSH = List.of(
             "fcm.googleapis.com", "push.services.mozilla.com", "push.apple.com", "notify.windows.com");
-    // O app usa o tipo para decidir o que mostrar e o que abrir no toque
-    static final String TIPO_CONFIRMACAO = "AGENDAMENTO_CONFIRMADO";
     private static final DateTimeFormatter DIA_E_HORA = DateTimeFormatter.ofPattern("dd/MM 'às' HH:mm");
 
     private final DispositivoNotificacaoRepository dispositivoRepository;
@@ -77,15 +76,25 @@ public class NotificacaoService {
                 "agendamentoId", mensagem.agendamentoId().toString()), destinatarios);
     }
 
-    /** Avisa a cliente que o estúdio confirmou o horário. Assíncrono pelo mesmo motivo da mensagem. */
+    /** Avisa a cliente que o estúdio confirmou, cancelou ou remarcou o horário. Assíncrono como a mensagem. */
     @Async
-    public void notificarConfirmacao(AgendamentoResponse agendamento) {
+    public void notificarAgendamento(AgendamentoResponse agendamento, TipoAvisoAgendamento tipo) {
         enviarAosUsuarios(Map.of(
-                "tipo", TIPO_CONFIRMACAO,
+                "tipo", tipo.getCodigo(),
                 "titulo", agendamento.nomeEmpresa(),
-                "corpo", "Seu horário de " + agendamento.nomeServico() + " em "
-                        + DIA_E_HORA.format(agendamento.dataHoraInicio()) + " foi confirmado.",
+                "corpo", textoDoAviso(agendamento, tipo),
                 "agendamentoId", agendamento.id().toString()), List.of(agendamento.clienteId()));
+    }
+
+    private static String textoDoAviso(AgendamentoResponse agendamento, TipoAvisoAgendamento tipo) {
+        String servico = agendamento.nomeServico();
+        String quando = DIA_E_HORA.format(agendamento.dataHoraInicio());
+        return switch (tipo) {
+            case CONFIRMADO -> "Seu horário de " + servico + " em " + quando + " foi confirmado.";
+            case CANCELADO_PELO_ESTUDIO -> "Seu horário de " + servico + " em " + quando + " foi cancelado pelo estúdio.";
+            // O agendamento já traz o horário novo
+            case REMARCADO_PELO_ESTUDIO -> "Seu horário de " + servico + " mudou para " + quando + ".";
+        };
     }
 
     private void enviarAosUsuarios(Map<String, String> notificacao, List<UUID> destinatarios) {
