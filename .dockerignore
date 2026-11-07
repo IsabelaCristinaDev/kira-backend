@@ -1,0 +1,17 @@
+# O build só precisa do pom.xml e do src. O resto não deve chegar ao Docker, principalmente segredos e backups
+.env
+*.env
+*.sql
+*.dump
+*.dump~
+uploads/
+target/
+.git/
+.github/
+.idea/
+.claude/
+.mvn/
+doc/
+CLAUDE.md
+CLAUDE.local.md
+erros.txt
