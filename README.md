@@ -127,7 +127,17 @@ O arquivo `.env` é carregado automaticamente e nunca deve ir para o repositóri
 | Exigir a verificação | `VERIFICACAO_OBRIGATORIA` | Não, o padrão é `false` |
 | Servidor e front-end | `SERVER_PORT`, `FRONTEND_URL` | Não, têm valor padrão |
 | Log do SQL | `MOSTRAR_SQL` | Não, o padrão é `false` |
+| Pasta das fotos | `KIRA_ARQUIVOS_PASTA` | Não, o padrão é `./uploads` (ver abaixo) |
 | Lembrete | `LEMBRETE_ANTECEDENCIA_HORAS`, `LEMBRETE_CRON`, `LEMBRETE_RETRY_*` | Não, têm valor padrão |
+
+### Pasta das fotos
+
+As fotos enviadas ficam em disco, na pasta `KIRA_ARQUIVOS_PASTA`, e o banco guarda só o nome de cada arquivo. Por isso:
+
+- use um caminho absoluto fixo (ex.: `/home/usuario/kira-uploads`). O padrão `./uploads` é relativo à pasta de onde a API é iniciada e pode apontar para outro lugar se ela for iniciada de outra pasta;
+- faça o backup dessa pasta junto com o do banco, no mesmo momento. Um sem o outro deixa fotos sem registro ou registros sem foto.
+
+No `docker-compose.servidor.yml` a pasta já é `/app/uploads`, guardada num volume do Docker.
 
 ### Exigir a identidade verificada
 
