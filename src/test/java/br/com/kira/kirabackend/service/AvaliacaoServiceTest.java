@@ -311,11 +311,26 @@ class AvaliacaoServiceTest {
         when(avaliacaoRepository.findByClienteIdAndTipoAvaliador(cliente.getId(), TipoAvaliador.CLIENTE))
                 .thenReturn(List.of(avaliacao(TipoAvaliador.CLIENTE)));
 
-        List<AvaliacaoResponse> avaliacoes = service.listarMinhasAvaliacoes(cliente.getId());
+        List<AvaliacaoResponse> avaliacoes = service.listarMinhasAvaliacoes(cliente);
 
         assertEquals(1, avaliacoes.size());
         assertEquals(TipoAvaliador.CLIENTE, avaliacoes.get(0).tipoAvaliador());
         verify(avaliacaoRepository, never()).findByClienteIdAndTipoAvaliador(cliente.getId(), TipoAvaliador.EMPRESA);
+    }
+
+    @Test
+    @DisplayName("Minhas avaliações do estúdio traz as que ele fez das clientes")
+    void minhasAvaliacoesDoEstudioTrazAsQueEleFez() {
+        when(avaliacaoRepository.findByEmpresaIdAndTipoAvaliador(empresa.getId(), TipoAvaliador.EMPRESA))
+                .thenReturn(List.of(avaliacao(TipoAvaliador.EMPRESA)));
+
+        List<AvaliacaoResponse> avaliacoes = service.listarMinhasAvaliacoes(empresa);
+
+        assertEquals(1, avaliacoes.size());
+        assertEquals(TipoAvaliador.EMPRESA, avaliacoes.get(0).tipoAvaliador());
+        assertEquals(agendamento.getId(), avaliacoes.get(0).agendamentoId());
+        // As avaliações que o estúdio recebeu têm rota própria (/empresa/{id})
+        verify(avaliacaoRepository, never()).findByEmpresaIdAndTipoAvaliador(empresa.getId(), TipoAvaliador.CLIENTE);
     }
 
     @Test

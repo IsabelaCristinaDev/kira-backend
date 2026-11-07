@@ -399,6 +399,11 @@ class RotasComBancoRealTest {
         get("/api/avaliacoes/cliente/" + bia.id(), bia.token());
         chamar("GET", "/api/avaliacoes/cliente/" + bia.id(), null, estudio.token(), 403);
         assertEquals(5, get("/api/avaliacoes/minhas", bia.token()).get(0).get("nota").asInt());
+        // O estúdio vê as que ele fez, para saber quais atendimentos já avaliou
+        JsonNode doEstudio = get("/api/avaliacoes/minhas", estudio.token());
+        assertEquals(1, doEstudio.size());
+        assertEquals(concluido, doEstudio.get(0).get("agendamentoId").asText());
+        assertEquals("EMPRESA", doEstudio.get(0).get("tipoAvaliador").asText());
         assertEquals("bia", get("/api/avaliacoes/empresa/" + estudio.id(), null).get(0).get("nomeCliente").asText());
         get("/api/avaliacoes/empresa/" + estudio.id() + "/media", null);
         get("/api/studios/" + estudio.id() + "/avaliacoes", null);
