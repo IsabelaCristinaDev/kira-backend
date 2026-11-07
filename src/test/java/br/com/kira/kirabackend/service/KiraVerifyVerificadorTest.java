@@ -68,7 +68,7 @@ class KiraVerifyVerificadorTest {
     }
 
     private Resultado verificar() {
-        return verificador.verificar(DOCUMENTO, SELFIE, TipoDocumentoIdentidade.CNH, "12345678900");
+        return verificador.verificar(DOCUMENTO, null, SELFIE, TipoDocumentoIdentidade.CNH, "12345678900");
     }
 
     @Test
@@ -92,13 +92,39 @@ class KiraVerifyVerificadorTest {
     }
 
     @Test
+    @DisplayName("Com o verso, envia também a parte document_back")
+    void enviaOVerso() {
+        Imagem verso = new Imagem(new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x02}, MediaType.IMAGE_JPEG);
+        servidor.expect(requestTo(URL))
+                .andExpect(content().string(containsString("name=\"document\"; filename=\"document.jpg\"")))
+                .andExpect(content().string(containsString("name=\"document_back\"; filename=\"document_back.jpg\"")))
+                .andRespond(withSuccess(respostaJson("APPROVED", "[]"), MediaType.APPLICATION_JSON));
+
+        verificador.verificar(DOCUMENTO, verso, SELFIE, TipoDocumentoIdentidade.RG, null);
+
+        servidor.verify();
+    }
+
+    @Test
+    @DisplayName("Sem o verso, a parte document_back não é enviada")
+    void semVerso() {
+        servidor.expect(requestTo(URL))
+                .andExpect(content().string(not(containsString("document_back"))))
+                .andRespond(withSuccess(respostaJson("APPROVED", "[]"), MediaType.APPLICATION_JSON));
+
+        verificar();
+
+        servidor.verify();
+    }
+
+    @Test
     @DisplayName("Sem CPF esperado, o campo expected_cpf não é enviado")
     void semCpfEsperado() {
         servidor.expect(requestTo(URL))
                 .andExpect(content().string(not(containsString("expected_cpf"))))
                 .andRespond(withSuccess(respostaJson("APPROVED", "[]"), MediaType.APPLICATION_JSON));
 
-        verificador.verificar(DOCUMENTO, SELFIE, TipoDocumentoIdentidade.RG, null);
+        verificador.verificar(DOCUMENTO, null, SELFIE, TipoDocumentoIdentidade.RG, null);
 
         servidor.verify();
     }
@@ -142,7 +168,7 @@ class KiraVerifyVerificadorTest {
         KiraVerifyVerificador semChave = new KiraVerifyVerificador(restClient, BASE, " ");
 
         assertThrows(FalhaVerificacaoException.class,
-                () -> semChave.verificar(DOCUMENTO, SELFIE, TipoDocumentoIdentidade.CNH, null));
+                () -> semChave.verificar(DOCUMENTO, null, SELFIE, TipoDocumentoIdentidade.CNH, null));
 
         servidor.verify();
     }

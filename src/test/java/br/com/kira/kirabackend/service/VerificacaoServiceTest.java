@@ -43,6 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -82,7 +83,7 @@ class VerificacaoServiceTest {
     }
 
     private VerificacaoResponse enviarCnh() {
-        return service.enviar(cliente, foto("document", JPEG), foto("selfie", PNG), "CNH", true);
+        return service.enviar(cliente, foto("document", JPEG), null, foto("selfie", PNG), "CNH", true);
     }
 
     private void semTentativaAnterior() {
@@ -98,7 +99,7 @@ class VerificacaoServiceTest {
     }
 
     private void servicoResponde(DecisaoVerificacaoIa decisao, List<String> motivos) {
-        when(verificador.verificar(any(), any(), any(), any())).thenReturn(new Resultado(
+        when(verificador.verificar(any(), any(), any(), any(), any())).thenReturn(new Resultado(
                 decisao, motivos, new BigDecimal("0.87"), new BigDecimal("0.93"), "req-1"));
     }
 
@@ -200,9 +201,37 @@ class VerificacaoServiceTest {
 
         ArgumentCaptor<Imagem> documento = ArgumentCaptor.forClass(Imagem.class);
         ArgumentCaptor<Imagem> selfie = ArgumentCaptor.forClass(Imagem.class);
-        verify(verificador).verificar(documento.capture(), selfie.capture(), eq(TipoDocumentoIdentidade.CNH), eq("12345678900"));
+        verify(verificador).verificar(documento.capture(), isNull(), selfie.capture(), eq(TipoDocumentoIdentidade.CNH), eq("12345678900"));
         assertEquals(MediaType.IMAGE_JPEG, documento.getValue().tipo());
         assertEquals(MediaType.IMAGE_PNG, selfie.getValue().tipo());
+    }
+
+    @Test
+    @DisplayName("Com o verso do documento, manda as três imagens ao serviço")
+    void mandaOVerso() {
+        semTentativaAnterior();
+        tentativasUsadas(0);
+        salvarDevolveOMesmo();
+        servicoResponde(DecisaoVerificacaoIa.APPROVED, List.of());
+
+        service.enviar(cliente, foto("document", JPEG), foto("document_back", PNG), foto("selfie", JPEG), "RG", true);
+
+        ArgumentCaptor<Imagem> verso = ArgumentCaptor.forClass(Imagem.class);
+        verify(verificador).verificar(any(), verso.capture(), any(), eq(TipoDocumentoIdentidade.RG), any());
+        assertEquals(new Imagem(PNG, MediaType.IMAGE_PNG), verso.getValue());
+    }
+
+    @Test
+    @DisplayName("Verso vazio conta como não enviado")
+    void versoVazioNaoVai() {
+        semTentativaAnterior();
+        tentativasUsadas(0);
+        salvarDevolveOMesmo();
+        servicoResponde(DecisaoVerificacaoIa.APPROVED, List.of());
+
+        service.enviar(cliente, foto("document", JPEG), foto("document_back", new byte[0]), foto("selfie", JPEG), "CNH", true);
+
+        verify(verificador).verificar(any(), isNull(), any(), any(), any());
     }
 
     @Test
@@ -213,9 +242,9 @@ class VerificacaoServiceTest {
         salvarDevolveOMesmo();
         servicoResponde(DecisaoVerificacaoIa.APPROVED, List.of());
 
-        service.enviar(cliente, foto("document", JPEG), foto("selfie", JPEG), " rg ", true);
+        service.enviar(cliente, foto("document", JPEG), null, foto("selfie", JPEG), " rg ", true);
 
-        verify(verificador).verificar(any(), any(), eq(TipoDocumentoIdentidade.RG), any());
+        verify(verificador).verificar(any(), isNull(), any(), eq(TipoDocumentoIdentidade.RG), any());
     }
 
     @Test
@@ -228,12 +257,12 @@ class VerificacaoServiceTest {
         salvarDevolveOMesmo();
         servicoResponde(DecisaoVerificacaoIa.APPROVED, List.of());
 
-        service.enviar(empresa, foto("document", JPEG), foto("selfie", JPEG), "CNH", true);
+        service.enviar(empresa, foto("document", JPEG), null, foto("selfie", JPEG), "CNH", true);
 
         ArgumentCaptor<VerificacaoIdentidade> salvo = ArgumentCaptor.forClass(VerificacaoIdentidade.class);
         verify(repository, atLeastOnce()).save(salvo.capture());
         assertEquals(TipoUsuario.EMPRESA, salvo.getValue().getTipoUsuario());
-        verify(verificador).verificar(any(), any(), any(), eq(null));
+        verify(verificador).verificar(any(), isNull(), any(), any(), eq(null));
     }
 
     @Test
@@ -278,7 +307,7 @@ class VerificacaoServiceTest {
         semTentativaAnterior();
         tentativasUsadas(0);
         salvarDevolveOMesmo();
-        when(verificador.verificar(any(), any(), any(), any()))
+        when(verificador.verificar(any(), any(), any(), any(), any()))
                 .thenThrow(new VerificacaoIndisponivelException("fora do ar", new RuntimeException()));
 
         assertThrows(VerificacaoIndisponivelException.class, this::enviarCnh);
@@ -298,7 +327,7 @@ class VerificacaoServiceTest {
         MockMultipartFile selfie = foto("selfie", JPEG);
 
         assertThrows(RegraDeNegocioException.class,
-                () -> service.enviar(cliente, documento, selfie, "CNH", consentimento));
+                () -> service.enviar(cliente, documento, null, selfie, "CNH", consentimento));
 
         verifyNoInteractions(repository, verificador);
     }
@@ -313,7 +342,7 @@ class VerificacaoServiceTest {
         MockMultipartFile selfie = foto("selfie", JPEG);
 
         assertThrows(RegraDeNegocioException.class,
-                () -> service.enviar(admin, documento, selfie, "CNH", true));
+                () -> service.enviar(admin, documento, null, selfie, "CNH", true));
 
         verifyNoInteractions(repository, verificador);
     }
@@ -326,7 +355,7 @@ class VerificacaoServiceTest {
         MockMultipartFile selfie = foto("selfie", JPEG);
 
         assertThrows(RegraDeNegocioException.class,
-                () -> service.enviar(cliente, documento, selfie, tipo, true));
+                () -> service.enviar(cliente, documento, null, selfie, tipo, true));
 
         verifyNoInteractions(repository, verificador);
     }
@@ -338,8 +367,27 @@ class VerificacaoServiceTest {
         MockMultipartFile selfie = foto("selfie", JPEG);
         MockMultipartFile vazia = foto("selfie", new byte[0]);
 
-        assertThrows(RegraDeNegocioException.class, () -> service.enviar(cliente, null, selfie, "CNH", true));
-        assertThrows(RegraDeNegocioException.class, () -> service.enviar(cliente, documento, vazia, "CNH", true));
+        assertThrows(RegraDeNegocioException.class, () -> service.enviar(cliente, null, null, selfie, "CNH", true));
+        assertThrows(RegraDeNegocioException.class, () -> service.enviar(cliente, documento, null, vazia, "CNH", true));
+
+        verifyNoInteractions(repository, verificador);
+    }
+
+    @Test
+    @DisplayName("Verso grande demais ou fora de JPG e PNG é recusado como as outras fotos")
+    void versoInvalido() {
+        byte[] grande = new byte[(int) LIMITE_BYTES + 1];
+        System.arraycopy(JPEG, 0, grande, 0, JPEG.length);
+        byte[] gif = {'G', 'I', 'F', '8', '9', 'a', 0, 0, 0};
+        MockMultipartFile documento = foto("document", JPEG);
+        MockMultipartFile versoGrande = foto("document_back", grande);
+        MockMultipartFile versoGif = foto("document_back", gif);
+        MockMultipartFile selfie = foto("selfie", JPEG);
+
+        assertThrows(RegraDeNegocioException.class,
+                () -> service.enviar(cliente, documento, versoGrande, selfie, "RG", true));
+        assertThrows(RegraDeNegocioException.class,
+                () -> service.enviar(cliente, documento, versoGif, selfie, "RG", true));
 
         verifyNoInteractions(repository, verificador);
     }
@@ -354,7 +402,7 @@ class VerificacaoServiceTest {
         MockMultipartFile selfie = foto("selfie", JPEG);
 
         assertThrows(RegraDeNegocioException.class,
-                () -> service.enviar(cliente, documento, selfie, "CNH", true));
+                () -> service.enviar(cliente, documento, null, selfie, "CNH", true));
 
         verifyNoInteractions(repository, verificador);
     }
@@ -368,7 +416,7 @@ class VerificacaoServiceTest {
         MockMultipartFile selfie = foto("selfie", JPEG);
 
         assertThrows(RegraDeNegocioException.class,
-                () -> service.enviar(cliente, documento, selfie, "CNH", true));
+                () -> service.enviar(cliente, documento, null, selfie, "CNH", true));
 
         verifyNoInteractions(repository, verificador);
     }

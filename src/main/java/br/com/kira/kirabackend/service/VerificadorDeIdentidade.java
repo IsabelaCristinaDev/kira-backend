@@ -21,12 +21,14 @@ import java.util.Objects;
 public interface VerificadorDeIdentidade {
 
     /**
-     * @param cpfEsperado CPF do cadastro para o serviço conferir com o documento. Pode ser nulo
+     * @param versoDocumento verso do documento. Pode ser nulo: o serviço trabalha só com a frente
+     * @param cpfEsperado    CPF do cadastro para o serviço conferir com o documento. Pode ser nulo
      * @throws VerificacaoIndisponivelException se o serviço não responder a tempo ou estiver fora do ar
      * @throws FalhaVerificacaoException        se a chave estiver errada ou a resposta fugir do contrato
      * @throws RegraDeNegocioException          se o serviço recusar a imagem (tamanho ou formato)
      */
-    Resultado verificar(Imagem documento, Imagem selfie, TipoDocumentoIdentidade tipoDocumento, String cpfEsperado);
+    Resultado verificar(Imagem documento, Imagem versoDocumento, Imagem selfie, TipoDocumentoIdentidade tipoDocumento,
+                        String cpfEsperado);
 
     /** Imagem já validada pelo backend. O tipo vai junto porque o serviço confere o formato. */
     record Imagem(byte[] conteudo, MediaType tipo) {

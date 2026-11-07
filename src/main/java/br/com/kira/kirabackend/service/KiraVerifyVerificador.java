@@ -27,7 +27,7 @@ import java.net.ConnectException;
 
 /**
  * Chama o kira-verify-ai em POST /v1/verify: multipart com document, selfie, document_type e,
- * se houver, expected_cpf. Toda chamada leva o header X-Service-Key.
+ * se houver, document_back (verso do documento) e expected_cpf. Toda chamada leva o header X-Service-Key.
  *
  * Tenta de novo no máximo uma vez, e só quando o serviço não chegou a receber o pedido (conexão
  * recusada) ou disse que está ocupado (503). Erro 4xx não se repete: o resultado seria o mesmo.
@@ -59,8 +59,8 @@ public class KiraVerifyVerificador implements VerificadorDeIdentidade {
     }
 
     @Override
-    public Resultado verificar(Imagem documento, Imagem selfie, TipoDocumentoIdentidade tipoDocumento,
-                               String cpfEsperado) {
+    public Resultado verificar(Imagem documento, Imagem versoDocumento, Imagem selfie,
+                               TipoDocumentoIdentidade tipoDocumento, String cpfEsperado) {
         if (chaveServico.isBlank()) {
             log.error("Verificação: VERIFY_SERVICE_KEY não configurada");
             throw new FalhaVerificacaoException("Chave do serviço de verificação não configurada");
@@ -68,6 +68,9 @@ public class KiraVerifyVerificador implements VerificadorDeIdentidade {
 
         MultiValueMap<String, Object> corpo = new LinkedMultiValueMap<>();
         corpo.add("document", parteDeImagem(documento, "document"));
+        if (versoDocumento != null) {
+            corpo.add("document_back", parteDeImagem(versoDocumento, "document_back"));
+        }
         corpo.add("selfie", parteDeImagem(selfie, "selfie"));
         corpo.add("document_type", tipoDocumento.name());
         if (cpfEsperado != null && !cpfEsperado.isBlank()) {

@@ -27,10 +27,11 @@ public class VerificacaoController {
     public ResponseEntity<VerificacaoResponse> enviar(
             @AuthenticationPrincipal Usuario usuario,
             @RequestParam(value = "document", required = false) MultipartFile documento,
+            @RequestParam(value = "document_back", required = false) MultipartFile versoDocumento,
             @RequestParam(value = "selfie", required = false) MultipartFile selfie,
             @RequestParam(value = "document_type", required = false) String tipoDocumento,
             @RequestParam(value = "consent", required = false) Boolean consentimento) {
-        return ResponseEntity.ok(verificacaoService.enviar(usuario, documento, selfie, tipoDocumento, consentimento));
+        return ResponseEntity.ok(verificacaoService.enviar(usuario, documento, versoDocumento, selfie, tipoDocumento, consentimento));
     }
 
     @GetMapping("/me")

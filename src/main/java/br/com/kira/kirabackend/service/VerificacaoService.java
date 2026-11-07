@@ -70,20 +70,25 @@ public class VerificacaoService {
     }
 
     // Sem @Transactional de propósito: o serviço de IA pode levar até 30 s e não deve segurar uma conexão do banco
-    public VerificacaoResponse enviar(Usuario usuario, MultipartFile documento, MultipartFile selfie,
-                                      String tipoDocumento, Boolean consentimento) {
+    public VerificacaoResponse enviar(Usuario usuario, MultipartFile documento, MultipartFile versoDocumento,
+                                      MultipartFile selfie, String tipoDocumento, Boolean consentimento) {
         TipoUsuario tipoUsuario = tipoDoUsuario(usuario);
         if (!Boolean.TRUE.equals(consentimento)) {
             throw new RegraDeNegocioException("Aceite o termo de consentimento para verificar sua identidade");
         }
         TipoDocumentoIdentidade tipo = lerTipoDocumento(tipoDocumento);
         Imagem imagemDocumento = lerImagem(documento, "Envie a foto do documento");
+        // O verso é opcional: sem ele, o serviço trabalha só com a frente
+        Imagem imagemVerso = versoDocumento == null || versoDocumento.isEmpty()
+                ? null
+                : lerImagem(versoDocumento, "Envie a foto do verso do documento");
         Imagem imagemSelfie = lerImagem(selfie, "Envie a selfie");
 
         VerificacaoIdentidade verificacao = prepararTentativa(usuario, tipoUsuario, tipo);
 
         // Se o serviço falhar, a exceção sobe e a tentativa continua PENDING para a pessoa tentar de novo
-        Resultado resultado = verificador.verificar(imagemDocumento, imagemSelfie, tipo, cpfDoCadastro(usuario));
+        Resultado resultado = verificador.verificar(imagemDocumento, imagemVerso, imagemSelfie, tipo,
+                cpfDoCadastro(usuario));
 
         verificacao.setStatus(statusDa(resultado.decisao()));
         verificacao.setMotivos(resultado.motivos());
