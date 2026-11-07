@@ -63,6 +63,20 @@ Com a API no ar:
 
 As tabelas são criadas e atualizadas automaticamente pelo Hibernate (`ddl-auto: update`).
 
+### Rodar num servidor
+
+O arquivo `docker-compose.servidor.yml` sobe a API e o banco juntos, cada um no seu container:
+
+```bash
+cp .env.example .env   # preencher com os valores do servidor
+docker compose -f docker-compose.servidor.yml up -d --build
+```
+
+- O banco não fica acessível de fora do servidor: só a API o enxerga.
+- A API fica em `127.0.0.1:8081`, para ser publicada por um proxy com HTTPS. Para testar sem proxy, use `API_ENDERECO=0.0.0.0:8081`.
+- O banco e as fotos enviadas ficam em volumes do Docker e continuam lá a cada novo deploy. Só `docker compose down -v` os apaga.
+- Além das variáveis obrigatórias da tabela abaixo, o servidor exige `KIRA_CORS_ORIGENS` e `FRONTEND_URL` com o endereço real do app web. As `SPRING_DATASOURCE_*` não são usadas: a API aponta sozinha para o banco do compose.
+
 ## Variáveis de ambiente
 
 O arquivo `.env` é carregado automaticamente e nunca deve ir para o repositório. O modelo completo está em [`.env.example`](.env.example).

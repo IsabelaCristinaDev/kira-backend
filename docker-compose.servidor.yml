@@ -1,0 +1,61 @@
+# API + banco para rodar num servidor. O docker-compose.yml continua sendo o do dia a dia (só o Postgres).
+#
+#   docker compose -f docker-compose.servidor.yml up -d --build
+#
+# Os valores vêm do .env do servidor. Faltando um obrigatório, o compose para e diz qual é.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:?Defina DB_NAME no .env}
+      POSTGRES_USER: ${DB_USERNAME:?Defina DB_USERNAME no .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no .env}
+    # Sem "ports": o banco só é visto pela API, pela rede interna do compose, nunca de fora do servidor
+    volumes:
+      - kira_db_dados:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Demais variáveis (e-mail, VAPID, Cloudflare, lembrete etc.). As de "environment" abaixo têm prioridade
+    env_file:
+      - ${KIRA_ENV_FILE:-.env}
+    environment:
+      # O banco é o serviço "postgres" daqui, e não o 127.0.0.1:5433 do ambiente local
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET no .env (openssl rand -hex 64)}
+      JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:?Defina JWT_REFRESH_EXPIRATION no .env}
+      KIRA_CORS_ORIGENS: ${KIRA_CORS_ORIGENS:?Defina KIRA_CORS_ORIGENS com o endereço do app web}
+      FRONTEND_URL: ${FRONTEND_URL:?Defina FRONTEND_URL com o endereço do app web}
+      # Fixos: a imagem escuta na 8081 e grava as fotos no volume abaixo
+      SERVER_PORT: "8081"
+      KIRA_ARQUIVOS_PASTA: /app/uploads
+    ports:
+      # Por padrão, só o próprio servidor acessa a API: quem fica exposto é o proxy com HTTPS na frente dela.
+      # Para testar sem proxy, use API_ENDERECO=0.0.0.0:8081 no .env
+      - "${API_ENDERECO:-127.0.0.1:8081}:8081"
+    volumes:
+      # Fotos enviadas: sobrevivem a cada novo deploy
+      - kira_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q UP"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      # A primeira subida cria as tabelas e demora mais
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  kira_db_dados:
+  kira_uploads:
