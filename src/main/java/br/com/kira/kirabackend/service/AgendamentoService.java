@@ -4,6 +4,7 @@ import br.com.kira.kirabackend.domain.entity.*;
 import br.com.kira.kirabackend.domain.enums.DiaSemana;
 import br.com.kira.kirabackend.domain.enums.FormaPagamento;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
+import br.com.kira.kirabackend.domain.enums.TipoAvisoAgendamento;
 import br.com.kira.kirabackend.domain.enums.TipoUsuario;
 import br.com.kira.kirabackend.dto.request.AgendamentoRequest;
 import br.com.kira.kirabackend.dto.request.ReagendamentoRequest;
@@ -12,8 +13,8 @@ import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.observer.AgendamentoCanceladoEvent;
 import br.com.kira.kirabackend.observer.AgendamentoCriadoEvent;
-import br.com.kira.kirabackend.observer.AgendamentoConfirmadoEvent;
 import br.com.kira.kirabackend.observer.AtendimentoConcluidoEvent;
+import br.com.kira.kirabackend.observer.AvisoAgendamentoEvent;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.DisponibilidadeEstudioRepository;
 import br.com.kira.kirabackend.repository.FuncionariaRepository;
@@ -153,7 +154,7 @@ public class AgendamentoService {
         agendamento.setStatus(StatusAgendamento.CANCELADO);
         Agendamento salvo = agendamentoRepository.save(agendamento);
         eventPublisher.publishEvent(new AgendamentoCanceladoEvent(this, salvo));
-        return toResponse(salvo);
+        return avisarCliente(toResponse(salvo), TipoAvisoAgendamento.CANCELADO_PELO_ESTUDIO);
     }
 
     /** O estúdio confirma um agendamento novo ou remarcado. */
@@ -168,8 +169,12 @@ public class AgendamentoService {
         }
 
         agendamento.setStatus(StatusAgendamento.CONFIRMADO);
-        AgendamentoResponse resposta = toResponse(agendamentoRepository.save(agendamento));
-        eventPublisher.publishEvent(new AgendamentoConfirmadoEvent(resposta));
+        return avisarCliente(toResponse(agendamentoRepository.save(agendamento)), TipoAvisoAgendamento.CONFIRMADO);
+    }
+
+    /** Mudança feita pelo estúdio: a cliente recebe a notificação depois do commit. */
+    private AgendamentoResponse avisarCliente(AgendamentoResponse resposta, TipoAvisoAgendamento tipo) {
+        eventPublisher.publishEvent(new AvisoAgendamentoEvent(resposta, tipo));
         return resposta;
     }
 
@@ -231,7 +236,7 @@ public class AgendamentoService {
                                                     ReagendamentoRequest request) {
         Agendamento agendamento = buscarAgendamento(agendamentoId);
         validarEmpresaDoAgendamento(agendamento, empresaId);
-        return reagendar(agendamento, request);
+        return avisarCliente(reagendar(agendamento, request), TipoAvisoAgendamento.REMARCADO_PELO_ESTUDIO);
     }
 
     private Agendamento buscarAgendamento(UUID agendamentoId) {
