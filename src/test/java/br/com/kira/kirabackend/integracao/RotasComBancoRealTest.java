@@ -426,6 +426,35 @@ class RotasComBancoRealTest {
     }
 
     @Test
+    @DisplayName("CEP com hífen é gravado só com os dígitos no cadastro e no perfil; CEP incompleto é 400")
+    void cepComHifen() throws IOException, InterruptedException {
+        Map<String, Object> corpo = new HashMap<>(Map.of(
+                "nome", "lara", "email", "lara@example.com", "senha", SENHA, "telefone", "62999990000",
+                "cpf", "74115060107", "dataNascimento", "1995-01-01", "genero", "FEMININO"));
+        corpo.put("endereco", Map.of("cep", "7411-506", "logradouro", "Rua A", "numero", "1",
+                "bairro", "Centro", "cidade", "Goiania", "estado", "GO"));
+        JsonNode recusado = chamar("POST", "/api/auth/registro/cliente", corpo, null, 400);
+        assertEquals("VALIDACAO", recusado.get("erro").asText());
+        assertEquals("CEP deve ter 8 dígitos", recusado.get("erros").get("endereco.cep").asText());
+
+        corpo.put("endereco", Map.of("cep", "74115-060", "logradouro", "Rua A", "numero", "1",
+                "bairro", "Centro", "cidade", "Goiania", "estado", "GO"));
+        chamar("POST", "/api/auth/registro/cliente", corpo, null, 201);
+        Conta lara = conta("lara");
+        assertEquals("74115060", get("/api/clientes/" + lara.id() + "/perfil", lara.token())
+                .get("endereco").get("cep").asText());
+
+        chamar("PUT", "/api/clientes/" + lara.id() + "/perfil", Map.of("nome", "Lara", "telefone", "62988887777",
+                "dataNascimento", "1995-01-01", "genero", "FEMININO", "endereco", Map.of("cep", "01001-000",
+                        "logradouro", "Praça da Sé", "numero", "1", "bairro", "Sé", "cidade", "São Paulo", "estado", "SP")),
+                lara.token(), 200);
+        assertEquals("01001000", get("/api/clientes/" + lara.id() + "/perfil", lara.token())
+                .get("endereco").get("cep").asText());
+        chamar("PUT", "/api/empresas/" + salao.id() + "/perfil", Map.of("nome", "salao", "telefone", "62999990001",
+                "tipoEstabelecimento", "ESTABELECIMENTO", "endereco", Map.of("cep", "74.000-0000")), salao.token(), 400);
+    }
+
+    @Test
     @DisplayName("Sessão: renovar o token, sair e pedir recuperação de senha")
     void sessao() throws IOException, InterruptedException {
         String refresh = entrar("bia").get("refreshToken").asText();

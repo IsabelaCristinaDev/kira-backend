@@ -1,6 +1,7 @@
 package br.com.kira.kirabackend.dto.request;
 
 import br.com.kira.kirabackend.domain.enums.Genero;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Past;
@@ -21,6 +22,7 @@ public record ClientePerfilRequest(
         LocalDate dataNascimento,
         @NotNull(message = "Gênero é obrigatório")
         Genero genero,
+        @Valid
         EnderecoRequest endereco,
         Double latitude,
         Double longitude
