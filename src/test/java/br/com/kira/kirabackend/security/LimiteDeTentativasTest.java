@@ -4,6 +4,7 @@ import br.com.kira.kirabackend.config.LimiteTentativasPropriedades;
 import br.com.kira.kirabackend.config.LimiteTentativasPropriedades.Limite;
 import br.com.kira.kirabackend.config.LimiteTentativasPropriedades.Login;
 import br.com.kira.kirabackend.config.LimiteTentativasPropriedades.PorEmail;
+import br.com.kira.kirabackend.config.LimiteTentativasPropriedades.Recuperacao;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,11 +25,16 @@ class LimiteDeTentativasTest {
     private static final String EMAIL = "ana@teste.com";
 
     // Mesmos números do application.yml
-    static final LimiteTentativasPropriedades PROPRIEDADES = new LimiteTentativasPropriedades(new Login(
-            new Limite(5, Duration.ofMinutes(15)),
-            new Limite(20, Duration.ofMinutes(15)),
-            new PorEmail(5, Duration.ofSeconds(1), Duration.ofSeconds(8), Duration.ofMinutes(15),
-                    10, Duration.ofHours(1))));
+    static final LimiteTentativasPropriedades PROPRIEDADES = new LimiteTentativasPropriedades(
+            new Login(
+                    new Limite(5, Duration.ofMinutes(15)),
+                    new Limite(20, Duration.ofMinutes(15)),
+                    new PorEmail(5, Duration.ofSeconds(1), Duration.ofSeconds(8), Duration.ofMinutes(15),
+                            10, Duration.ofHours(1))),
+            new Recuperacao(
+                    new Limite(3, Duration.ofHours(1)),
+                    new Limite(10, Duration.ofHours(1)),
+                    new Limite(10, Duration.ofMinutes(15))));
 
     private final AtomicLong agoraNanos = new AtomicLong();
     private LimiteDeTentativas limite;
@@ -173,6 +179,70 @@ class LimiteDeTentativasTest {
         avancar(Duration.ofMinutes(61));
         falhar(IP, EMAIL, 10);
         assertTrue(limite.deveAvisar(EMAIL));
+    }
+
+    // ---------- recuperação de senha ----------
+
+    @Test
+    @DisplayName("Recuperação: 3 pedidos por hora para o mesmo e-mail; o 4º recebe o tempo de espera")
+    void recuperacaoTresPorEmail() {
+        for (int i = 0; i < 3; i++) {
+            assertTrue(limite.registrarPedidoDeRecuperacao("200.0.0." + i, EMAIL).isEmpty());
+        }
+
+        Optional<Duration> espera = limite.registrarPedidoDeRecuperacao("200.0.0.9", " ANA@teste.com ");
+
+        assertEquals(Optional.of(Duration.ofHours(1)), espera);
+    }
+
+    @Test
+    @DisplayName("Recuperação: 10 pedidos por hora do mesmo IP, em e-mails diferentes")
+    void recuperacaoDezPorIp() {
+        for (int i = 0; i < 10; i++) {
+            assertTrue(limite.registrarPedidoDeRecuperacao(IP, "conta" + i + "@teste.com").isEmpty());
+        }
+
+        assertTrue(limite.registrarPedidoDeRecuperacao(IP, "outra@teste.com").isPresent());
+        assertTrue(limite.registrarPedidoDeRecuperacao(OUTRO_IP, "outra@teste.com").isEmpty());
+    }
+
+    @Test
+    @DisplayName("Recuperação: pedido recusado não gasta a cota do outro limite")
+    void recuperacaoRecusadaNaoGastaOutraCota() {
+        for (int i = 0; i < 3; i++) {
+            limite.registrarPedidoDeRecuperacao(IP, EMAIL);
+        }
+        // Estes 5 são recusados pelo limite do e-mail: não podem contar no limite do IP
+        for (int i = 0; i < 5; i++) {
+            assertTrue(limite.registrarPedidoDeRecuperacao(IP, EMAIL).isPresent());
+        }
+
+        for (int i = 0; i < 7; i++) {
+            assertTrue(limite.registrarPedidoDeRecuperacao(IP, "conta" + i + "@teste.com").isEmpty());
+        }
+    }
+
+    @Test
+    @DisplayName("Recuperação: depois de 1 hora, o e-mail volta a poder pedir")
+    void recuperacaoLiberaDepoisDeUmaHora() {
+        for (int i = 0; i < 3; i++) {
+            limite.registrarPedidoDeRecuperacao(IP, EMAIL);
+        }
+
+        avancar(Duration.ofHours(1));
+
+        assertTrue(limite.registrarPedidoDeRecuperacao(IP, EMAIL).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Validação do token: 10 tentativas a cada 15 minutos por IP")
+    void validacaoDeTokenPorIp() {
+        for (int i = 0; i < 10; i++) {
+            assertTrue(limite.registrarValidacaoDeToken(IP).isEmpty());
+        }
+
+        assertEquals(Optional.of(Duration.ofMinutes(15)), limite.registrarValidacaoDeToken(IP));
+        assertTrue(limite.registrarValidacaoDeToken(OUTRO_IP).isEmpty());
     }
 
     @Test

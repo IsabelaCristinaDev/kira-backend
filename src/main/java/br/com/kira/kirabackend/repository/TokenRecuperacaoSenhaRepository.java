@@ -10,7 +10,10 @@ import java.util.UUID;
 @Repository
 public interface TokenRecuperacaoSenhaRepository extends JpaRepository<TokenRecuperacaoSenha, UUID> {
 
-    Optional<TokenRecuperacaoSenha> findByToken(String token);
+    Optional<TokenRecuperacaoSenha> findByTokenHash(String tokenHash);
 
     void deleteByUsuarioId(UUID usuarioId);
+
+    /** Depois de redefinir a senha: apaga os outros links pendentes e mantém o usado (para responder "já utilizado"). */
+    void deleteByUsuarioIdAndIdNot(UUID usuarioId, UUID tokenUsadoId);
 }

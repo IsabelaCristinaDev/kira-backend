@@ -28,15 +28,20 @@ public class LimiteDeTentativas {
     private static final long MAXIMO_DE_CHAVES = 100_000;
 
     private final LimiteTentativasPropriedades.Login regras;
+    private final LimiteTentativasPropriedades.Recuperacao regrasRecuperacao;
     private final TimeMeter relogioDosBaldes;
     private final Cache<String, Bucket> porIpEEmail;
     private final Cache<String, Bucket> porIp;
     private final Cache<String, Integer> falhasPorEmail;
     private final Cache<String, Boolean> avisosEnviados;
+    private final Cache<String, Bucket> recuperacaoPorEmail;
+    private final Cache<String, Bucket> recuperacaoPorIp;
+    private final Cache<String, Bucket> validacaoDeTokenPorIp;
 
     /** @param relogio fonte de tempo em nanossegundos; nos testes é um relógio falso */
     public LimiteDeTentativas(LimiteTentativasPropriedades propriedades, Ticker relogio) {
         this.regras = propriedades.login();
+        this.regrasRecuperacao = propriedades.recuperacao();
         this.relogioDosBaldes = new TimeMeter() {
             @Override
             public long currentTimeNanos() {
@@ -54,6 +59,9 @@ public class LimiteDeTentativas {
         // Cada falha reescreve o valor: 15 min sem falhas zeram a conta
         this.falhasPorEmail = cache(relogio).expireAfterWrite(porEmail.janela()).build();
         this.avisosEnviados = cache(relogio).expireAfterWrite(porEmail.intervaloEntreAvisos()).build();
+        this.recuperacaoPorEmail = cache(relogio).expireAfterAccess(regrasRecuperacao.porEmail().janela()).build();
+        this.recuperacaoPorIp = cache(relogio).expireAfterAccess(regrasRecuperacao.porIp().janela()).build();
+        this.validacaoDeTokenPorIp = cache(relogio).expireAfterAccess(regrasRecuperacao.validacaoPorIp().janela()).build();
     }
 
     private static Caffeine<Object, Object> cache(Ticker relogio) {
@@ -101,6 +109,32 @@ public class LimiteDeTentativas {
                 && avisosEnviados.asMap().putIfAbsent(chave, Boolean.TRUE) == null;
     }
 
+    // ---------- recuperação de senha: aqui cada pedido conta, não só as falhas ----------
+
+    /**
+     * Conta um pedido de e-mail de recuperação. Se o e-mail ou o IP já esgotou a cota, devolve a espera
+     * e não gasta nada do outro limite.
+     */
+    public Optional<Duration> registrarPedidoDeRecuperacao(String ip, String email) {
+        Bucket doEmail = recuperacaoPorEmail.get(normalizar(email), chave -> novoBalde(regrasRecuperacao.porEmail()));
+        Bucket doIp = recuperacaoPorIp.get(ip, chave -> novoBalde(regrasRecuperacao.porIp()));
+        Optional<Duration> espera = esperaSeVazio(doEmail);
+        if (espera.isEmpty()) {
+            espera = esperaSeVazio(doIp);
+        }
+        if (espera.isEmpty()) {
+            doEmail.tryConsume(1);
+            doIp.tryConsume(1);
+        }
+        return espera;
+    }
+
+    /** Conta uma tentativa de usar um token de recuperação vinda deste IP. */
+    public Optional<Duration> registrarValidacaoDeToken(String ip) {
+        Bucket balde = validacaoDeTokenPorIp.get(ip, chave -> novoBalde(regrasRecuperacao.validacaoPorIp()));
+        return balde.tryConsume(1) ? Optional.empty() : esperaSeVazio(balde);
+    }
+
     /** "isabela@gmail.com" vira "is***@gmail.com": dá para investigar o log sem expor o e-mail. */
     public static String mascarar(String email) {
         if (email == null || !email.contains("@")) {
@@ -128,8 +162,8 @@ public class LimiteDeTentativas {
     // As fichas voltam todas de uma vez quando a janela termina, contada a partir da primeira falha
     private Bucket novoBalde(Limite limite) {
         return Bucket.builder()
-                .addLimit(regra -> regra.capacity(limite.maxFalhas())
-                        .refillIntervally(limite.maxFalhas(), limite.janela()))
+                .addLimit(regra -> regra.capacity(limite.maximo())
+                        .refillIntervally(limite.maximo(), limite.janela()))
                 .withCustomTimePrecision(relogioDosBaldes)
                 .build();
     }

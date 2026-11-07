@@ -61,7 +61,7 @@ public class EmailService {
                         link + "\n\n" +
                         "Se o link não abrir, use este código na tela de nova senha:\n\n" +
                         token + "\n\n" +
-                        "O link e o código expiram em 30 minutos.\n\n" +
+                        "O link e o código expiram em 15 minutos e só podem ser usados uma vez.\n\n" +
                         "Se você não solicitou a recuperação de senha, ignore este email.\n\n" +
                         "Equipe KIRA"
         );

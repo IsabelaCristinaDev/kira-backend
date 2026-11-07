@@ -105,11 +105,11 @@ kira:
       login:
         # Mesmo IP na mesma conta: 5 senhas erradas em 15 min e a 6ª tentativa recebe 429
         por-ip-e-email:
-          max-falhas: 5
+          maximo: 5
           janela: 15m
         # Mesmo IP em qualquer conta: 20 erros em 15 min
         por-ip:
-          max-falhas: 20
+          maximo: 20
           janela: 15m
         # A conta sozinha nunca é bloqueada: a partir de 5 falhas o login fica mais lento (1 s, 2 s, 4 s, até 8 s)
         # e passa a exigir a verificação extra. Na 10ª falha, o dono recebe um aviso (no máximo 1 por hora)
@@ -120,6 +120,18 @@ kira:
           janela: 15m
           falhas-para-aviso: 10
           intervalo-entre-avisos: 1h
+      recuperacao:
+        # Pedidos do e-mail de recuperação: cada pedido conta, exista a conta ou não
+        por-email:
+          maximo: 3
+          janela: 1h
+        por-ip:
+          maximo: 10
+          janela: 1h
+        # Tentativas de usar um token para trocar a senha (impede chutar tokens)
+        validacao-por-ip:
+          maximo: 10
+          janela: 15m
   diagnostico:
     # TODO(LGPD): remover depois do primeiro deploy no Render. Liga o log dos headers de IP do login
     registrar-headers-ip: ${REGISTRAR_HEADERS_IP:false}
