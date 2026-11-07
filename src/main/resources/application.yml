@@ -51,6 +51,10 @@ jwt:
 kira:
   # Endereço do app web, usado no link do e-mail de recuperação de senha
   frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  cors:
+    # Endereços do app web que podem chamar a API e abrir o WebSocket, separados por vírgula.
+    # No servidor, coloque o endereço real do front (ex.: https://kira.exemplo.com)
+    origens: ${KIRA_CORS_ORIGENS:http://localhost:8080,http://localhost:3000,http://localhost:5173,http://localhost:4200}
   arquivos:
     # Pasta das fotos enviadas. Fora do Git (.gitignore)
     pasta: ${KIRA_ARQUIVOS_PASTA:./uploads}

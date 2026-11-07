@@ -1,7 +1,7 @@
 package br.com.kira.kirabackend.config;
 
 import br.com.kira.kirabackend.security.JwtAuthenticationFilter;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -16,26 +16,29 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.util.StringUtils;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 
-@RequiredArgsConstructor
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
-    /** Origens do app web: valem para o CORS da API e para a conexão do WebSocket. */
-    static final List<String> ORIGENS_PERMITIDAS = List.of(
-            "http://localhost:8080",
-            "http://localhost:3000",
-            "http://localhost:5173",
-            "http://localhost:4200"
-    );
-
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    /** Origens do app web (kira.cors.origens), já validadas. Valem só para o CORS da API. */
+    private final List<String> origensPermitidas;
+
+    // Construtor escrito à mão: o Lombok não copia o @Value para o parâmetro
+    public SecurityConfig(
+            JwtAuthenticationFilter jwtAuthenticationFilter,
+            @Value("${kira.cors.origens}") List<String> origensPermitidas) {
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.origensPermitidas = validarOrigens(origensPermitidas);
+    }
 
     @Bean
     @SuppressWarnings("java:S4502") // CSRF desligado de propósito: ver comentário no .csrf()
@@ -94,7 +97,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(ORIGENS_PERMITIDAS);
+        config.setAllowedOrigins(origensPermitidas);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of("Authorization"));
@@ -103,6 +106,30 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
+    }
+
+    /**
+     * Confere a lista na subida da aplicação: um erro aqui apareceria só como "CORS bloqueado" no navegador.
+     * Tira espaços e a barra do fim, porque o navegador manda a origem sem ela.
+     */
+    static List<String> validarOrigens(List<String> origens) {
+        List<String> validas = origens == null ? List.of() : origens.stream()
+                .map(String::trim)
+                .filter(origem -> !origem.isEmpty())
+                .map(origem -> StringUtils.trimTrailingCharacter(origem, '/'))
+                .toList();
+
+        if (validas.isEmpty()) {
+            throw new IllegalStateException("Defina KIRA_CORS_ORIGENS com o endereço do app web");
+        }
+        for (String origem : validas) {
+            // Com allowCredentials, o Spring não aceita o curinga "*"
+            if (!origem.startsWith("http://") && !origem.startsWith("https://")) {
+                throw new IllegalStateException(
+                        "Origem inválida em KIRA_CORS_ORIGENS: \"" + origem + "\". Use http:// ou https://");
+            }
+        }
+        return validas;
     }
 
     @Bean
