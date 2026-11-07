@@ -682,6 +682,105 @@ class AgendamentoServiceTest {
         }
     }
 
+    // ---------- corrigir forma de pagamento ----------
+
+    @Nested
+    @DisplayName("corrigirFormaPagamento")
+    class CorrigirFormaPagamento {
+
+        @Test
+        @DisplayName("O estúdio corrige a forma de um atendimento concluído sem disparar evento")
+        void deveCorrigirFormaDeConcluido() {
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.CONCLUIDO);
+            agendamento.setFormaPagamento(FormaPagamento.PIX);
+            when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+            mockarSaveDevolvendoArgumento();
+
+            AgendamentoResponse response = service.corrigirFormaPagamento(agendamento.getId(), empresa.getId(),
+                    FormaPagamento.CARTAO_CREDITO);
+
+            assertEquals(FormaPagamento.CARTAO_CREDITO, response.formaPagamento());
+            assertEquals(FormaPagamento.CARTAO_CREDITO, agendamento.getFormaPagamento());
+            assertEquals(StatusAgendamento.CONCLUIDO, agendamento.getStatus());
+            verify(agendamentoRepository).save(agendamento);
+            verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        @DisplayName("Atendimento concluído sem forma registrada passa a ter a forma informada")
+        void deveRegistrarFormaQuandoNaoHavia() {
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.CONCLUIDO);
+            when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+            mockarSaveDevolvendoArgumento();
+
+            AgendamentoResponse response = service.corrigirFormaPagamento(agendamento.getId(), empresa.getId(),
+                    FormaPagamento.DINHEIRO);
+
+            assertEquals(FormaPagamento.DINHEIRO, response.formaPagamento());
+        }
+
+        @ParameterizedTest
+        @EnumSource(value = StatusAgendamento.class, names = "CONCLUIDO", mode = EnumSource.Mode.EXCLUDE)
+        @DisplayName("Só atendimento concluído tem a forma corrigida")
+        void deveRejeitarStatusDiferenteDeConcluido(StatusAgendamento status) {
+            Agendamento agendamento = agendamentoExistente(status);
+            agendamento.setFormaPagamento(FormaPagamento.PIX);
+            when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+            UUID agendamentoId = agendamento.getId();
+            UUID empresaId = empresa.getId();
+
+            assertThrows(RegraDeNegocioException.class,
+                    () -> service.corrigirFormaPagamento(agendamentoId, empresaId, FormaPagamento.DINHEIRO));
+
+            assertEquals(FormaPagamento.PIX, agendamento.getFormaPagamento());
+            verify(agendamentoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Sem forma informada dá erro e nada muda")
+        void deveExigirForma() {
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.CONCLUIDO);
+            agendamento.setFormaPagamento(FormaPagamento.PIX);
+            when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+            UUID agendamentoId = agendamento.getId();
+            UUID empresaId = empresa.getId();
+
+            assertThrows(RegraDeNegocioException.class,
+                    () -> service.corrigirFormaPagamento(agendamentoId, empresaId, null));
+
+            assertEquals(FormaPagamento.PIX, agendamento.getFormaPagamento());
+            verify(agendamentoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Agendamento inexistente dá 404")
+        void deveFalharAgendamentoInexistente() {
+            UUID id = UUID.randomUUID();
+            when(agendamentoRepository.findById(id)).thenReturn(Optional.empty());
+            UUID empresaId = empresa.getId();
+
+            assertThrows(RecursoNaoEncontradoException.class,
+                    () -> service.corrigirFormaPagamento(id, empresaId, FormaPagamento.PIX));
+        }
+
+        @Test
+        @DisplayName("Outra empresa não corrige a forma do atendimento")
+        void outraEmpresaNaoPodeCorrigir() {
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.CONCLUIDO);
+            agendamento.setFormaPagamento(FormaPagamento.PIX);
+            UUID agendamentoId = agendamento.getId();
+            UUID outraEmpresa = UUID.randomUUID();
+            when(agendamentoRepository.findById(agendamentoId)).thenReturn(Optional.of(agendamento));
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> service.corrigirFormaPagamento(agendamentoId, outraEmpresa, FormaPagamento.DINHEIRO));
+
+            assertEquals("Este atendimento não pertence ao seu estabelecimento", ex.getMessage());
+            assertEquals(FormaPagamento.PIX, agendamento.getFormaPagamento());
+            verify(agendamentoRepository, never()).save(any());
+        }
+    }
+
     // ---------- reagendar ----------
 
     @Nested
