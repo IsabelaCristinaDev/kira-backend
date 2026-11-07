@@ -9,6 +9,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.mail.MailSendException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -16,12 +18,13 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class EmailServiceTest {
 
     @Mock
@@ -34,6 +37,42 @@ class EmailServiceTest {
         service = new EmailService(mailSender);
         // Barra no fim de propósito: o link não pode sair com "//"
         ReflectionTestUtils.setField(service, "frontendUrl", "https://app.kira.com/");
+    }
+
+    @Test
+    @DisplayName("Sem usuário e senha do e-mail, a subida avisa no log quais variáveis faltam")
+    void avisaSemCredenciais(CapturedOutput saida) {
+        // Arrange
+        ReflectionTestUtils.setField(service, "usuarioEmail", "");
+        ReflectionTestUtils.setField(service, "senhaEmail", "");
+
+        // Act
+        service.avisarSeEmailNaoConfigurado();
+
+        // Assert
+        assertTrue(saida.getOut().contains("MAIL_USERNAME e MAIL_PASSWORD"), saida.getOut());
+    }
+
+    @Test
+    @DisplayName("Só com o usuário preenchido, a falta da senha também gera o aviso")
+    void avisaSemSenha(CapturedOutput saida) {
+        ReflectionTestUtils.setField(service, "usuarioEmail", "kira@teste.com");
+        ReflectionTestUtils.setField(service, "senhaEmail", "  ");
+
+        service.avisarSeEmailNaoConfigurado();
+
+        assertTrue(saida.getOut().contains("MAIL_USERNAME e MAIL_PASSWORD"), saida.getOut());
+    }
+
+    @Test
+    @DisplayName("Com usuário e senha preenchidos, não há aviso")
+    void semAvisoQuandoConfigurado(CapturedOutput saida) {
+        ReflectionTestUtils.setField(service, "usuarioEmail", "kira@teste.com");
+        ReflectionTestUtils.setField(service, "senhaEmail", "senha-de-app");
+
+        service.avisarSeEmailNaoConfigurado();
+
+        assertFalse(saida.getOut().contains("MAIL_USERNAME"), saida.getOut());
     }
 
     @Test

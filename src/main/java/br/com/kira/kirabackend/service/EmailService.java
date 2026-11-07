@@ -1,5 +1,6 @@
 package br.com.kira.kirabackend.service;
 
+import jakarta.annotation.PostConstruct;
 import br.com.kira.kirabackend.domain.entity.Agendamento;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +29,22 @@ public class EmailService {
     // Endereço do app web: o link de redefinição de senha abre a tela de nova senha
     @Value("${kira.frontend-url}")
     private String frontendUrl;
+
+    // Conta que envia os e-mails (MAIL_USERNAME e MAIL_PASSWORD). Vazias, nenhum e-mail sai
+    @Value("${spring.mail.username:}")
+    private String usuarioEmail;
+
+    @Value("${spring.mail.password:}")
+    private String senhaEmail;
+
+    // A API sobe mesmo sem e-mail, mas o aviso sai na subida, e não só quando alguém tenta recuperar a senha
+    @PostConstruct
+    void avisarSeEmailNaoConfigurado() {
+        if (!StringUtils.hasText(usuarioEmail) || !StringUtils.hasText(senhaEmail)) {
+            log.warn("E-mail não configurado: defina MAIL_USERNAME e MAIL_PASSWORD. "
+                    + "Boas-vindas, recuperação de senha e lembretes não serão enviados");
+        }
+    }
 
     // Assíncrono e tolerante a falha: a resposta da API é a mesma exista o e-mail ou não,
     // sem esperar o SMTP nem devolver erro quando ele falha.

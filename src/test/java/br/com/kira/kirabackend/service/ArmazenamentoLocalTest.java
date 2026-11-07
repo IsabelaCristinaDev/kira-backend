@@ -14,7 +14,10 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class ArmazenamentoLocalTest {
 
@@ -28,6 +31,51 @@ class ArmazenamentoLocalTest {
     void setUp() {
         pasta = raiz.resolve("uploads");
         armazenamento = new ArmazenamentoLocal(pasta.toString());
+    }
+
+    @Test
+    @DisplayName("A pasta é criada já na subida, antes do primeiro envio")
+    void criaPastaNaSubida() {
+        // Arrange + Act: o setUp já criou o armazenamento
+        // Assert
+        assertTrue(Files.isDirectory(pasta));
+    }
+
+    @Test
+    @DisplayName("Se a pasta não pode ser criada, a aplicação não sobe e a mensagem cita a variável")
+    void pastaImpossivelNaoSobe() throws IOException {
+        // Arrange: um arquivo comum ocupa o lugar de onde a pasta ficaria
+        Path ocupado = raiz.resolve("ocupado");
+        Files.write(ocupado, new byte[]{1});
+        String pastaDentroDoArquivo = ocupado.resolve("uploads").toString();
+
+        // Act
+        IllegalStateException erro = assertThrows(IllegalStateException.class,
+                () -> new ArmazenamentoLocal(pastaDentroDoArquivo));
+
+        // Assert
+        assertTrue(erro.getMessage().contains("KIRA_ARQUIVOS_PASTA"));
+    }
+
+    @Test
+    @DisplayName("Se a pasta existe mas não aceita gravação, a aplicação não sobe")
+    void pastaSemPermissaoNaoSobe() throws IOException {
+        // Arrange: pasta só de leitura, como /app quando o container não roda como root
+        Path somenteLeitura = Files.createDirectory(raiz.resolve("somente-leitura"));
+        assumeTrue(somenteLeitura.toFile().setWritable(false), "o sistema não permite tirar a permissão");
+        try {
+            // Como root a gravação é sempre liberada, então o teste não teria o que provar
+            assumeFalse(Files.isWritable(somenteLeitura), "rodando como root");
+
+            // Act + Assert
+            String caminho = somenteLeitura.toString();
+            IllegalStateException erro = assertThrows(IllegalStateException.class,
+                    () -> new ArmazenamentoLocal(caminho));
+            assertTrue(erro.getMessage().contains(caminho));
+        } finally {
+            // Devolve a permissão para o JUnit conseguir apagar a pasta temporária
+            somenteLeitura.toFile().setWritable(true);
+        }
     }
 
     @Test
