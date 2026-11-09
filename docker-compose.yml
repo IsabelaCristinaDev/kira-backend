@@ -1,3 +1,6 @@
+# Nome fixo: o banco e o volume do MinIO são os mesmos, seja qual for a pasta de onde o compose roda
+name: kira-backend
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -17,5 +20,24 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # Fotos enviadas, quando a API roda com KIRA_ARQUIVOS_TIPO=s3. O MinIO oficial não publica mais imagens
+  # da versão gratuita; esta é a do fork mantido pela comunidade
+  minio:
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    container_name: kira_minio
+    command: server /data --console-address ":9001"
+    environment:
+      # O mesmo par que a API usa para entrar. A senha precisa de pelo menos 8 caracteres
+      MINIO_ROOT_USER: ${KIRA_S3_ACCESS_KEY:?Defina KIRA_S3_ACCESS_KEY no .env}
+      MINIO_ROOT_PASSWORD: ${KIRA_S3_SECRET_KEY:?Defina KIRA_S3_SECRET_KEY no .env}
+    ports:
+      # Só a própria máquina acessa: 9000 é a API do S3 e 9001, o painel
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - kira_minio_data:/data
+    restart: unless-stopped
+
 volumes:
   kira_postgres_data:
+  kira_minio_data:

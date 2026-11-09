@@ -127,17 +127,36 @@ O arquivo `.env` é carregado automaticamente e nunca deve ir para o repositóri
 | Exigir a verificação | `VERIFICACAO_OBRIGATORIA` | Não, o padrão é `false` |
 | Servidor e front-end | `SERVER_PORT`, `FRONTEND_URL` | Não, têm valor padrão |
 | Log do SQL | `MOSTRAR_SQL` | Não, o padrão é `false` |
-| Pasta das fotos | `KIRA_ARQUIVOS_PASTA` | Não, o padrão é `./uploads` (ver abaixo) |
+| Fotos enviadas | `KIRA_ARQUIVOS_TIPO`, `KIRA_S3_*` (MinIO ou R2) ou `KIRA_ARQUIVOS_PASTA` | Não, o padrão é a pasta `./uploads` (ver abaixo) |
 | Lembrete | `LEMBRETE_ANTECEDENCIA_HORAS`, `LEMBRETE_CRON`, `LEMBRETE_RETRY_*` | Não, têm valor padrão |
 
-### Pasta das fotos
+### Fotos enviadas
 
-As fotos enviadas ficam em disco, na pasta `KIRA_ARQUIVOS_PASTA`, e o banco guarda só o nome de cada arquivo. Por isso:
+O banco guarda só o nome de cada foto; o arquivo fica num armazenamento de objetos compatível com S3, escolhido por `KIRA_ARQUIVOS_TIPO=s3`:
 
-- use um caminho absoluto fixo (ex.: `/home/usuario/kira-uploads`). O padrão `./uploads` é relativo à pasta de onde a API é iniciada e pode apontar para outro lugar se ela for iniciada de outra pasta;
-- faça o backup dessa pasta junto com o do banco, no mesmo momento. Um sem o outro deixa fotos sem registro ou registros sem foto.
+- **Local:** o MinIO do `docker-compose.yml`, com as chaves `KIRA_S3_ACCESS_KEY` e `KIRA_S3_SECRET_KEY` do `.env`. Painel em <http://localhost:9001>.
+- **Servidor:** o Cloudflare R2. No painel da Cloudflare, em R2:
+  1. crie o bucket `kira-arquivos`, sem acesso público (as fotos saem pela API);
+  2. em *Manage API tokens*, crie um token com **Object Read & Write** só nesse bucket;
+  3. no servidor, defina `KIRA_ARQUIVOS_TIPO=s3`, `KIRA_S3_ENDPOINT=https://<ID da conta>.r2.cloudflarestorage.com`, `KIRA_S3_REGIAO=auto` e as chaves do token em `KIRA_S3_ACCESS_KEY`/`KIRA_S3_SECRET_KEY`.
 
-No `docker-compose.servidor.yml` a pasta já é `/app/uploads`, guardada num volume do Docker.
+Sem `KIRA_ARQUIVOS_TIPO`, as fotos ficam na pasta `KIRA_ARQUIVOS_PASTA` (padrão `./uploads`). Para levar as fotos dessa pasta para o MinIO, use uma vez `scripts/copiar-fotos-para-minio.sh`.
+
+#### Backup das fotos
+
+Faça o backup das fotos junto com o do banco, no mesmo momento: um sem o outro deixa fotos sem registro ou registros sem foto.
+
+- **R2:** os dados ficam na Cloudflare, sem volume para copiar. Para ter uma cópia fora dela, use `mc mirror` ou `rclone sync` do bucket para uma pasta.
+- **MinIO local:** as fotos ficam no volume `kira-backend_kira_minio_data`. Com o MinIO parado, para a cópia ficar consistente:
+
+```bash
+docker compose stop minio
+docker run --rm -v kira-backend_kira_minio_data:/data:ro -v "$PWD":/backup alpine \
+  tar czf /backup/kira-minio.tar.gz -C /data .
+docker compose start minio
+```
+
+Para restaurar num volume vazio, com o MinIO parado: o mesmo comando, sem o `:ro` no volume e com `tar xzf /backup/kira-minio.tar.gz -C /data`.
 
 ### Exigir a identidade verificada
 
