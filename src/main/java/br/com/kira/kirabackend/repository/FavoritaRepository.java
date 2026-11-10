@@ -36,4 +36,11 @@ public interface FavoritaRepository extends JpaRepository<Favorita, UUID> {
     List<Empresa> listarEmpresasAtivas(@Param("clienteId") UUID clienteId);
 
     void deleteByClienteIdAndEmpresaId(UUID clienteId, UUID empresaId);
+
+    // Todas, inclusive de estúdio desativado: é o que a exportação de dados mostra
+    List<Favorita> findByClienteIdOrderByDataCriacaoDesc(UUID clienteId);
+
+    void deleteByClienteId(UUID clienteId);
+
+    void deleteByEmpresaId(UUID empresaId);
 }

@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -60,4 +61,15 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID> 
             StatusAgendamento status,
             LocalDateTime inicio,
             LocalDateTime fim);
+
+    // Atendimentos que ainda vão acontecer: usados para cancelar os de uma conta excluída
+    List<Agendamento> findByClienteIdAndStatusInAndDataHoraInicioAfter(
+            UUID clienteId,
+            Collection<StatusAgendamento> status,
+            LocalDateTime agora);
+
+    List<Agendamento> findByEmpresaIdAndStatusInAndDataHoraInicioAfter(
+            UUID empresaId,
+            Collection<StatusAgendamento> status,
+            LocalDateTime agora);
 }
