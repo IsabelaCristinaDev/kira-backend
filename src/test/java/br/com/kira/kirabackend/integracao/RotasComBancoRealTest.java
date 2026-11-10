@@ -580,6 +580,54 @@ class RotasComBancoRealTest {
     }
 
     @Test
+    @DisplayName("Foto da funcionária: só o estúdio dono envia e remove, e editar não mexe na foto")
+    void fotoDaFuncionaria() throws IOException, InterruptedException {
+        String funcionariaId = novaFuncionaria("Iara");
+        String cadastro = "/api/empresas/" + estudio.id() + "/funcionarias/" + funcionariaId;
+        String foto = cadastro + "/foto";
+
+        assertEquals(401, enviarArquivo(foto, "arquivo", PNG, null).statusCode());
+        assertEquals(403, enviarArquivo(foto, "arquivo", PNG, salao.token()).statusCode());
+        assertEquals(403, enviarArquivo(foto, "arquivo", PNG, cliente.token()).statusCode());
+        assertEquals(404, enviarArquivo("/api/empresas/" + salao.id() + "/funcionarias/" + funcionariaId + "/foto",
+                "arquivo", PNG, salao.token()).statusCode());
+        assertEquals(400, enviarArquivo(foto, "arquivo", "texto".getBytes(StandardCharsets.UTF_8),
+                estudio.token()).statusCode());
+
+        HttpResponse<String> enviada = enviarArquivo(foto, "arquivo", PNG, estudio.token());
+        assertEquals(200, enviada.statusCode(), enviada.body());
+        String primeira = json.readTree(enviada.body()).get("fotoUrl").asText();
+        assertEquals(200, abrir(primeira).statusCode());
+        assertEquals(primeira, fotoNaVitrine(funcionariaId));
+
+        // O app reenvia a foto no PUT: o campo é ignorado e a foto continua a que foi enviada
+        Map<String, Object> edicao = new HashMap<>(Map.of("nome", "Iara Souza", "comissaoPercentual", 10));
+        edicao.put("fotoUrl", "https://exemplo.com/outra.png");
+        JsonNode editada = chamar("PUT", cadastro, edicao, estudio.token(), 200);
+        assertEquals(primeira, editada.get("fotoUrl").asText());
+
+        String segunda = json.readTree(enviarArquivo(foto, "arquivo", JPEG, estudio.token()).body())
+                .get("fotoUrl").asText();
+        assertNotEquals(primeira, segunda);
+        assertEquals(404, abrir(primeira).statusCode());
+
+        chamar("DELETE", foto, null, null, 401);
+        chamar("DELETE", foto, null, salao.token(), 403);
+        assertEquals(200, abrir(segunda).statusCode());
+        chamar("DELETE", foto, null, estudio.token(), 204);
+        assertEquals(404, abrir(segunda).statusCode());
+        assertTrue(get("/api/empresas/" + estudio.id() + "/funcionarias", estudio.token()).findParents("id").stream()
+                .filter(f -> f.get("id").asText().equals(funcionariaId)).findFirst().orElseThrow()
+                .get("fotoUrl").isNull());
+    }
+
+    private String fotoNaVitrine(String funcionariaId) throws IOException, InterruptedException {
+        return get("/api/studios/" + estudio.id() + "/funcionarias", null).findParents("id").stream()
+                .filter(f -> f.get("id").asText().equals(funcionariaId)).findFirst().orElseThrow()
+                .get("fotoUrl").asText();
+    }
+
+    @Test
     @DisplayName("Portfólio: público para ver, só o dono muda, e aceita até 20 fotos")
     void portfolio() throws IOException, InterruptedException {
         String publico = "/api/studios/" + outroEstudio.id() + "/portfolio";
