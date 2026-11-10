@@ -227,7 +227,7 @@ public class DashboardEmpresaService {
 
     private BigDecimal somarPreco(List<Agendamento> agendamentos) {
         return agendamentos.stream()
-                .map(a -> a.getServico().getPreco())
+                .map(Agendamento::valorCombinado)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }

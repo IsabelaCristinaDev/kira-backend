@@ -186,6 +186,23 @@ class DashboardEmpresaServiceTest {
         }
 
         @Test
+        @DisplayName("Fatura pelo valor guardado no agendamento, e pelo preço do serviço só quando ele é nulo")
+        void usaValorDoAgendamento() {
+            // Cílios custa R$ 120 hoje, mas foi agendado a R$ 80; a unha é de antes do valor guardado
+            Agendamento ciliosAgendadoA80 = concluido(cilios, ana, dia(9, 29, 9));
+            ciliosAgendadoA80.setValor(new BigDecimal("80.00"));
+            mockarPeriodo(ciliosAgendadoA80, concluido(unha, bia, dia(9, 29, 10)));
+            mockarCancelados(0);
+
+            DashboardEmpresaResponse r = gerar();
+
+            assertEquals(new BigDecimal("130.00"), r.faturamentoTotal());
+            assertEquals(new BigDecimal("65.00"), r.ticketMedio());
+            assertEquals(new BigDecimal("80.00"), r.rankingServicos().stream()
+                    .filter(s -> s.nome().equals("Cílios")).findFirst().orElseThrow().faturamento());
+        }
+
+        @Test
         @DisplayName("Agrupa o faturamento por dia, em ordem de data")
         void porDia() {
             mockarPeriodo(

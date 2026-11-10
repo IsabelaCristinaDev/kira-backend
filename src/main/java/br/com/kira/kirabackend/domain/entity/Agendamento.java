@@ -59,6 +59,14 @@ public class Agendamento {
     @Column(precision = 10, scale = 2)
     private BigDecimal valor;
 
+    /**
+     * Valor combinado com a cliente: o guardado no agendamento ou, nos agendamentos antigos
+     * (sem valor), o preço atual do serviço. Comissão e faturamento usam este valor.
+     */
+    public BigDecimal valorCombinado() {
+        return valor != null ? valor : servico.getPreco();
+    }
+
     @Enumerated(EnumType.STRING)
     @Column(name = "forma_pagamento", length = 20)
     private FormaPagamento formaPagamento;
