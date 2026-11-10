@@ -296,6 +296,12 @@ class RotasComBancoRealTest {
         chamar("PUT", funcionarias + "/" + funcionariaId,
                 Map.of("nome", "Elis Souza", "comissaoPercentual", 10), estudio.token(), 200);
         get(funcionarias, estudio.token());
+        // Outra conta: 403 com a mensagem genérica, diferente do 403 da verificação obrigatória
+        JsonNode negado = chamar("PUT", funcionarias + "/" + funcionariaId,
+                Map.of("nome", "Outra", "comissaoPercentual", 50), outroEstudio.token(), 403);
+        assertEquals("ACESSO_NEGADO", negado.get("erro").asText());
+        assertEquals("Você só pode acessar os dados do seu estabelecimento", negado.get("mensagem").asText());
+        chamar("PUT", "/api/empresas/" + estudio.id() + "/disponibilidade", Map.of("dias", List.of()), cliente.token(), 403);
 
         String bloqueios = "/api/funcionarias/" + funcionariaId + "/bloqueios";
         String bloqueioId = chamar("POST", bloqueios, Map.of("dataHoraInicio", adiante.plusDays(2) + "T10:00:00",
@@ -350,7 +356,7 @@ class RotasComBancoRealTest {
         JsonNode conversa = get("/api/mensagens/agendamento/" + remarcado, estudio.token());
         assertEquals("ana", conversa.get(0).get("nomeRemetente").asText());
         chamar("PATCH", "/api/mensagens/" + conversa.get(0).get("id").asText() + "/lida", null, estudio.token(), 204);
-        chamar("GET", "/api/mensagens/agendamento/" + remarcado, null, bia.token(), 400);
+        chamar("GET", "/api/mensagens/agendamento/" + remarcado, null, bia.token(), 403);
 
         chamar("PATCH", "/api/agendamentos/" + remarcado + "/cancelar", null, ana.token(), 200);
         String canceladoPeloEstudio = agendar(ana.id(), ana.token(), estudio.id(), servicoDoEstudio, null, adiante + "T15:00:00");
@@ -391,8 +397,13 @@ class RotasComBancoRealTest {
                 Map.of("agendamentoId", concluido, "nota", 5, "comentario", "Ótimo"), bia.token(), 201);
         chamar("POST", "/api/avaliacoes/empresa", Map.of("agendamentoId", concluido, "nota", 4), estudio.token(), 201);
         get("/api/avaliacoes/cliente/" + bia.id(), bia.token());
-        chamar("GET", "/api/avaliacoes/cliente/" + bia.id(), null, estudio.token(), 400);
+        chamar("GET", "/api/avaliacoes/cliente/" + bia.id(), null, estudio.token(), 403);
         assertEquals(5, get("/api/avaliacoes/minhas", bia.token()).get(0).get("nota").asInt());
+        // O estúdio vê as que ele fez, para saber quais atendimentos já avaliou
+        JsonNode doEstudio = get("/api/avaliacoes/minhas", estudio.token());
+        assertEquals(1, doEstudio.size());
+        assertEquals(concluido, doEstudio.get(0).get("agendamentoId").asText());
+        assertEquals("EMPRESA", doEstudio.get(0).get("tipoAvaliador").asText());
         assertEquals("bia", get("/api/avaliacoes/empresa/" + estudio.id(), null).get(0).get("nomeCliente").asText());
         get("/api/avaliacoes/empresa/" + estudio.id() + "/media", null);
         get("/api/studios/" + estudio.id() + "/avaliacoes", null);
@@ -426,6 +437,35 @@ class RotasComBancoRealTest {
     }
 
     @Test
+    @DisplayName("CEP com hífen é gravado só com os dígitos no cadastro e no perfil; CEP incompleto é 400")
+    void cepComHifen() throws IOException, InterruptedException {
+        Map<String, Object> corpo = new HashMap<>(Map.of(
+                "nome", "lara", "email", "lara@example.com", "senha", SENHA, "telefone", "62999990000",
+                "cpf", "74115060107", "dataNascimento", "1995-01-01", "genero", "FEMININO"));
+        corpo.put("endereco", Map.of("cep", "7411-506", "logradouro", "Rua A", "numero", "1",
+                "bairro", "Centro", "cidade", "Goiania", "estado", "GO"));
+        JsonNode recusado = chamar("POST", "/api/auth/registro/cliente", corpo, null, 400);
+        assertEquals("VALIDACAO", recusado.get("erro").asText());
+        assertEquals("CEP deve ter 8 dígitos", recusado.get("erros").get("endereco.cep").asText());
+
+        corpo.put("endereco", Map.of("cep", "74115-060", "logradouro", "Rua A", "numero", "1",
+                "bairro", "Centro", "cidade", "Goiania", "estado", "GO"));
+        chamar("POST", "/api/auth/registro/cliente", corpo, null, 201);
+        Conta lara = conta("lara");
+        assertEquals("74115060", get("/api/clientes/" + lara.id() + "/perfil", lara.token())
+                .get("endereco").get("cep").asText());
+
+        chamar("PUT", "/api/clientes/" + lara.id() + "/perfil", Map.of("nome", "Lara", "telefone", "62988887777",
+                "dataNascimento", "1995-01-01", "genero", "FEMININO", "endereco", Map.of("cep", "01001-000",
+                        "logradouro", "Praça da Sé", "numero", "1", "bairro", "Sé", "cidade", "São Paulo", "estado", "SP")),
+                lara.token(), 200);
+        assertEquals("01001000", get("/api/clientes/" + lara.id() + "/perfil", lara.token())
+                .get("endereco").get("cep").asText());
+        chamar("PUT", "/api/empresas/" + salao.id() + "/perfil", Map.of("nome", "salao", "telefone", "62999990001",
+                "tipoEstabelecimento", "ESTABELECIMENTO", "endereco", Map.of("cep", "74.000-0000")), salao.token(), 400);
+    }
+
+    @Test
     @DisplayName("Sessão: renovar o token, sair e pedir recuperação de senha")
     void sessao() throws IOException, InterruptedException {
         String refresh = entrar("bia").get("refreshToken").asText();
@@ -453,10 +493,45 @@ class RotasComBancoRealTest {
 
         // Valor que não existe e estúdio errado não concluem: a chamada certa depois disso ainda funciona
         chamar("PATCH", concluir.formatted(recusado), Map.of("formaPagamento", "CHEQUE"), salao.token(), 400);
-        chamar("PATCH", concluir.formatted(recusado), Map.of("formaPagamento", "PIX"), outroEstudio.token(), 400);
-        chamar("PATCH", concluir.formatted(recusado), Map.of("formaPagamento", "PIX"), cliente.token(), 400);
+        chamar("PATCH", concluir.formatted(recusado), Map.of("formaPagamento", "PIX"), outroEstudio.token(), 403);
+        chamar("PATCH", concluir.formatted(recusado), Map.of("formaPagamento", "PIX"), cliente.token(), 403);
         assertEquals("CARTAO_DEBITO", chamar("PATCH", concluir.formatted(recusado),
                 Map.of("formaPagamento", "CARTAO_DEBITO"), salao.token(), 200).get("formaPagamento").asText());
+    }
+
+    @Test
+    @DisplayName("Depois de concluir, só o estúdio dono corrige a forma de pagamento")
+    void corrigirFormaDePagamento() throws IOException, InterruptedException {
+        String concluido = agendamentoNoPassado(7, 10);
+        String aberto = agendamentoNoPassado(7, 12);
+        String corrigir = "/api/agendamentos/%s/forma-pagamento";
+        chamar("PATCH", "/api/agendamentos/" + concluido + "/concluir", Map.of("formaPagamento", "PIX"),
+                salao.token(), 200);
+
+        // Recusados: nada muda
+        chamar("PATCH", corrigir.formatted(concluido), Map.of("formaPagamento", "DINHEIRO"), null, 401);
+        chamar("PATCH", corrigir.formatted(concluido), Map.of("formaPagamento", "DINHEIRO"), outroEstudio.token(), 403);
+        chamar("PATCH", corrigir.formatted(concluido), Map.of("formaPagamento", "DINHEIRO"), cliente.token(), 403);
+        chamar("PATCH", corrigir.formatted(concluido), Map.of("formaPagamento", "CHEQUE"), salao.token(), 400);
+        chamar("PATCH", corrigir.formatted(concluido), Map.of(), salao.token(), 400);
+        chamar("PATCH", corrigir.formatted(aberto), Map.of("formaPagamento", "DINHEIRO"), salao.token(), 400);
+        chamar("PATCH", corrigir.formatted(UUID.randomUUID()), Map.of("formaPagamento", "DINHEIRO"), salao.token(), 404);
+        assertEquals("PIX", formaNaLista(concluido));
+
+        JsonNode corrigido = chamar("PATCH", corrigir.formatted(concluido), Map.of("formaPagamento", "CARTAO_CREDITO"),
+                salao.token(), 200);
+        assertEquals("CARTAO_CREDITO", corrigido.get("formaPagamento").asText());
+        assertEquals("CONCLUIDO", corrigido.get("status").asText());
+        assertEquals("CARTAO_CREDITO", formaNaLista(concluido));
+    }
+
+    private String formaNaLista(String agendamentoId) throws IOException, InterruptedException {
+        for (JsonNode linha : get("/api/agendamentos/empresa/" + salao.id(), salao.token())) {
+            if (agendamentoId.equals(linha.get("id").asText())) {
+                return linha.get("formaPagamento").asText();
+            }
+        }
+        throw new AssertionError("Agendamento fora da lista do estúdio");
     }
 
     @Test
@@ -512,8 +587,8 @@ class RotasComBancoRealTest {
         assertEquals(0, get(publico, null).size());
 
         assertEquals(401, enviarArquivo(doDono, "arquivo", PNG, null).statusCode());
-        assertEquals(400, enviarArquivo(doDono, "arquivo", PNG, salao.token()).statusCode());
-        assertEquals(400, enviarArquivo(doDono, "arquivo", PNG, cliente.token()).statusCode());
+        assertEquals(403, enviarArquivo(doDono, "arquivo", PNG, salao.token()).statusCode());
+        assertEquals(403, enviarArquivo(doDono, "arquivo", PNG, cliente.token()).statusCode());
 
         HttpResponse<String> enviada = enviarArquivo(doDono, "arquivo", PNG, outroEstudio.token());
         assertEquals(201, enviada.statusCode(), enviada.body());
@@ -523,7 +598,7 @@ class RotasComBancoRealTest {
         assertEquals(200, abrir(url).statusCode());
         assertEquals(url, get(publico, null).get(0).get("url").asText());
 
-        chamar("DELETE", doDono + "/" + fotoId, null, salao.token(), 400);
+        chamar("DELETE", doDono + "/" + fotoId, null, salao.token(), 403);
         chamar("DELETE", "/api/empresas/" + salao.id() + "/portfolio/" + fotoId, null, salao.token(), 404);
         assertEquals(200, abrir(url).statusCode());
 
@@ -568,7 +643,7 @@ class RotasComBancoRealTest {
 
         String lidas = "/api/mensagens/agendamento/" + agendamento + "/lidas";
         chamar("PATCH", lidas, null, null, 401);
-        chamar("PATCH", lidas, null, outraCliente.token(), 400);
+        chamar("PATCH", lidas, null, outraCliente.token(), 403);
         assertEquals(2, conversa(agendamento, salao.token()).get("naoLidas").asInt());
 
         chamar("PATCH", lidas, null, salao.token(), 204);

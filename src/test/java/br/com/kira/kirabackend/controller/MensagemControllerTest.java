@@ -4,7 +4,7 @@ import br.com.kira.kirabackend.domain.entity.Cliente;
 import br.com.kira.kirabackend.dto.request.MensagemRequest;
 import br.com.kira.kirabackend.dto.response.ConversaResponse;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
-import br.com.kira.kirabackend.exception.RegraDeNegocioException;
+import br.com.kira.kirabackend.exception.AcessoNegadoException;
 import br.com.kira.kirabackend.service.MensagemService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -66,7 +66,7 @@ class MensagemControllerTest {
     void naoEnviaEmNomeDeOutro() {
         UUID outroUsuario = UUID.randomUUID();
 
-        assertThrows(RegraDeNegocioException.class,
+        assertThrows(AcessoNegadoException.class,
                 () -> controller.enviar(outroUsuario, usuarioLogado, request));
         verifyNoInteractions(mensagemService);
     }

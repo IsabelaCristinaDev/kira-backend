@@ -2,6 +2,7 @@ package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.DispositivoNotificacao;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
+import br.com.kira.kirabackend.domain.enums.TipoAvisoAgendamento;
 import br.com.kira.kirabackend.dto.request.DispositivoWebRequest;
 import br.com.kira.kirabackend.dto.response.AgendamentoResponse;
 import br.com.kira.kirabackend.dto.response.MensagemResponse;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
@@ -230,34 +232,39 @@ class NotificacaoServiceTest {
     private AgendamentoResponse confirmado() {
         return new AgendamentoResponse(UUID.randomUUID(), usuarioId, "Camila", UUID.randomUUID(), "Espaço Aurora",
                 null, null, UUID.randomUUID(), "Corte feminino", 60, LocalDateTime.of(2026, 11, 6, 10, 0),
-                LocalDateTime.of(2026, 11, 6, 11, 0), StatusAgendamento.CONFIRMADO, null, null);
+                LocalDateTime.of(2026, 11, 6, 11, 0), StatusAgendamento.CONFIRMADO, null, null, null);
     }
 
-    @Test
-    @DisplayName("Confirmação avisa os navegadores da cliente, com o estúdio, o serviço, o dia e a hora")
-    void avisaConfirmacao() throws Exception {
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "CONFIRMADO             | AGENDAMENTO_CONFIRMADO | Seu horário de Corte feminino em 06/11 às 10:00 foi confirmado.",
+            "CANCELADO_PELO_ESTUDIO | AGENDAMENTO_CANCELADO  | Seu horário de Corte feminino em 06/11 às 10:00 foi cancelado pelo estúdio.",
+            "REMARCADO_PELO_ESTUDIO | AGENDAMENTO_REMARCADO  | Seu horário de Corte feminino mudou para 06/11 às 10:00."
+    })
+    @DisplayName("Aviso do agendamento vai para os navegadores da cliente, com o estúdio, o serviço, o dia e a hora")
+    void avisaAgendamento(TipoAvisoAgendamento tipo, String tipoNoApp, String corpo) throws Exception {
         AgendamentoResponse agendamento = confirmado();
         when(webPush.ativo()).thenReturn(true);
         when(dispositivoRepository.findByUsuarioIdIn(List.of(usuarioId))).thenReturn(List.of(dispositivo()));
         when(webPush.enviar(anyString(), anyString(), anyString(), any())).thenReturn(201);
 
-        service.notificarConfirmacao(agendamento);
+        service.notificarAgendamento(agendamento, tipo);
 
         ArgumentCaptor<byte[]> conteudo = ArgumentCaptor.forClass(byte[].class);
         verify(webPush).enviar(eq(ENDERECO), anyString(), anyString(), conteudo.capture());
         JsonNode json = objectMapper.readTree(conteudo.getValue());
-        assertEquals("AGENDAMENTO_CONFIRMADO", json.get("tipo").asText());
+        assertEquals(tipoNoApp, json.get("tipo").asText());
         assertEquals("Espaço Aurora", json.get("titulo").asText());
-        assertEquals("Seu horário de Corte feminino em 06/11 às 10:00 foi confirmado.", json.get("corpo").asText());
+        assertEquals(corpo, json.get("corpo").asText());
         assertEquals(agendamento.id().toString(), json.get("agendamentoId").asText());
     }
 
     @Test
-    @DisplayName("Confirmação sem chaves configuradas não consulta nem envia nada")
+    @DisplayName("Aviso do agendamento sem chaves configuradas não consulta nem envia nada")
     void confirmacaoDesligada() {
         when(webPush.ativo()).thenReturn(false);
 
-        service.notificarConfirmacao(confirmado());
+        service.notificarAgendamento(confirmado(), TipoAvisoAgendamento.CONFIRMADO);
 
         verifyNoInteractions(dispositivoRepository);
     }

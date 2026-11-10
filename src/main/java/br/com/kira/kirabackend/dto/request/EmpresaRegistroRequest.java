@@ -1,6 +1,7 @@
 package br.com.kira.kirabackend.dto.request;
 
 import br.com.kira.kirabackend.domain.enums.TipoEstabelecimento;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -33,6 +34,7 @@ public record EmpresaRegistroRequest(
 
         LocalDate dataNascimento,
 
+        @Valid
         EnderecoRequest endereco,
 
         Double latitude,

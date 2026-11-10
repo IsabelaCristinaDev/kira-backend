@@ -9,13 +9,14 @@ API REST da KIRA, plataforma de agendamento de serviços de beleza. Projeto dese
 
 - **Contas:** cadastro de cliente e de empresa, login com JWT, renovação de sessão e recuperação de senha por e-mail.
 - **Vitrine:** busca de estúdios, portfólio e avaliações, abertos sem login.
-- **Agendamentos:** criação, cancelamento e conclusão de atendimentos, com registro da forma e do status do pagamento.
+- **Agendamentos:** criação, cancelamento e conclusão de atendimentos, com registro da forma de pagamento.
 - **Gestão da empresa:** serviços, funcionárias, disponibilidade, bloqueios de horário, agenda, comissões e painel com indicadores.
 - **Comunicação:** mensagens em tempo real por WebSocket, notificações do navegador e lembrete de agendamento por e-mail.
 - **Cliente:** favoritas, contatos de emergência e foto de perfil.
 - **Provador virtual:** simulação de resultado com IA (Cloudflare Workers AI), condicionada ao consentimento da usuária, que pode ser revogado.
+- **Verificação de identidade:** compara a foto do documento com a selfie pelo kira-verify-ai e guarda só o resultado. Pode ser exigida para agendar e para aparecer na vitrine.
 
-> O pagamento é apenas registrado no sistema (dinheiro, cartão ou Pix). Não há integração com gateway de pagamento.
+> O pagamento é feito no estúdio. O sistema só registra a forma (dinheiro, cartão de crédito ou de débito, ou Pix), informada ao agendar ou ao concluir o atendimento. Não há integração com gateway de pagamento.
 
 ## Perfis de usuário
 
@@ -122,9 +123,31 @@ O arquivo `.env` é carregado automaticamente e nunca deve ir para o repositóri
 | E-mail | `MAIL_USERNAME`, `MAIL_PASSWORD` | Para enviar e-mails |
 | Notificações do navegador | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Para usar as notificações |
 | Provador virtual | `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | Para usar o provador |
+| Verificação de identidade | `VERIFY_SERVICE_URL` (padrão `http://localhost:8001`, o kira-ai) e `VERIFY_SERVICE_KEY` (opcional) | Para usar a verificação |
+| Exigir a verificação | `VERIFICACAO_OBRIGATORIA` | Não, o padrão é `false` |
 | Servidor e front-end | `SERVER_PORT`, `FRONTEND_URL` | Não, têm valor padrão |
 | Log do SQL | `MOSTRAR_SQL` | Não, o padrão é `false` |
+| Pasta das fotos | `KIRA_ARQUIVOS_PASTA` | Não, o padrão é `./uploads` (ver abaixo) |
 | Lembrete | `LEMBRETE_ANTECEDENCIA_HORAS`, `LEMBRETE_CRON`, `LEMBRETE_RETRY_*` | Não, têm valor padrão |
+
+### Pasta das fotos
+
+As fotos enviadas ficam em disco, na pasta `KIRA_ARQUIVOS_PASTA`, e o banco guarda só o nome de cada arquivo. Por isso:
+
+- use um caminho absoluto fixo (ex.: `/home/usuario/kira-uploads`). O padrão `./uploads` é relativo à pasta de onde a API é iniciada e pode apontar para outro lugar se ela for iniciada de outra pasta;
+- faça o backup dessa pasta junto com o do banco, no mesmo momento. Um sem o outro deixa fotos sem registro ou registros sem foto.
+
+No `docker-compose.servidor.yml` a pasta já é `/app/uploads`, guardada num volume do Docker.
+
+### Exigir a identidade verificada
+
+Com `VERIFICACAO_OBRIGATORIA=true`:
+
+- a cliente sem verificação não agenda: a API responde `403` com o código `VERIFICACAO_OBRIGATORIA`;
+- o estúdio sem verificação sai da vitrine, da busca e do ranking do provador, e não recebe agendamento (`400`). O perfil dele continua abrindo pelo id;
+- `GET /api/verificacao/me` devolve `"required": true`, para o app saber quando pedir a verificação.
+
+Com `false`, o padrão, nada disso vale, e o backend avisa no log ao subir. Só ligue com o kira-verify-ai no ar: sem ele, ninguém consegue se verificar.
 
 Para gerar uma chave JWT forte:
 
@@ -227,6 +250,6 @@ As limitações do limite de tentativas de login estão na seção [Segurança](
 
 - **Unitários:** services, strategies, segurança e job, com JUnit 5 e Mockito.
 - **Integração:** os testes do pacote `integracao` usam um PostgreSQL real, criado pelo Testcontainers. Sem Docker, eles são ignorados.
-- **`KiraBackendApplicationTests`:** precisa do PostgreSQL do Compose no ar e do `.env` preenchido.
+- **`KiraBackendApplicationTests`:** confere que a aplicação inteira sobe, com um PostgreSQL do Testcontainers. Não precisa do banco local nem das variáveis da máquina; sem Docker, é ignorado.
 
 O relatório de cobertura do JaCoCo é gerado em `target/site/jacoco/index.html`. O GitHub Actions roda os testes em cada pull request e em cada push na `main`.

@@ -186,6 +186,20 @@ class FavoritasEContatosComBancoRealTest {
         esperar(404, "DELETE", CONTATOS + "/" + id, null, fer);
         assertEquals(1, esperar(200, "GET", CONTATOS, null, eva).size());
 
+        // Edita: a outra cliente não alcança, e a dona troca os três campos
+        esperar(404, "PUT", CONTATOS + "/" + id, contato("Intrusa"), fer);
+        esperar(400, "PUT", CONTATOS + "/" + id, Map.of("nome", " ", "telefone", "62988887777"), eva);
+        JsonNode editado = esperar(200, "PUT", CONTATOS + "/" + id,
+                Map.of("nome", "Rosa Lima", "telefone", "62911112222", "parentesco", "Tia"), eva);
+        assertEquals(id, editado.get("id").asText());
+        assertEquals("Rosa Lima", editado.get("nome").asText());
+        assertEquals("62911112222", editado.get("telefone").asText());
+        assertEquals("Tia", editado.get("parentesco").asText());
+        JsonNode lista = esperar(200, "GET", CONTATOS, null, eva);
+        assertEquals(1, lista.size());
+        assertEquals("Rosa Lima", lista.get(0).get("nome").asText());
+        esperar(404, "PUT", CONTATOS + "/" + UUID.randomUUID(), contato("Rosa"), eva);
+
         esperar(204, "DELETE", CONTATOS + "/" + id, null, eva);
         assertEquals(0, esperar(200, "GET", CONTATOS, null, eva).size());
         esperar(404, "DELETE", CONTATOS + "/" + id, null, eva);
@@ -207,7 +221,11 @@ class FavoritasEContatosComBancoRealTest {
             esperar(201, "POST", CONTATOS, contato("Pessoa " + i), gabi);
         }
         esperar(400, "POST", CONTATOS, contato("Sexta"), gabi);
-        assertEquals(5, esperar(200, "GET", CONTATOS, null, gabi).size());
+        JsonNode cinco = esperar(200, "GET", CONTATOS, null, gabi);
+        assertEquals(5, cinco.size());
+
+        // No limite, editar continua permitido
+        esperar(200, "PUT", CONTATOS + "/" + cinco.get(0).get("id").asText(), contato("Rosa Lima"), gabi);
     }
 
     @Test
@@ -225,5 +243,6 @@ class FavoritasEContatosComBancoRealTest {
         esperar(400, "PUT", FAVORITAS + "/" + estudio.get("id").asText(), null, token);
         esperar(400, "GET", CONTATOS, null, token);
         esperar(400, "POST", CONTATOS, contato("Rosa"), token);
+        esperar(400, "PUT", CONTATOS + "/" + UUID.randomUUID(), contato("Rosa"), token);
     }
 }

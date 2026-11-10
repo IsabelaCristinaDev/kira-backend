@@ -7,6 +7,7 @@ import br.com.kira.kirabackend.dto.request.DisponibilidadeRequest;
 import br.com.kira.kirabackend.dto.response.DisponibilidadeResponse;
 import br.com.kira.kirabackend.dto.response.SlotDisponivel;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
+import br.com.kira.kirabackend.exception.AcessoNegadoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.DisponibilidadeEstudioRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
@@ -37,7 +38,7 @@ public class DisponibilidadeService {
 
     private static void exigirDono(UUID empresaId, UUID usuarioId) {
         if (!empresaId.equals(usuarioId)) {
-            throw new RegraDeNegocioException("Você só pode alterar o horário do seu estabelecimento");
+            throw new AcessoNegadoException("Você só pode alterar o horário do seu estabelecimento");
         }
     }
 

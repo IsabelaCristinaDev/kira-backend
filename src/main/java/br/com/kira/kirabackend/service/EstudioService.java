@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 @RequiredArgsConstructor
 @Service
@@ -28,6 +29,7 @@ public class EstudioService {
     private final AvaliacaoRepository avaliacaoRepository;
     private final FuncionariaRepository funcionariaRepository;
     private final ServicoRepository servicoRepository;
+    private final ExigenciaVerificacao exigenciaVerificacao;
 
     public List<EstudioResponse> listarTodos() {
         return empresasAtivas()
@@ -88,12 +90,16 @@ public class EstudioService {
                 .toList();
     }
 
+    // Com a verificação obrigatória, estúdio sem verificação fica fora da vitrine. O perfil (buscarPorId) continua
+    // abrindo, para favoritas e histórico, mas o agendamento é recusado
     private Stream<Empresa> empresasAtivas() {
+        Predicate<UUID> naVitrine = exigenciaVerificacao.naVitrine();
         return usuarioRepository.findAll()
                 .stream()
                 .filter(Empresa.class::isInstance)
                 .map(Empresa.class::cast)
-                .filter(Empresa::isEnabled);
+                .filter(Empresa::isEnabled)
+                .filter(empresa -> naVitrine.test(empresa.getId()));
     }
 
     EstudioResponse toResponse(Empresa empresa) {

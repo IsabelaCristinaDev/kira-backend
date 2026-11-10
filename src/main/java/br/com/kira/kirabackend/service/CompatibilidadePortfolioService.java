@@ -21,6 +21,7 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 /**
  * Ordena os estúdios de cabelo pela semelhança do portfólio com a foto de referência do Provador.
@@ -39,6 +40,7 @@ public class CompatibilidadePortfolioService {
     private final FotoPortfolioRepository fotoPortfolioRepository;
     private final ImagensEnviadas imagens;
     private final ComparadorDePortfolio comparador;
+    private final ExigenciaVerificacao exigenciaVerificacao;
 
     // Sem @Transactional de propósito: as chamadas à IA demoram e não devem segurar uma conexão do banco
     public List<CompatibilidadeEstudioResponse> ranquear(MultipartFile referencia) {
@@ -77,11 +79,13 @@ public class CompatibilidadePortfolioService {
     }
 
     // Serviço antigo sem categoria é reconhecido pelo nome, igual ao resto da API
+    // Com a verificação obrigatória, estúdio sem verificação fica fora, como na vitrine
     private Set<UUID> estudiosDeCabelo() {
+        Predicate<UUID> naVitrine = exigenciaVerificacao.naVitrine();
         Set<UUID> estudios = new LinkedHashSet<>();
         for (Servico servico : servicoRepository.findByAtivoTrueAndEmpresaAtivoTrue()) {
             CategoriaServico categoria = CategoriaServico.escolhidaOuPeloNome(servico.getCategoria(), servico.getNome());
-            if (categoria == CategoriaServico.CABELO) {
+            if (categoria == CategoriaServico.CABELO && naVitrine.test(servico.getEmpresa().getId())) {
                 estudios.add(servico.getEmpresa().getId());
             }
         }

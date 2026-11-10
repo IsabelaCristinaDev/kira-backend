@@ -10,7 +10,7 @@ import br.com.kira.kirabackend.dto.response.ClientePerfilResponse;
 import br.com.kira.kirabackend.dto.response.EmpresaPerfilResponse;
 import br.com.kira.kirabackend.dto.response.EnderecoResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
-import br.com.kira.kirabackend.exception.RegraDeNegocioException;
+import br.com.kira.kirabackend.exception.AcessoNegadoException;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -69,7 +69,7 @@ public class PerfilService {
 
     private Cliente buscarCliente(UUID clienteId, UUID usuarioId) {
         if (!clienteId.equals(usuarioId)) {
-            throw new RegraDeNegocioException("Você só pode acessar o seu próprio perfil");
+            throw new AcessoNegadoException("Você só pode acessar o seu próprio perfil");
         }
         if (!(usuarioRepository.findById(clienteId).orElse(null) instanceof Cliente cliente)) {
             throw new RecursoNaoEncontradoException("Cliente não encontrado");

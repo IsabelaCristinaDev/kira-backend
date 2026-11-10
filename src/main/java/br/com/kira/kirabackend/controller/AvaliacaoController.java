@@ -43,7 +43,7 @@ public class AvaliacaoController {
     @GetMapping("/minhas")
     public ResponseEntity<List<AvaliacaoResponse>> listarMinhasAvaliacoes(
             @AuthenticationPrincipal Usuario usuario) {
-        return ResponseEntity.ok(avaliacaoService.listarMinhasAvaliacoes(usuario.getId()));
+        return ResponseEntity.ok(avaliacaoService.listarMinhasAvaliacoes(usuario));
     }
 
     @GetMapping("/empresa/{empresaId}")

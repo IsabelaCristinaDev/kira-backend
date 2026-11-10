@@ -3,7 +3,7 @@ package br.com.kira.kirabackend.security;
 import br.com.kira.kirabackend.domain.entity.Funcionaria;
 import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
-import br.com.kira.kirabackend.exception.RegraDeNegocioException;
+import br.com.kira.kirabackend.exception.AcessoNegadoException;
 import br.com.kira.kirabackend.repository.FuncionariaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -24,7 +24,7 @@ public class AcessoEmpresa {
 
     public void exigirEmpresa(UUID empresaId, Usuario usuario) {
         if (!empresaId.equals(usuario.getId())) {
-            throw new RegraDeNegocioException(SO_O_SEU_ESTABELECIMENTO);
+            throw new AcessoNegadoException(SO_O_SEU_ESTABELECIMENTO);
         }
     }
 

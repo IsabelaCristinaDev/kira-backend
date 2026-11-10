@@ -1,7 +1,7 @@
 package br.com.kira.kirabackend.security;
 
 import br.com.kira.kirabackend.domain.entity.Cliente;
-import br.com.kira.kirabackend.exception.RegraDeNegocioException;
+import br.com.kira.kirabackend.exception.AcessoNegadoException;
 import br.com.kira.kirabackend.service.MensagemService;
 import br.com.kira.kirabackend.util.KiraTimeZone;
 import org.junit.jupiter.api.BeforeEach;
@@ -179,11 +179,11 @@ class WebSocketAutenticacaoInterceptorTest {
     @Test
     @DisplayName("Quem não participa do agendamento não assina a conversa")
     void naoParticipanteNaoAssina() {
-        doThrow(new RegraDeNegocioException("Você não participa deste agendamento"))
+        doThrow(new AcessoNegadoException("Você não participa deste agendamento"))
                 .when(mensagemService).exigirParticipante(agendamentoId, cliente.getId());
         Message<byte[]> mensagem = frame(StompCommand.SUBSCRIBE, topico(), autenticacao());
 
-        assertThrows(RegraDeNegocioException.class, () -> interceptor.preSend(mensagem, canal));
+        assertThrows(AcessoNegadoException.class, () -> interceptor.preSend(mensagem, canal));
     }
 
     @Test

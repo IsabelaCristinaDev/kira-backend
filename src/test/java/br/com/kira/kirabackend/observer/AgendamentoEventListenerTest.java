@@ -4,6 +4,7 @@ import br.com.kira.kirabackend.domain.entity.Agendamento;
 import br.com.kira.kirabackend.domain.entity.Cliente;
 import br.com.kira.kirabackend.domain.entity.Empresa;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
+import br.com.kira.kirabackend.domain.enums.TipoAvisoAgendamento;
 import br.com.kira.kirabackend.dto.response.AgendamentoResponse;
 import br.com.kira.kirabackend.service.ComissaoService;
 import br.com.kira.kirabackend.service.NotificacaoService;
@@ -37,16 +38,16 @@ class AgendamentoEventListenerTest {
     private AgendamentoEventListener listener;
 
     @Test
-    @DisplayName("Agendamento confirmado avisa a cliente pela notificação do aparelho")
-    void confirmadoAvisaACliente() {
+    @DisplayName("Aviso do agendamento vai para a cliente pela notificação do aparelho")
+    void avisoVaiParaACliente() {
         AgendamentoResponse agendamento = new AgendamentoResponse(UUID.randomUUID(), UUID.randomUUID(), "Camila",
                 UUID.randomUUID(), "Espaço Aurora", null, null, UUID.randomUUID(), "Corte feminino", 60,
                 LocalDateTime.of(2026, 11, 6, 10, 0), LocalDateTime.of(2026, 11, 6, 11, 0),
-                StatusAgendamento.CONFIRMADO, null, null);
+                StatusAgendamento.CONFIRMADO, null, null, null);
 
-        listener.onAgendamentoConfirmado(new AgendamentoConfirmadoEvent(agendamento));
+        listener.onAvisoAgendamento(new AvisoAgendamentoEvent(agendamento, TipoAvisoAgendamento.CANCELADO_PELO_ESTUDIO));
 
-        verify(notificacaoService).notificarConfirmacao(agendamento);
+        verify(notificacaoService).notificarAgendamento(agendamento, TipoAvisoAgendamento.CANCELADO_PELO_ESTUDIO);
         verifyNoInteractions(comissaoService);
     }
 

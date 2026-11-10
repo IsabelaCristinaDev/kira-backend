@@ -52,6 +52,9 @@ class EstudioServiceTest {
     @Mock
     private ServicoRepository servicoRepository;
 
+    @Mock
+    private ExigenciaVerificacao exigenciaVerificacao;
+
     @InjectMocks
     private EstudioService service;
 
@@ -73,6 +76,8 @@ class EstudioServiceTest {
         lenient().when(usuarioRepository.findAll())
                 .thenReturn(List.of(studioBelaVista, cliente, espacoCilios, semEndereco));
         lenient().when(avaliacaoRepository.calcularMediaAvaliacaoEmpresa(any())).thenReturn(null);
+        // Como com VERIFICACAO_OBRIGATORIA=false: todos aparecem
+        lenient().when(exigenciaVerificacao.naVitrine()).thenReturn(id -> true);
     }
 
     private static Empresa empresa(String nome, TipoEstabelecimento tipo, Endereco endereco) {
@@ -256,5 +261,17 @@ class EstudioServiceTest {
                 lista);
         assertEquals(List.of("id", "nome", "fotoUrl", "especialidades"),
                 Arrays.stream(FuncionariaPublicaResponse.class.getRecordComponents()).map(c -> c.getName()).toList());
+    }
+
+    @Test
+    @DisplayName("Com a verificação obrigatória, a vitrine e as buscas mostram só os estúdios verificados")
+    void vitrineSoComVerificados() {
+        UUID verificado = studioBelaVista.getId();
+        when(exigenciaVerificacao.naVitrine()).thenReturn(verificado::equals);
+
+        assertEquals(List.of("Studio Bela Vista"), nomes(service.listarTodos()));
+        assertEquals(List.of("Studio Bela Vista"), nomes(service.buscarPorNome("bela")));
+        assertEquals(List.of("Studio Bela Vista"), nomes(service.buscarPorCidade("são")));
+        assertEquals(List.of("Studio Bela Vista"), nomes(service.buscarPorTipo(TipoEstabelecimento.ESTABELECIMENTO)));
     }
 }

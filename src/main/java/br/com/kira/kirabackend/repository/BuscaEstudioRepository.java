@@ -2,7 +2,7 @@ package br.com.kira.kirabackend.repository;
 
 import br.com.kira.kirabackend.domain.enums.OrdenacaoBusca;
 import br.com.kira.kirabackend.dto.request.BuscaEstudioFiltro;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -15,7 +15,6 @@ import java.util.Locale;
 import java.util.UUID;
 
 /** Consulta fixa: filtro vazio vai nulo e não restringe nada, e os valores vão sempre como parâmetros. */
-@RequiredArgsConstructor
 @Repository
 public class BuscaEstudioRepository {
 
@@ -43,6 +42,8 @@ public class BuscaEstudioRepository {
               END AS distancia
             FROM empresa e JOIN usuario u ON u.id = e.id
             WHERE u.ativo = true
+              AND (CAST(:somenteVerificados AS boolean) = false OR EXISTS (SELECT 1 FROM verificacao_identidade vi
+                WHERE vi.usuario_id = e.id AND vi.status = 'VERIFIED'))
               AND (CAST(:texto AS text) IS NULL
             """
             + " OR " + SEM_ACENTO_INICIO + "u.nome" + CONTEM_TEXTO
@@ -89,6 +90,15 @@ public class BuscaEstudioRepository {
             """;
 
     private final NamedParameterJdbcTemplate jdbc;
+    // VERIFICACAO_OBRIGATORIA=true: só estúdios com a identidade verificada aparecem
+    private final boolean somenteVerificados;
+
+    public BuscaEstudioRepository(
+            NamedParameterJdbcTemplate jdbc,
+            @Value("${kira.verificacao.obrigatoria:false}") boolean somenteVerificados) {
+        this.jdbc = jdbc;
+        this.somenteVerificados = somenteVerificados;
+    }
 
     public long contar(BuscaEstudioFiltro filtro, Coordenadas origem) {
         Long total = jdbc.queryForObject(CONTAR, parametros(filtro, origem), Long.class);
@@ -109,10 +119,11 @@ public class BuscaEstudioRepository {
                 rs.getObject("distancia", Double.class)));
     }
 
-    private static MapSqlParameterSource parametros(BuscaEstudioFiltro filtro, Coordenadas origem) {
+    private MapSqlParameterSource parametros(BuscaEstudioFiltro filtro, Coordenadas origem) {
         // Sem login de cliente não há de onde medir, e nota zero não restringe nada
         Double notaMinima = filtro.notaMinima() != null && filtro.notaMinima() > 0 ? filtro.notaMinima() : null;
         return new MapSqlParameterSource()
+                .addValue("somenteVerificados", somenteVerificados, Types.BOOLEAN)
                 .addValue("texto", padraoContem(filtro.texto()), Types.VARCHAR)
                 .addValue("cidade", padraoContem(filtro.cidade()), Types.VARCHAR)
                 .addValue("servico", padraoContem(filtro.servico()), Types.VARCHAR)

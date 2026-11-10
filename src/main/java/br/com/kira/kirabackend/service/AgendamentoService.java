@@ -4,16 +4,18 @@ import br.com.kira.kirabackend.domain.entity.*;
 import br.com.kira.kirabackend.domain.enums.DiaSemana;
 import br.com.kira.kirabackend.domain.enums.FormaPagamento;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
+import br.com.kira.kirabackend.domain.enums.TipoAvisoAgendamento;
 import br.com.kira.kirabackend.domain.enums.TipoUsuario;
 import br.com.kira.kirabackend.dto.request.AgendamentoRequest;
 import br.com.kira.kirabackend.dto.request.ReagendamentoRequest;
 import br.com.kira.kirabackend.dto.response.AgendamentoResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
+import br.com.kira.kirabackend.exception.AcessoNegadoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.observer.AgendamentoCanceladoEvent;
 import br.com.kira.kirabackend.observer.AgendamentoCriadoEvent;
-import br.com.kira.kirabackend.observer.AgendamentoConfirmadoEvent;
 import br.com.kira.kirabackend.observer.AtendimentoConcluidoEvent;
+import br.com.kira.kirabackend.observer.AvisoAgendamentoEvent;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.DisponibilidadeEstudioRepository;
 import br.com.kira.kirabackend.repository.FuncionariaRepository;
@@ -47,6 +49,7 @@ public class AgendamentoService {
     private final List<CancelamentoStrategy> cancelamentoStrategies;
     private final ApplicationEventPublisher eventPublisher;
     private final OcupacaoService ocupacaoService;
+    private final ExigenciaVerificacao exigenciaVerificacao;
 
     private CancelamentoStrategy resolverEstrategiaCancelamento(TipoUsuario tipo) {
         return cancelamentoStrategies.stream()
@@ -58,6 +61,7 @@ public class AgendamentoService {
 
     public AgendamentoResponse criar(UUID clienteId, UUID usuarioId, AgendamentoRequest request) {
         exigirProprioUsuario(clienteId, usuarioId, "Você só pode agendar em seu próprio nome");
+        exigenciaVerificacao.exigirClienteVerificada(clienteId);
         Cliente cliente = (Cliente) usuarioRepository.findById(clienteId)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Cliente não encontrado"));
 
@@ -67,6 +71,7 @@ public class AgendamentoService {
                 .map(Empresa.class::cast)
                 .filter(Empresa::isEnabled)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Empresa não encontrada"));
+        exigenciaVerificacao.exigirEstudioVerificado(empresa.getId());
 
         Servico servico = servicoRepository.findById(request.servicoId())
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Serviço não encontrado"));
@@ -103,6 +108,7 @@ public class AgendamentoService {
         agendamento.setServico(servico);
         agendamento.setDataHoraInicio(request.dataHoraInicio());
         agendamento.setDataHoraFim(dataHoraFim);
+        agendamento.setValor(servico.getPreco());
         agendamento.setFormaPagamento(request.formaPagamento());
         agendamento.setObservacoes(request.observacoes());
 
@@ -150,7 +156,7 @@ public class AgendamentoService {
         agendamento.setStatus(StatusAgendamento.CANCELADO);
         Agendamento salvo = agendamentoRepository.save(agendamento);
         eventPublisher.publishEvent(new AgendamentoCanceladoEvent(this, salvo));
-        return toResponse(salvo);
+        return avisarCliente(toResponse(salvo), TipoAvisoAgendamento.CANCELADO_PELO_ESTUDIO);
     }
 
     /** O estúdio confirma um agendamento novo ou remarcado. */
@@ -165,8 +171,12 @@ public class AgendamentoService {
         }
 
         agendamento.setStatus(StatusAgendamento.CONFIRMADO);
-        AgendamentoResponse resposta = toResponse(agendamentoRepository.save(agendamento));
-        eventPublisher.publishEvent(new AgendamentoConfirmadoEvent(resposta));
+        return avisarCliente(toResponse(agendamentoRepository.save(agendamento)), TipoAvisoAgendamento.CONFIRMADO);
+    }
+
+    /** Mudança feita pelo estúdio: a cliente recebe a notificação depois do commit. */
+    private AgendamentoResponse avisarCliente(AgendamentoResponse resposta, TipoAvisoAgendamento tipo) {
+        eventPublisher.publishEvent(new AvisoAgendamentoEvent(resposta, tipo));
         return resposta;
     }
 
@@ -190,24 +200,44 @@ public class AgendamentoService {
         return toResponse(salvo);
     }
 
+    /**
+     * O estúdio corrige a forma registrada de um atendimento já concluído.
+     * Não dispara evento: a comissão não depende da forma de pagamento.
+     */
+    public AgendamentoResponse corrigirFormaPagamento(UUID agendamentoId, UUID empresaId,
+                                                      FormaPagamento formaPagamento) {
+        Agendamento agendamento = buscarAgendamento(agendamentoId);
+        validarEmpresaDoAgendamento(agendamento, empresaId);
+
+        if (agendamento.getStatus() != StatusAgendamento.CONCLUIDO) {
+            throw new RegraDeNegocioException("Só é possível corrigir a forma de pagamento de um atendimento concluído");
+        }
+        if (formaPagamento == null) {
+            throw new RegraDeNegocioException("Forma de pagamento é obrigatória");
+        }
+
+        agendamento.setFormaPagamento(formaPagamento);
+        return toResponse(agendamentoRepository.save(agendamento));
+    }
+
     /** Só a empresa dona do atendimento pode concluí-lo ou cancelá-lo como empresa. */
     private static void validarEmpresaDoAgendamento(Agendamento agendamento, UUID empresaId) {
         if (!agendamento.getEmpresa().getId().equals(empresaId)) {
-            throw new RegraDeNegocioException("Este atendimento não pertence ao seu estabelecimento");
+            throw new AcessoNegadoException("Este atendimento não pertence ao seu estabelecimento");
         }
     }
 
     /** Só a cliente do atendimento pode cancelá-lo ou reagendá-lo como cliente. */
     private static void validarClienteDoAgendamento(Agendamento agendamento, UUID clienteId) {
         if (!agendamento.getCliente().getId().equals(clienteId)) {
-            throw new RegraDeNegocioException("Você não participou deste atendimento");
+            throw new AcessoNegadoException("Você não participou deste atendimento");
         }
     }
 
     /** O id da rota precisa ser o do usuário logado. */
     private static void exigirProprioUsuario(UUID idDaRota, UUID usuarioId, String mensagem) {
         if (!idDaRota.equals(usuarioId)) {
-            throw new RegraDeNegocioException(mensagem);
+            throw new AcessoNegadoException(mensagem);
         }
     }
 
@@ -228,7 +258,7 @@ public class AgendamentoService {
                                                     ReagendamentoRequest request) {
         Agendamento agendamento = buscarAgendamento(agendamentoId);
         validarEmpresaDoAgendamento(agendamento, empresaId);
-        return reagendar(agendamento, request);
+        return avisarCliente(reagendar(agendamento, request), TipoAvisoAgendamento.REMARCADO_PELO_ESTUDIO);
     }
 
     private Agendamento buscarAgendamento(UUID agendamentoId) {

@@ -9,16 +9,19 @@ import br.com.kira.kirabackend.domain.entity.Servico;
 import br.com.kira.kirabackend.domain.enums.DiaSemana;
 import br.com.kira.kirabackend.domain.enums.FormaPagamento;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
+import br.com.kira.kirabackend.domain.enums.TipoAvisoAgendamento;
 import br.com.kira.kirabackend.domain.enums.TipoUsuario;
 import br.com.kira.kirabackend.dto.request.AgendamentoRequest;
 import br.com.kira.kirabackend.dto.request.ReagendamentoRequest;
 import br.com.kira.kirabackend.dto.response.AgendamentoResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
+import br.com.kira.kirabackend.exception.AcessoNegadoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
+import br.com.kira.kirabackend.exception.VerificacaoObrigatoriaException;
 import br.com.kira.kirabackend.observer.AgendamentoCanceladoEvent;
 import br.com.kira.kirabackend.observer.AgendamentoCriadoEvent;
-import br.com.kira.kirabackend.observer.AgendamentoConfirmadoEvent;
 import br.com.kira.kirabackend.observer.AtendimentoConcluidoEvent;
+import br.com.kira.kirabackend.observer.AvisoAgendamentoEvent;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.BloqueioHorarioRepository;
 import br.com.kira.kirabackend.repository.DisponibilidadeEstudioRepository;
@@ -40,6 +43,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -96,6 +100,10 @@ class AgendamentoServiceTest {
     @Mock
     private BloqueioHorarioRepository bloqueioHorarioRepository;
 
+    // Mock sem regra: não recusa nada, como com VERIFICACAO_OBRIGATORIA=false
+    @Mock
+    private ExigenciaVerificacao exigenciaVerificacao;
+
     private AgendamentoService service;
 
     private Cliente cliente;
@@ -119,7 +127,8 @@ class AgendamentoServiceTest {
                 disponibilidadeRepository,
                 List.of(cancelamentoClienteStrategy, cancelamentoEmpresaStrategy),
                 eventPublisher,
-                new OcupacaoService(agendamentoRepository, funcionariaRepository, bloqueioHorarioRepository));
+                new OcupacaoService(agendamentoRepository, funcionariaRepository, bloqueioHorarioRepository),
+                exigenciaVerificacao);
 
         cliente = new Cliente();
         cliente.setId(UUID.randomUUID());
@@ -231,6 +240,83 @@ class AgendamentoServiceTest {
             verify(eventPublisher).publishEvent(evento.capture());
             AgendamentoCriadoEvent criado = assertInstanceOf(AgendamentoCriadoEvent.class, evento.getValue());
             assertSame(salvo, criado.getAgendamento());
+        }
+
+        @Test
+        @DisplayName("Guarda no agendamento o preço que o serviço tem no momento e devolve na resposta")
+        void deveGuardarOValorDoServicoNoAgendamento() {
+            servico.setPreco(new BigDecimal("80.00"));
+            mockarEntidadesDaCriacao();
+            mockarExpedientePadrao();
+            mockarAgendamentosNoIntervalo(List.of());
+            mockarSaveDevolvendoArgumento();
+
+            AgendamentoResponse response = service.criar(cliente.getId(), cliente.getId(), request(inicioValido));
+
+            ArgumentCaptor<Agendamento> captor = ArgumentCaptor.forClass(Agendamento.class);
+            verify(agendamentoRepository).save(captor.capture());
+            assertEquals(new BigDecimal("80.00"), captor.getValue().getValor());
+            assertEquals(new BigDecimal("80.00"), response.valor());
+        }
+
+        @Test
+        @DisplayName("Se o estúdio muda o preço do serviço depois, o valor do agendamento não muda")
+        void mudarOPrecoDoServicoNaoMudaOValorDoAgendamento() {
+            servico.setPreco(new BigDecimal("80.00"));
+            mockarEntidadesDaCriacao();
+            mockarExpedientePadrao();
+            mockarAgendamentosNoIntervalo(List.of());
+            mockarSaveDevolvendoArgumento();
+
+            service.criar(cliente.getId(), cliente.getId(), request(inicioValido));
+            servico.setPreco(new BigDecimal("120.00"));
+
+            ArgumentCaptor<Agendamento> captor = ArgumentCaptor.forClass(Agendamento.class);
+            verify(agendamentoRepository).save(captor.capture());
+            assertEquals(new BigDecimal("80.00"), captor.getValue().getValor());
+        }
+
+        @Test
+        @DisplayName("Com a verificação obrigatória, cliente sem verificação não agenda e nada é salvo")
+        void clienteSemVerificacaoNaoAgenda() {
+            UUID clienteId = cliente.getId();
+            AgendamentoRequest req = request(inicioValido);
+            doThrow(new VerificacaoObrigatoriaException("Verifique sua identidade para agendar"))
+                    .when(exigenciaVerificacao).exigirClienteVerificada(clienteId);
+
+            assertThrows(VerificacaoObrigatoriaException.class, () -> service.criar(clienteId, clienteId, req));
+
+            verify(agendamentoRepository, never()).save(any());
+            verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        @DisplayName("Com a verificação obrigatória, estúdio sem verificação não recebe agendamento")
+        void estudioSemVerificacaoNaoRecebe() {
+            when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
+            when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+            doThrow(new RegraDeNegocioException("Este estúdio ainda não pode receber agendamentos"))
+                    .when(exigenciaVerificacao).exigirEstudioVerificado(empresa.getId());
+            UUID clienteId = cliente.getId();
+            AgendamentoRequest req = request(inicioValido);
+
+            assertThrows(RegraDeNegocioException.class, () -> service.criar(clienteId, clienteId, req));
+
+            verify(agendamentoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Confere a cliente e o estúdio ao agendar")
+        void confereAVerificacao() {
+            mockarEntidadesDaCriacao();
+            mockarExpedientePadrao();
+            mockarAgendamentosNoIntervalo(List.of());
+            mockarSaveDevolvendoArgumento();
+
+            service.criar(cliente.getId(), cliente.getId(), request(inicioValido));
+
+            verify(exigenciaVerificacao).exigirClienteVerificada(cliente.getId());
+            verify(exigenciaVerificacao).exigirEstudioVerificado(empresa.getId());
         }
 
         @Test
@@ -470,6 +556,17 @@ class AgendamentoServiceTest {
         }
     }
 
+    /** O aviso à cliente vai por publishEvent(Object); os eventos antigos usam publishEvent(ApplicationEvent). */
+    private AvisoAgendamentoEvent avisoPublicado() {
+        ArgumentCaptor<Object> evento = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher).publishEvent(evento.capture());
+        return assertInstanceOf(AvisoAgendamentoEvent.class, evento.getValue());
+    }
+
+    private void semAviso() {
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
+    }
+
     // ---------- confirmar ----------
 
     @Nested
@@ -489,11 +586,7 @@ class AgendamentoServiceTest {
             assertEquals(StatusAgendamento.CONFIRMADO, response.status());
             assertEquals(StatusAgendamento.CONFIRMADO, agendamento.getStatus());
             // O evento leva os dados prontos: o aviso à cliente sai em outra thread, sem ler relação LAZY
-            ArgumentCaptor<Object> evento = ArgumentCaptor.forClass(Object.class);
-            verify(eventPublisher).publishEvent(evento.capture());
-            AgendamentoConfirmadoEvent confirmado =
-                    assertInstanceOf(AgendamentoConfirmadoEvent.class, evento.getValue());
-            assertEquals(response, confirmado.agendamento());
+            assertEquals(new AvisoAgendamentoEvent(response, TipoAvisoAgendamento.CONFIRMADO), avisoPublicado());
         }
 
         @ParameterizedTest
@@ -517,7 +610,7 @@ class AgendamentoServiceTest {
             Agendamento agendamento = agendamentoExistente(StatusAgendamento.PENDENTE);
             when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
 
-            assertThrows(RegraDeNegocioException.class,
+            assertThrows(AcessoNegadoException.class,
                     () -> service.confirmar(agendamento.getId(), UUID.randomUUID()));
 
             assertEquals(StatusAgendamento.PENDENTE, agendamento.getStatus());
@@ -614,7 +707,7 @@ class AgendamentoServiceTest {
             UUID outraEmpresa = UUID.randomUUID();
             when(agendamentoRepository.findById(agendamentoId)).thenReturn(Optional.of(agendamento));
 
-            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+            AcessoNegadoException ex = assertThrows(AcessoNegadoException.class,
                     () -> service.concluir(agendamentoId, outraEmpresa, FormaPagamento.PIX));
 
             assertEquals("Este atendimento não pertence ao seu estabelecimento", ex.getMessage());
@@ -622,6 +715,105 @@ class AgendamentoServiceTest {
             assertNull(agendamento.getFormaPagamento());
             verify(agendamentoRepository, never()).save(any());
             verifyNoInteractions(eventPublisher);
+        }
+    }
+
+    // ---------- corrigir forma de pagamento ----------
+
+    @Nested
+    @DisplayName("corrigirFormaPagamento")
+    class CorrigirFormaPagamento {
+
+        @Test
+        @DisplayName("O estúdio corrige a forma de um atendimento concluído sem disparar evento")
+        void deveCorrigirFormaDeConcluido() {
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.CONCLUIDO);
+            agendamento.setFormaPagamento(FormaPagamento.PIX);
+            when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+            mockarSaveDevolvendoArgumento();
+
+            AgendamentoResponse response = service.corrigirFormaPagamento(agendamento.getId(), empresa.getId(),
+                    FormaPagamento.CARTAO_CREDITO);
+
+            assertEquals(FormaPagamento.CARTAO_CREDITO, response.formaPagamento());
+            assertEquals(FormaPagamento.CARTAO_CREDITO, agendamento.getFormaPagamento());
+            assertEquals(StatusAgendamento.CONCLUIDO, agendamento.getStatus());
+            verify(agendamentoRepository).save(agendamento);
+            verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        @DisplayName("Atendimento concluído sem forma registrada passa a ter a forma informada")
+        void deveRegistrarFormaQuandoNaoHavia() {
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.CONCLUIDO);
+            when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+            mockarSaveDevolvendoArgumento();
+
+            AgendamentoResponse response = service.corrigirFormaPagamento(agendamento.getId(), empresa.getId(),
+                    FormaPagamento.DINHEIRO);
+
+            assertEquals(FormaPagamento.DINHEIRO, response.formaPagamento());
+        }
+
+        @ParameterizedTest
+        @EnumSource(value = StatusAgendamento.class, names = "CONCLUIDO", mode = EnumSource.Mode.EXCLUDE)
+        @DisplayName("Só atendimento concluído tem a forma corrigida")
+        void deveRejeitarStatusDiferenteDeConcluido(StatusAgendamento status) {
+            Agendamento agendamento = agendamentoExistente(status);
+            agendamento.setFormaPagamento(FormaPagamento.PIX);
+            when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+            UUID agendamentoId = agendamento.getId();
+            UUID empresaId = empresa.getId();
+
+            assertThrows(RegraDeNegocioException.class,
+                    () -> service.corrigirFormaPagamento(agendamentoId, empresaId, FormaPagamento.DINHEIRO));
+
+            assertEquals(FormaPagamento.PIX, agendamento.getFormaPagamento());
+            verify(agendamentoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Sem forma informada dá erro e nada muda")
+        void deveExigirForma() {
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.CONCLUIDO);
+            agendamento.setFormaPagamento(FormaPagamento.PIX);
+            when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+            UUID agendamentoId = agendamento.getId();
+            UUID empresaId = empresa.getId();
+
+            assertThrows(RegraDeNegocioException.class,
+                    () -> service.corrigirFormaPagamento(agendamentoId, empresaId, null));
+
+            assertEquals(FormaPagamento.PIX, agendamento.getFormaPagamento());
+            verify(agendamentoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Agendamento inexistente dá 404")
+        void deveFalharAgendamentoInexistente() {
+            UUID id = UUID.randomUUID();
+            when(agendamentoRepository.findById(id)).thenReturn(Optional.empty());
+            UUID empresaId = empresa.getId();
+
+            assertThrows(RecursoNaoEncontradoException.class,
+                    () -> service.corrigirFormaPagamento(id, empresaId, FormaPagamento.PIX));
+        }
+
+        @Test
+        @DisplayName("Outra empresa não corrige a forma do atendimento")
+        void outraEmpresaNaoPodeCorrigir() {
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.CONCLUIDO);
+            agendamento.setFormaPagamento(FormaPagamento.PIX);
+            UUID agendamentoId = agendamento.getId();
+            UUID outraEmpresa = UUID.randomUUID();
+            when(agendamentoRepository.findById(agendamentoId)).thenReturn(Optional.of(agendamento));
+
+            AcessoNegadoException ex = assertThrows(AcessoNegadoException.class,
+                    () -> service.corrigirFormaPagamento(agendamentoId, outraEmpresa, FormaPagamento.DINHEIRO));
+
+            assertEquals("Este atendimento não pertence ao seu estabelecimento", ex.getMessage());
+            assertEquals(FormaPagamento.PIX, agendamento.getFormaPagamento());
+            verify(agendamentoRepository, never()).save(any());
         }
     }
 
@@ -643,6 +835,8 @@ class AgendamentoServiceTest {
 
             AgendamentoResponse response = service.reagendarPeloCliente(agendamento.getId(), cliente.getId(),
                     new ReagendamentoRequest(novoInicio, "Imprevisto"));
+            // Quem remarcou foi a própria cliente: não há o que avisar
+            semAviso();
 
             assertEquals(novoInicio, agendamento.getDataHoraInicio());
             assertEquals(novoInicio.plusMinutes(DURACAO_SERVICO), agendamento.getDataHoraFim());
@@ -683,10 +877,12 @@ class AgendamentoServiceTest {
             mockarAgendamentosNoIntervalo(List.of());
             mockarSaveDevolvendoArgumento();
 
-            service.reagendarPelaEmpresa(agendamento.getId(), empresa.getId(),
+            AgendamentoResponse response = service.reagendarPelaEmpresa(agendamento.getId(), empresa.getId(),
                     new ReagendamentoRequest(novoInicio, null));
 
             assertEquals(novoInicio, agendamento.getDataHoraInicio());
+            assertEquals(new AvisoAgendamentoEvent(response, TipoAvisoAgendamento.REMARCADO_PELO_ESTUDIO),
+                    avisoPublicado());
         }
 
         @Test
@@ -794,6 +990,7 @@ class AgendamentoServiceTest {
             verify(cancelamentoEmpresaStrategy, never()).validarCancelamento(any());
             assertEquals(StatusAgendamento.CANCELADO, response.status());
             assertCanceladoComEvento(agendamento);
+            semAviso();
         }
 
         @Test
@@ -823,6 +1020,8 @@ class AgendamentoServiceTest {
             verify(cancelamentoClienteStrategy, never()).validarCancelamento(any());
             assertEquals(StatusAgendamento.CANCELADO, response.status());
             assertCanceladoComEvento(agendamento);
+            assertEquals(new AvisoAgendamentoEvent(response, TipoAvisoAgendamento.CANCELADO_PELO_ESTUDIO),
+                    avisoPublicado());
         }
 
         @Test
@@ -852,7 +1051,7 @@ class AgendamentoServiceTest {
             UUID outraEmpresa = UUID.randomUUID();
             when(agendamentoRepository.findById(agendamentoId)).thenReturn(Optional.of(agendamento));
 
-            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+            AcessoNegadoException ex = assertThrows(AcessoNegadoException.class,
                     () -> service.cancelarPelaEmpresa(agendamentoId, outraEmpresa));
 
             assertEquals("Este atendimento não pertence ao seu estabelecimento", ex.getMessage());
@@ -887,7 +1086,7 @@ class AgendamentoServiceTest {
             AgendamentoRequest request = request(inicioValido);
             UUID clienteId = cliente.getId();
 
-            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+            AcessoNegadoException ex = assertThrows(AcessoNegadoException.class,
                     () -> service.criar(clienteId, outroUsuario, request));
 
             assertEquals("Você só pode agendar em seu próprio nome", ex.getMessage());
@@ -900,9 +1099,9 @@ class AgendamentoServiceTest {
             UUID clienteId = cliente.getId();
             UUID empresaId = empresa.getId();
 
-            assertThrows(RegraDeNegocioException.class, () -> service.listarPorCliente(clienteId, outroUsuario));
-            assertThrows(RegraDeNegocioException.class, () -> service.listarPorEmpresa(empresaId, outroUsuario));
-            assertThrows(RegraDeNegocioException.class, () -> service.historicoCliente(clienteId, outroUsuario));
+            assertThrows(AcessoNegadoException.class, () -> service.listarPorCliente(clienteId, outroUsuario));
+            assertThrows(AcessoNegadoException.class, () -> service.listarPorEmpresa(empresaId, outroUsuario));
+            assertThrows(AcessoNegadoException.class, () -> service.historicoCliente(clienteId, outroUsuario));
             verifyNoInteractions(agendamentoRepository);
         }
 
@@ -913,7 +1112,7 @@ class AgendamentoServiceTest {
             UUID agendamentoId = agendamento.getId();
             when(agendamentoRepository.findById(agendamentoId)).thenReturn(Optional.of(agendamento));
 
-            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+            AcessoNegadoException ex = assertThrows(AcessoNegadoException.class,
                     () -> service.cancelarPeloCliente(agendamentoId, outroUsuario));
 
             assertEquals("Você não participou deste atendimento", ex.getMessage());
@@ -930,9 +1129,9 @@ class AgendamentoServiceTest {
             var reagendamento = new ReagendamentoRequest(inicioValido.plusDays(1), null);
             when(agendamentoRepository.findById(agendamentoId)).thenReturn(Optional.of(agendamento));
 
-            assertThrows(RegraDeNegocioException.class,
+            assertThrows(AcessoNegadoException.class,
                     () -> service.reagendarPeloCliente(agendamentoId, outroUsuario, reagendamento));
-            assertThrows(RegraDeNegocioException.class,
+            assertThrows(AcessoNegadoException.class,
                     () -> service.reagendarPelaEmpresa(agendamentoId, outroUsuario, reagendamento));
             assertEquals(inicioValido, agendamento.getDataHoraInicio());
             verify(agendamentoRepository, never()).save(any());

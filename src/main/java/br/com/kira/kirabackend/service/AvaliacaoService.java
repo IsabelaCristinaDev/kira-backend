@@ -2,11 +2,14 @@ package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.Agendamento;
 import br.com.kira.kirabackend.domain.entity.Avaliacao;
+import br.com.kira.kirabackend.domain.entity.Empresa;
+import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import br.com.kira.kirabackend.domain.enums.TipoAvaliador;
 import br.com.kira.kirabackend.dto.request.AvaliacaoRequest;
 import br.com.kira.kirabackend.dto.response.AvaliacaoResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
+import br.com.kira.kirabackend.exception.AcessoNegadoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.AvaliacaoRepository;
@@ -35,7 +38,7 @@ public class AvaliacaoService {
                 .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
 
         if (!agendamento.getCliente().getId().equals(clienteId)) {
-            throw new RegraDeNegocioException("Você não participou deste atendimento");
+            throw new AcessoNegadoException("Você não participou deste atendimento");
         }
 
         if (agendamento.getStatus() != StatusAgendamento.CONCLUIDO) {
@@ -63,7 +66,7 @@ public class AvaliacaoService {
                 .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
 
         if (!agendamento.getEmpresa().getId().equals(empresaId)) {
-            throw new RegraDeNegocioException("Este atendimento não pertence ao seu estabelecimento");
+            throw new AcessoNegadoException("Este atendimento não pertence ao seu estabelecimento");
         }
 
         if (agendamento.getStatus() != StatusAgendamento.CONCLUIDO) {
@@ -97,7 +100,7 @@ public class AvaliacaoService {
 
     public List<AvaliacaoResponse> listarAvaliacoesCliente(UUID clienteId, UUID usuarioId) {
         if (!clienteId.equals(usuarioId)) {
-            throw new RegraDeNegocioException("Você só pode ver as suas avaliações");
+            throw new AcessoNegadoException("Você só pode ver as suas avaliações");
         }
         return avaliacaoRepository
                 .findByClienteIdAndTipoAvaliador(clienteId, TipoAvaliador.EMPRESA)
@@ -106,13 +109,15 @@ public class AvaliacaoService {
                 .toList();
     }
 
-    /** As avaliações que a própria cliente fez. A lista de cima traz as que ela recebeu das empresas. */
-    public List<AvaliacaoResponse> listarMinhasAvaliacoes(UUID clienteId) {
-        return avaliacaoRepository
-                .findByClienteIdAndTipoAvaliador(clienteId, TipoAvaliador.CLIENTE)
-                .stream()
-                .map(this::toResponse)
-                .toList();
+    /**
+     * As avaliações que a conta logada fez: a cliente, as dos estúdios; o estúdio, as das clientes.
+     * Com elas, a tela sabe quais atendimentos já avaliou. As recebidas têm rotas próprias.
+     */
+    public List<AvaliacaoResponse> listarMinhasAvaliacoes(Usuario usuario) {
+        List<Avaliacao> feitas = usuario instanceof Empresa
+                ? avaliacaoRepository.findByEmpresaIdAndTipoAvaliador(usuario.getId(), TipoAvaliador.EMPRESA)
+                : avaliacaoRepository.findByClienteIdAndTipoAvaliador(usuario.getId(), TipoAvaliador.CLIENTE);
+        return feitas.stream().map(this::toResponse).toList();
     }
 
     public Double mediaAvaliacaoEmpresa(UUID empresaId) {

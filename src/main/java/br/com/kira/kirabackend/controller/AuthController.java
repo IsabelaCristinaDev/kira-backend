@@ -1,9 +1,11 @@
 package br.com.kira.kirabackend.controller;
 
+import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.dto.request.ClienteRegistroRequest;
 import br.com.kira.kirabackend.dto.request.EmpresaRegistroRequest;
 import br.com.kira.kirabackend.dto.request.LoginRequest;
 import br.com.kira.kirabackend.dto.request.RefreshTokenRequest;
+import br.com.kira.kirabackend.dto.request.TrocaSenhaRequest;
 import br.com.kira.kirabackend.dto.response.LoginResponse;
 import br.com.kira.kirabackend.security.IpDoCliente;
 import br.com.kira.kirabackend.security.ProtecaoLogin;
@@ -13,6 +15,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RequiredArgsConstructor
@@ -53,5 +56,13 @@ public class AuthController {
     public ResponseEntity<Void> logout(@RequestBody @Valid RefreshTokenRequest data) {
         authService.logout(data);
         return ResponseEntity.noContent().build();
+    }
+
+    // Rota protegida: a troca é sempre da conta logada
+    @PatchMapping("/senha")
+    public ResponseEntity<LoginResponse> trocarSenha(
+            @AuthenticationPrincipal Usuario usuario,
+            @RequestBody @Valid TrocaSenhaRequest data) {
+        return ResponseEntity.ok(authService.trocarSenha(usuario, data));
     }
 }
