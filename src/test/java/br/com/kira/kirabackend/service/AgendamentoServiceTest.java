@@ -498,6 +498,23 @@ class AgendamentoServiceTest {
         }
 
         @Test
+        @DisplayName("Deve dar erro quando o serviço não tem empresa cadastrada")
+        void deveFalharServicoSemEmpresa() {
+            servico.setEmpresa(null);
+            when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
+            when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+            when(servicoRepository.findById(servico.getId())).thenReturn(Optional.of(servico));
+
+            UUID clienteId = cliente.getId();
+            AgendamentoRequest req = request(inicioValido);
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> service.criar(clienteId, clienteId, req));
+            assertEquals("Serviço não pertence a este estabelecimento", ex.getMessage());
+            verify(agendamentoRepository, never()).save(any());
+        }
+
+        @Test
         @DisplayName("Deve dar erro quando a data está no passado")
         void deveFalharDataNoPassado() {
             mockarEntidadesDaCriacao();
@@ -1138,6 +1155,80 @@ class AgendamentoServiceTest {
         }
     }
 
+    // ---------- listagens ----------
+
+    @Nested
+    @DisplayName("listagens")
+    class Listagens {
+
+        @Test
+        @DisplayName("A cliente vê os próprios agendamentos convertidos em resposta")
+        void clienteListaOsProprios() {
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.PENDENTE);
+            agendamento.setFuncionaria(funcionaria);
+            when(agendamentoRepository.findByClienteId(cliente.getId())).thenReturn(List.of(agendamento));
+
+            List<AgendamentoResponse> lista = service.listarPorCliente(cliente.getId(), cliente.getId());
+
+            assertEquals(1, lista.size());
+            AgendamentoResponse resposta = lista.get(0);
+            assertEquals(agendamento.getId(), resposta.id());
+            assertEquals(cliente.getId(), resposta.clienteId());
+            assertEquals(empresa.getId(), resposta.empresaId());
+            assertEquals(funcionaria.getId(), resposta.funcionariaId());
+            assertEquals(servico.getNome(), resposta.nomeServico());
+            assertEquals(StatusAgendamento.PENDENTE, resposta.status());
+        }
+
+        @Test
+        @DisplayName("A empresa vê os agendamentos do próprio estabelecimento, mesmo sem funcionária")
+        void empresaListaOsProprios() {
+            Agendamento semFuncionaria = agendamentoExistente(StatusAgendamento.CONFIRMADO);
+            Agendamento comFuncionaria = agendamentoExistente(StatusAgendamento.PENDENTE);
+            comFuncionaria.setFuncionaria(funcionaria);
+            when(agendamentoRepository.findByEmpresaId(empresa.getId()))
+                    .thenReturn(List.of(semFuncionaria, comFuncionaria));
+
+            List<AgendamentoResponse> lista = service.listarPorEmpresa(empresa.getId(), empresa.getId());
+
+            assertEquals(2, lista.size());
+            assertEquals(semFuncionaria.getId(), lista.get(0).id());
+            assertNull(lista.get(0).funcionariaId());
+            assertEquals(comFuncionaria.getId(), lista.get(1).id());
+            assertEquals(funcionaria.getId(), lista.get(1).funcionariaId());
+        }
+
+        @Test
+        @DisplayName("O histórico da cliente busca só os atendimentos concluídos, mantendo a ordem do banco")
+        void historicoBuscaSoConcluidos() {
+            Agendamento recente = agendamentoExistente(StatusAgendamento.CONCLUIDO);
+            Agendamento antigo = agendamentoExistente(StatusAgendamento.CONCLUIDO);
+            antigo.setDataHoraInicio(inicioValido.minusDays(30));
+            when(agendamentoRepository.findByClienteIdAndStatusOrderByDataHoraInicioDesc(
+                    cliente.getId(), StatusAgendamento.CONCLUIDO)).thenReturn(List.of(recente, antigo));
+
+            List<AgendamentoResponse> historico = service.historicoCliente(cliente.getId(), cliente.getId());
+
+            assertEquals(List.of(recente.getId(), antigo.getId()),
+                    historico.stream().map(AgendamentoResponse::id).toList());
+            verify(agendamentoRepository).findByClienteIdAndStatusOrderByDataHoraInicioDesc(
+                    cliente.getId(), StatusAgendamento.CONCLUIDO);
+        }
+
+        @Test
+        @DisplayName("Sem agendamentos, as listagens devolvem lista vazia em vez de erro")
+        void semAgendamentosDevolveListaVazia() {
+            when(agendamentoRepository.findByClienteId(cliente.getId())).thenReturn(List.of());
+            when(agendamentoRepository.findByEmpresaId(empresa.getId())).thenReturn(List.of());
+            when(agendamentoRepository.findByClienteIdAndStatusOrderByDataHoraInicioDesc(
+                    cliente.getId(), StatusAgendamento.CONCLUIDO)).thenReturn(List.of());
+
+            assertEquals(List.of(), service.listarPorCliente(cliente.getId(), cliente.getId()));
+            assertEquals(List.of(), service.listarPorEmpresa(empresa.getId(), empresa.getId()));
+            assertEquals(List.of(), service.historicoCliente(cliente.getId(), cliente.getId()));
+        }
+    }
+
     // ---------- horário por funcionária ----------
 
     @Nested
@@ -1231,6 +1322,44 @@ class AgendamentoServiceTest {
             RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
                     () -> service.reagendarPelaEmpresa(id, empresaId, req));
             assertEquals("A funcionária não está livre neste horário", ex.getMessage());
+        }
+
+        @Test
+        @DisplayName("Reagendar com a funcionária desativada passa o horário para outra livre")
+        void reagendarComFuncionariaDesativadaEscolheOutra() {
+            Agendamento agendamento = daAna();
+            funcionaria.setAtivo(false);
+            when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+            // A Ana tem outro atendimento no dia: se ela continuasse escolhida, ficaria com o horário mesmo assim,
+            // porque às 14h está livre. Só a regra da desativada faz a Bia (menos ocupada) assumir.
+            Agendamento outroDaAna = daAna();
+            mockarAgendamentosNoIntervalo(List.of(outroDaAna));
+            mockarSaveDevolvendoArgumento();
+            ReagendamentoRequest req = new ReagendamentoRequest(inicioValido.withHour(14), null);
+
+            AgendamentoResponse resposta = service.reagendarPelaEmpresa(agendamento.getId(), empresa.getId(), req);
+
+            assertSame(bia, agendamento.getFuncionaria());
+            assertEquals(bia.getId(), resposta.funcionariaId());
+        }
+
+        @Test
+        @DisplayName("Sem preferência e com todas as funcionárias ocupadas, avisa que o estabelecimento está cheio")
+        void semPreferenciaTodasOcupadas() {
+            when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
+            when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+            when(servicoRepository.findById(servico.getId())).thenReturn(Optional.of(servico));
+            Agendamento daBia = agendamentoExistente(StatusAgendamento.CONFIRMADO);
+            daBia.setFuncionaria(bia);
+            mockarAgendamentosNoIntervalo(List.of(daAna(), daBia));
+            UUID clienteId = cliente.getId();
+            AgendamentoRequest semPreferencia = new AgendamentoRequest(empresa.getId(), null, servico.getId(),
+                    inicioValido, null, null);
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> service.criar(clienteId, clienteId, semPreferencia));
+            assertEquals("Já existe um agendamento neste horário para este estabelecimento", ex.getMessage());
+            verify(agendamentoRepository, never()).save(any());
         }
     }
 }
