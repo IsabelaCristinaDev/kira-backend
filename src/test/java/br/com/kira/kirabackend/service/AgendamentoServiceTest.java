@@ -43,6 +43,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -239,6 +240,40 @@ class AgendamentoServiceTest {
             verify(eventPublisher).publishEvent(evento.capture());
             AgendamentoCriadoEvent criado = assertInstanceOf(AgendamentoCriadoEvent.class, evento.getValue());
             assertSame(salvo, criado.getAgendamento());
+        }
+
+        @Test
+        @DisplayName("Guarda no agendamento o preço que o serviço tem no momento e devolve na resposta")
+        void deveGuardarOValorDoServicoNoAgendamento() {
+            servico.setPreco(new BigDecimal("80.00"));
+            mockarEntidadesDaCriacao();
+            mockarExpedientePadrao();
+            mockarAgendamentosNoIntervalo(List.of());
+            mockarSaveDevolvendoArgumento();
+
+            AgendamentoResponse response = service.criar(cliente.getId(), cliente.getId(), request(inicioValido));
+
+            ArgumentCaptor<Agendamento> captor = ArgumentCaptor.forClass(Agendamento.class);
+            verify(agendamentoRepository).save(captor.capture());
+            assertEquals(new BigDecimal("80.00"), captor.getValue().getValor());
+            assertEquals(new BigDecimal("80.00"), response.valor());
+        }
+
+        @Test
+        @DisplayName("Se o estúdio muda o preço do serviço depois, o valor do agendamento não muda")
+        void mudarOPrecoDoServicoNaoMudaOValorDoAgendamento() {
+            servico.setPreco(new BigDecimal("80.00"));
+            mockarEntidadesDaCriacao();
+            mockarExpedientePadrao();
+            mockarAgendamentosNoIntervalo(List.of());
+            mockarSaveDevolvendoArgumento();
+
+            service.criar(cliente.getId(), cliente.getId(), request(inicioValido));
+            servico.setPreco(new BigDecimal("120.00"));
+
+            ArgumentCaptor<Agendamento> captor = ArgumentCaptor.forClass(Agendamento.class);
+            verify(agendamentoRepository).save(captor.capture());
+            assertEquals(new BigDecimal("80.00"), captor.getValue().getValor());
         }
 
         @Test
