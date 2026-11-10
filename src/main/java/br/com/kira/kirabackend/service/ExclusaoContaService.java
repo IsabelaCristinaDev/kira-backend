@@ -136,6 +136,7 @@ public class ExclusaoContaService {
         cliente.setEndereco(null);
         cliente.setLatitude(null);
         cliente.setLongitude(null);
+        cliente.getPreferencias().clear();
     }
 
     private static void anonimizarEstudio(Empresa empresa) {

@@ -1,5 +1,6 @@
 package br.com.kira.kirabackend.dto.response;
 
+import br.com.kira.kirabackend.domain.enums.CategoriaServico;
 import br.com.kira.kirabackend.domain.enums.Genero;
 import br.com.kira.kirabackend.domain.enums.StatusVerificacao;
 import br.com.kira.kirabackend.domain.enums.TipoDocumentoIdentidade;
@@ -34,7 +35,7 @@ public record DadosPessoaisResponse(
         Estudio estudio
 ) {
 
-    /** Campos que não se aplicam ao tipo da conta vêm nulos (ex.: CNPJ de cliente). */
+    /** Campos que não se aplicam ao tipo da conta vêm nulos (ex.: CNPJ de cliente, preferências de estúdio). */
     public record Conta(
             UUID id,
             String nome,
@@ -51,7 +52,8 @@ public record DadosPessoaisResponse(
             LocalDateTime dataCriacao,
             String descricao,
             List<String> especialidades,
-            TipoEstabelecimento tipoEstabelecimento
+            TipoEstabelecimento tipoEstabelecimento,
+            List<CategoriaServico> preferencias
     ) {}
 
     public record EstudioFavorito(UUID id, String nome, LocalDateTime salvoEm) {}

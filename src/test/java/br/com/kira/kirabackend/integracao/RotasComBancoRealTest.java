@@ -411,6 +411,35 @@ class RotasComBancoRealTest {
     }
 
     @Test
+    @DisplayName("Preferências: só a dona vê e troca, valores fora da lista dão 400, e aparecem no perfil")
+    void preferencias() throws IOException, InterruptedException {
+        String rota = "/api/clientes/" + outraCliente.id() + "/preferencias";
+
+        assertEquals(0, get(rota, outraCliente.token()).get("categorias").size());
+
+        JsonNode salvas = chamar("PUT", rota, Map.of("categorias", List.of("UNHAS", "CABELO", "UNHAS")),
+                outraCliente.token(), 200);
+        assertEquals("[\"UNHAS\",\"CABELO\"]", salvas.get("categorias").toString());
+        assertEquals(salvas.get("categorias"), get(rota, outraCliente.token()).get("categorias"));
+        assertEquals(salvas.get("categorias"),
+                get("/api/clientes/" + outraCliente.id() + "/perfil", outraCliente.token()).get("preferencias"));
+
+        chamar("PUT", rota, Map.of("categorias", List.of("TATUAGEM")), outraCliente.token(), 400);
+        chamar("PUT", rota, Map.of("categorias", List.of("OUTRO")), outraCliente.token(), 400);
+        chamar("PUT", rota, Map.of(), outraCliente.token(), 400);
+        assertEquals(salvas.get("categorias"), get(rota, outraCliente.token()).get("categorias"));
+
+        // Outra cliente e estúdio não leem nem trocam
+        chamar("GET", rota, null, cliente.token(), 403);
+        chamar("PUT", rota, Map.of("categorias", List.of("CABELO")), cliente.token(), 403);
+        chamar("GET", "/api/clientes/" + salao.id() + "/preferencias", null, salao.token(), 404);
+        chamar("GET", rota, null, null, 401);
+
+        JsonNode vazias = chamar("PUT", rota, Map.of("categorias", List.of()), outraCliente.token(), 200);
+        assertEquals(0, vazias.get("categorias").size());
+    }
+
+    @Test
     @DisplayName("Perfil editado aparece no lembrete, que roda fora de uma requisição")
     void perfilELembrete() throws IOException, InterruptedException {
         // Contas próprias: este teste muda o nome e o tipo, e os outros dependem desses dados

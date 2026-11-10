@@ -7,6 +7,7 @@ import br.com.kira.kirabackend.domain.entity.Endereco;
 import br.com.kira.kirabackend.domain.entity.FotoPortfolio;
 import br.com.kira.kirabackend.domain.entity.Funcionaria;
 import br.com.kira.kirabackend.domain.entity.Servico;
+import br.com.kira.kirabackend.domain.enums.CategoriaServico;
 import br.com.kira.kirabackend.domain.enums.Genero;
 import br.com.kira.kirabackend.domain.enums.TipoEstabelecimento;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
@@ -38,6 +39,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -98,6 +100,7 @@ class ExclusaoContaServiceTest {
         cliente.setLatitude(-16.6);
         cliente.setLongitude(-49.2);
         cliente.setFotoUrl("/api/arquivos/perfil.jpg");
+        cliente.getPreferencias().add(CategoriaServico.UNHAS);
         cliente.setAtivo(true);
         when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
         return cliente;
@@ -141,6 +144,7 @@ class ExclusaoContaServiceTest {
         assertEquals("Senha incorreta", erro.getMessage());
         assertEquals("Ana", cliente.getNome());
         assertTrue(cliente.getAtivo());
+        assertEquals(Set.of(CategoriaServico.UNHAS), cliente.getPreferencias());
         verify(usuarioRepository, never()).save(any());
         verifyNoInteractions(agendamentoService, contatoEmergenciaRepository, eventPublisher);
     }
@@ -198,6 +202,7 @@ class ExclusaoContaServiceTest {
         assertNull(cliente.getEndereco());
         assertNull(cliente.getLatitude());
         assertNull(cliente.getLongitude());
+        assertTrue(cliente.getPreferencias().isEmpty());
         assertNull(cliente.getFotoUrl());
         assertFalse(cliente.getAtivo());
         verify(usuarioRepository).save(cliente);

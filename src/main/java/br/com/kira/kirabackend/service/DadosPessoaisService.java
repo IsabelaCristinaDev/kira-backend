@@ -96,7 +96,8 @@ public class DadosPessoaisService {
         UUID id = c.getId();
         Conta conta = new Conta(c.getId(), c.getNome(), c.getEmail(), c.getTelefone(), c.getCpf(), null,
                 c.getDataNascimento(), c.getGenero(), EnderecoResponse.from(c.getEndereco()),
-                c.getLatitude(), c.getLongitude(), c.getFotoUrl(), c.getDataCriacao(), null, List.of(), null);
+                c.getLatitude(), c.getLongitude(), c.getFotoUrl(), c.getDataCriacao(), null, List.of(), null,
+                PerfilService.emOrdem(c.getPreferencias()));
         return new DadosPessoaisResponse(
                 agora(),
                 TipoUsuario.CLIENTE,
@@ -120,7 +121,7 @@ public class DadosPessoaisService {
         Conta conta = new Conta(e.getId(), e.getNome(), e.getEmail(), e.getTelefone(), e.getCpf(), e.getCnpj(),
                 e.getDataNascimento(), null, EnderecoResponse.from(e.getEndereco()),
                 e.getLatitude(), e.getLongitude(), e.getFotoUrl(), e.getDataCriacao(), e.getDescricao(),
-                PerfilService.separarEspecialidades(e.getEspecialidades()), e.getTipoEstabelecimento());
+                PerfilService.separarEspecialidades(e.getEspecialidades()), e.getTipoEstabelecimento(), null);
         List<FotoPortfolio> portfolio = fotoPortfolioRepository.findByEmpresaIdOrderByDataCriacaoDesc(id);
         Estudio estudio = new Estudio(
                 servicoRepository.findByEmpresaId(id).stream().map(ServicoResponse::from).toList(),

@@ -237,6 +237,8 @@ class PrivacidadeComBancoRealTest {
                 """, UUID.randomUUID().toString(), ana.id());
         String navegador = "https://fcm.googleapis.com/fcm/send/" + UUID.randomUUID();
         registrarNavegador(ana, navegador);
+        chamar("PUT", "/api/clientes/" + ana.id() + "/preferencias",
+                Map.of("categorias", List.of("UNHAS", "CILIOS")), ana.token(), 200);
 
         chamar("GET", DADOS, null, null, 401);
         HttpResponse<String> resposta = enviar("GET", DADOS, null, ana.token());
@@ -250,6 +252,7 @@ class PrivacidadeComBancoRealTest {
         assertEquals("62999990000", conta.get("telefone").asText());
         assertEquals("Goiania", conta.get("endereco").get("cidade").asText());
         assertTrue(conta.has("latitude"));
+        assertEquals("[\"CILIOS\",\"UNHAS\"]", conta.get("preferencias").toString());
         assertEquals(foto, conta.get("fotoUrl").asText());
         assertEquals(1, dados.get("agendamentos").size());
         assertEquals("lumiere", dados.get("agendamentos").get(0).get("nomeEmpresa").asText());
@@ -330,6 +333,8 @@ class PrivacidadeComBancoRealTest {
         chamar("PUT", "/api/favoritas/" + estudio.id(), null, bia.token(), 204);
         chamar("POST", "/api/provador/consentimento", Map.of("versao", "v1"), bia.token(), 200);
         registrarNavegador(bia, "https://fcm.googleapis.com/fcm/send/" + UUID.randomUUID());
+        chamar("PUT", "/api/clientes/" + bia.id() + "/preferencias",
+                Map.of("categorias", List.of("UNHAS")), bia.token(), 200);
 
         chamar("DELETE", PERFIL, senha(SENHA), bia.token(), 204);
 
@@ -353,7 +358,7 @@ class PrivacidadeComBancoRealTest {
         assertNull(linha.get("data_nascimento"));
         assertEquals(404, abrir(foto));
 
-        for (String tabela : List.of("contato_emergencia", "favorita")) {
+        for (String tabela : List.of("contato_emergencia", "favorita", "cliente_preferencia")) {
             assertEquals(0, contar(tabela, "cliente_id", bia.id()), tabela);
         }
         for (String tabela : List.of("dispositivo_notificacao", "refresh_token", "consentimento_provador")) {
