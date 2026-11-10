@@ -9,6 +9,7 @@ import br.com.kira.kirabackend.domain.entity.Empresa;
 import br.com.kira.kirabackend.domain.entity.Favorita;
 import br.com.kira.kirabackend.domain.entity.FotoPortfolio;
 import br.com.kira.kirabackend.domain.entity.Funcionaria;
+import br.com.kira.kirabackend.domain.entity.Servico;
 import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.domain.entity.VerificacaoIdentidade;
 import br.com.kira.kirabackend.domain.enums.TipoAvaliador;
@@ -54,7 +55,9 @@ import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 /**
  * Exportação dos dados pessoais da conta logada (LGPD: direito de acesso e portabilidade).
@@ -123,8 +126,9 @@ public class DadosPessoaisService {
                 e.getLatitude(), e.getLongitude(), e.getFotoUrl(), e.getDataCriacao(), e.getDescricao(),
                 PerfilService.separarEspecialidades(e.getEspecialidades()), e.getTipoEstabelecimento(), null);
         List<FotoPortfolio> portfolio = fotoPortfolioRepository.findByEmpresaIdOrderByDataCriacaoDesc(id);
+        List<Servico> servicos = servicoRepository.findByEmpresaId(id);
         Estudio estudio = new Estudio(
-                servicoRepository.findByEmpresaId(id).stream().map(ServicoResponse::from).toList(),
+                servicos.stream().map(ServicoResponse::from).toList(),
                 funcionariaRepository.findByEmpresaId(id).stream().map(DadosPessoaisService::paraFuncionaria).toList(),
                 portfolio.stream()
                         .map(f -> new FotoPortfolioResponse(f.getId(), f.getUrl(), f.getDataCriacao())).toList(),
@@ -141,7 +145,9 @@ public class DadosPessoaisService {
                 List.of(),
                 consentimentos(id),
                 dispositivos(id),
-                fotos(e.getFotoUrl(), portfolio.stream().map(FotoPortfolio::getUrl).toList()),
+                fotos(e.getFotoUrl(), Stream.concat(
+                        portfolio.stream().map(FotoPortfolio::getUrl),
+                        servicos.stream().map(Servico::getFotoUrl).filter(Objects::nonNull)).toList()),
                 estudio);
     }
 

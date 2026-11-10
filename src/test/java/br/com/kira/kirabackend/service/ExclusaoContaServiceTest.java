@@ -236,6 +236,7 @@ class ExclusaoContaServiceTest {
         when(funcionariaRepository.findByEmpresaId(id)).thenReturn(List.of(funcionaria));
         Servico servico = new Servico();
         servico.setAtivo(true);
+        servico.setFotoUrl("/api/arquivos/corte.jpg");
         when(servicoRepository.findByEmpresaId(id)).thenReturn(List.of(servico));
 
         service.excluir(id, SENHA);
@@ -255,6 +256,7 @@ class ExclusaoContaServiceTest {
         assertFalse(funcionaria.getAtivo());
         assertNull(funcionaria.getFotoUrl());
         assertFalse(servico.getAtivo());
+        assertNull(servico.getFotoUrl());
 
         verify(agendamentoService).cancelarFuturosDaContaExcluida(empresa);
         verify(fotoPortfolioRepository).deleteAll(List.of(foto));
@@ -263,7 +265,7 @@ class ExclusaoContaServiceTest {
         verify(refreshTokenRepository).deleteByUsuarioId(id);
         verifyNoInteractions(contatoEmergenciaRepository);
 
-        assertEquals(List.of("/api/arquivos/logo.png", "/api/arquivos/trabalho.jpg", "/api/arquivos/carla.jpg"),
-                arquivosApagados());
+        assertEquals(List.of("/api/arquivos/logo.png", "/api/arquivos/trabalho.jpg", "/api/arquivos/carla.jpg",
+                "/api/arquivos/corte.jpg"), arquivosApagados());
     }
 }

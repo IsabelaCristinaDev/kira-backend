@@ -6,6 +6,7 @@ import br.com.kira.kirabackend.domain.enums.CategoriaServico;
 import br.com.kira.kirabackend.dto.request.ServicoRequest;
 import br.com.kira.kirabackend.dto.response.ServicoResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
+import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -23,10 +25,12 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -41,6 +45,9 @@ class ServicoServiceTest {
     @Mock
     private UsuarioRepository usuarioRepository;
 
+    @Mock
+    private ImagensEnviadas imagens;
+
     private ServicoService service;
 
     private Empresa empresa;
@@ -48,7 +55,7 @@ class ServicoServiceTest {
     @BeforeEach
     void setUp() {
         // Pelo construtor, como o Spring faz: garante que as dependências são realmente injetadas.
-        service = new ServicoService(servicoRepository, usuarioRepository);
+        service = new ServicoService(servicoRepository, usuarioRepository, imagens);
 
         empresa = new Empresa();
         empresa.setId(UUID.randomUUID());
@@ -212,5 +219,123 @@ class ServicoServiceTest {
 
         assertTrue(service.listarPorEmpresa(empresaId).isEmpty());
         verify(servicoRepository).findByEmpresaIdAndAtivoTrue(empresaId);
+    }
+
+    // ---------- foto ----------
+
+    private final MockMultipartFile arquivo =
+            new MockMultipartFile("arquivo", "foto.png", "image/png", new byte[]{1, 2, 3});
+
+    private Servico servicoDaEmpresa(String fotoUrl) {
+        Servico servico = new Servico();
+        servico.setId(UUID.randomUUID());
+        servico.setNome("Corte");
+        servico.setDuracaoMinutos(60);
+        servico.setPreco(new BigDecimal("80"));
+        servico.setAtivo(true);
+        servico.setEmpresa(empresa);
+        servico.setFotoUrl(fotoUrl);
+        return servico;
+    }
+
+    @Test
+    @DisplayName("A resposta do serviço traz o endereço da foto")
+    void respostaTrazFoto() {
+        Servico servico = servicoDaEmpresa("/api/arquivos/corte.png");
+
+        assertEquals("/api/arquivos/corte.png", ServicoResponse.from(servico).fotoUrl());
+    }
+
+    @Test
+    @DisplayName("Editar o serviço não mexe na foto")
+    void atualizarNaoMexeNaFoto() {
+        Servico servico = servicoDaEmpresa("/api/arquivos/corte.png");
+        when(servicoRepository.findById(servico.getId())).thenReturn(Optional.of(servico));
+        when(servicoRepository.save(any(Servico.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ServicoResponse response = service.atualizar(empresa.getId(), servico.getId(),
+                new ServicoRequest("Corte curto", null, 45, new BigDecimal("70"), null));
+
+        assertEquals("/api/arquivos/corte.png", response.fotoUrl());
+        verifyNoInteractions(imagens);
+    }
+
+    @Test
+    @DisplayName("Enviar foto guarda a nova, grava o endereço e apaga a anterior")
+    void definirFotoTrocaEApagaAnterior() {
+        Servico servico = servicoDaEmpresa("/api/arquivos/antiga.png");
+        when(servicoRepository.findById(servico.getId())).thenReturn(Optional.of(servico));
+        when(imagens.guardar(arquivo)).thenReturn("/api/arquivos/nova.png");
+        when(servicoRepository.save(servico)).thenReturn(servico);
+
+        ServicoResponse response = service.definirFoto(empresa.getId(), servico.getId(), arquivo);
+
+        assertEquals("/api/arquivos/nova.png", response.fotoUrl());
+        assertEquals("/api/arquivos/nova.png", servico.getFotoUrl());
+        verify(imagens).apagarSemFalhar("/api/arquivos/antiga.png");
+    }
+
+    @Test
+    @DisplayName("Se gravar o serviço falhar, a foto nova é apagada e a antiga fica")
+    void definirFotoFalhaAoSalvarApagaANova() {
+        Servico servico = servicoDaEmpresa("/api/arquivos/antiga.png");
+        UUID empresaId = empresa.getId();
+        UUID servicoId = servico.getId();
+        when(servicoRepository.findById(servicoId)).thenReturn(Optional.of(servico));
+        when(imagens.guardar(arquivo)).thenReturn("/api/arquivos/nova.png");
+        doThrow(new IllegalStateException("banco fora")).when(servicoRepository).save(servico);
+
+        assertThrows(IllegalStateException.class, () -> service.definirFoto(empresaId, servicoId, arquivo));
+
+        verify(imagens).apagarSemFalhar("/api/arquivos/nova.png");
+        verify(imagens, never()).apagarSemFalhar("/api/arquivos/antiga.png");
+    }
+
+    @Test
+    @DisplayName("Imagem recusada não muda a foto do serviço")
+    void definirFotoRecusada() {
+        Servico servico = servicoDaEmpresa("/api/arquivos/antiga.png");
+        UUID empresaId = empresa.getId();
+        UUID servicoId = servico.getId();
+        when(servicoRepository.findById(servicoId)).thenReturn(Optional.of(servico));
+        when(imagens.guardar(arquivo)).thenThrow(new RegraDeNegocioException("A foto precisa ser JPG, PNG ou WEBP"));
+
+        assertThrows(RegraDeNegocioException.class, () -> service.definirFoto(empresaId, servicoId, arquivo));
+
+        assertEquals("/api/arquivos/antiga.png", servico.getFotoUrl());
+        verify(servicoRepository, never()).save(any());
+        verify(imagens, never()).apagarSemFalhar(any());
+    }
+
+    @Test
+    @DisplayName("Foto de serviço de outra empresa responde como inexistente e nada é guardado")
+    void fotoDeServicoDeOutraEmpresa() {
+        Empresa outra = new Empresa();
+        outra.setId(UUID.randomUUID());
+        Servico servico = servicoDaEmpresa("/api/arquivos/antiga.png");
+        servico.setEmpresa(outra);
+        UUID empresaId = empresa.getId();
+        UUID servicoId = servico.getId();
+        when(servicoRepository.findById(servicoId)).thenReturn(Optional.of(servico));
+
+        assertThrows(RecursoNaoEncontradoException.class, () -> service.definirFoto(empresaId, servicoId, arquivo));
+        assertThrows(RecursoNaoEncontradoException.class, () -> service.removerFoto(empresaId, servicoId));
+
+        assertEquals("/api/arquivos/antiga.png", servico.getFotoUrl());
+        verify(servicoRepository, never()).save(any());
+        verifyNoInteractions(imagens);
+    }
+
+    @Test
+    @DisplayName("Remover a foto limpa o endereço e apaga o arquivo")
+    void removerFoto() {
+        Servico servico = servicoDaEmpresa("/api/arquivos/antiga.png");
+        when(servicoRepository.findById(servico.getId())).thenReturn(Optional.of(servico));
+
+        service.removerFoto(empresa.getId(), servico.getId());
+
+        assertNull(servico.getFotoUrl());
+        verify(servicoRepository).save(servico);
+        verify(imagens).apagarSemFalhar("/api/arquivos/antiga.png");
     }
 }
