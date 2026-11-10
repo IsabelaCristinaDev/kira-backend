@@ -9,6 +9,7 @@ import br.com.kira.kirabackend.domain.entity.Empresa;
 import br.com.kira.kirabackend.domain.entity.Favorita;
 import br.com.kira.kirabackend.domain.entity.FotoPortfolio;
 import br.com.kira.kirabackend.domain.entity.Funcionaria;
+import br.com.kira.kirabackend.domain.entity.Servico;
 import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.domain.entity.VerificacaoIdentidade;
 import br.com.kira.kirabackend.domain.enums.TipoAvaliador;
@@ -126,8 +127,9 @@ public class DadosPessoaisService {
                 PerfilService.separarEspecialidades(e.getEspecialidades()), e.getTipoEstabelecimento(), null);
         List<FotoPortfolio> portfolio = fotoPortfolioRepository.findByEmpresaIdOrderByDataCriacaoDesc(id);
         List<Funcionaria> funcionarias = funcionariaRepository.findByEmpresaId(id);
+        List<Servico> servicos = servicoRepository.findByEmpresaId(id);
         Estudio estudio = new Estudio(
-                servicoRepository.findByEmpresaId(id).stream().map(ServicoResponse::from).toList(),
+                servicos.stream().map(ServicoResponse::from).toList(),
                 funcionarias.stream().map(DadosPessoaisService::paraFuncionaria).toList(),
                 portfolio.stream()
                         .map(f -> new FotoPortfolioResponse(f.getId(), f.getUrl(), f.getDataCriacao())).toList(),
@@ -144,9 +146,11 @@ public class DadosPessoaisService {
                 List.of(),
                 consentimentos(id),
                 dispositivos(id),
-                fotos(e.getFotoUrl(), Stream.concat(
-                        portfolio.stream().map(FotoPortfolio::getUrl),
-                        funcionarias.stream().map(Funcionaria::getFotoUrl).filter(Objects::nonNull)).toList()),
+                fotos(e.getFotoUrl(), Stream.of(
+                                portfolio.stream().map(FotoPortfolio::getUrl),
+                                funcionarias.stream().map(Funcionaria::getFotoUrl),
+                                servicos.stream().map(Servico::getFotoUrl))
+                        .flatMap(urls -> urls).filter(Objects::nonNull).toList()),
                 estudio);
     }
 

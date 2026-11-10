@@ -10,6 +10,7 @@ import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -20,6 +21,7 @@ public class ServicoService {
 
     private final ServicoRepository servicoRepository;
     private final UsuarioRepository usuarioRepository;
+    private final ImagensEnviadas imagens;
 
     public ServicoResponse cadastrar(UUID empresaId, ServicoRequest request) {
         Empresa empresa = (Empresa) usuarioRepository.findById(empresaId)
@@ -63,6 +65,31 @@ public class ServicoService {
 
         servico.setAtivo(false);
         servicoRepository.save(servico);
+    }
+
+    /** Troca a foto do serviço. A anterior só é apagada depois que a nova foi gravada. */
+    public ServicoResponse definirFoto(UUID empresaId, UUID id, MultipartFile arquivo) {
+        Servico servico = buscarDaEmpresa(empresaId, id);
+        String fotoAnterior = servico.getFotoUrl();
+        String fotoNova = imagens.guardar(arquivo);
+        servico.setFotoUrl(fotoNova);
+        Servico salvo;
+        try {
+            salvo = servicoRepository.save(servico);
+        } catch (RuntimeException e) {
+            imagens.apagarSemFalhar(fotoNova);
+            throw e;
+        }
+        imagens.apagarSemFalhar(fotoAnterior);
+        return toResponse(salvo);
+    }
+
+    public void removerFoto(UUID empresaId, UUID id) {
+        Servico servico = buscarDaEmpresa(empresaId, id);
+        String fotoAnterior = servico.getFotoUrl();
+        servico.setFotoUrl(null);
+        servicoRepository.save(servico);
+        imagens.apagarSemFalhar(fotoAnterior);
     }
 
     /** Serviço de outra empresa é tratado como inexistente na rota desta empresa. */

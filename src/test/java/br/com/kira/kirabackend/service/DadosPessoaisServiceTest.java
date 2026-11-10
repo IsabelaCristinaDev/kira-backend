@@ -262,6 +262,7 @@ class DadosPessoaisServiceTest {
         Servico servico = new Servico();
         servico.setNome("Manicure");
         servico.setPreco(new BigDecimal("50.00"));
+        servico.setFotoUrl("/api/arquivos/manicure.jpg");
         when(servicoRepository.findByEmpresaId(id)).thenReturn(List.of(servico));
         Funcionaria funcionaria = new Funcionaria();
         funcionaria.setNome("Carla");
@@ -287,10 +288,12 @@ class DadosPessoaisServiceTest {
         assertTrue(dados.favoritas().isEmpty());
         assertTrue(dados.contatosEmergencia().isEmpty());
         assertEquals("Manicure", dados.estudio().servicos().get(0).nome());
+        assertEquals("/api/arquivos/manicure.jpg", dados.estudio().servicos().get(0).fotoUrl());
         assertEquals("Carla", dados.estudio().funcionarias().get(0).nome());
         assertEquals("/api/arquivos/trabalho.jpg", dados.estudio().portfolio().get(0).url());
         assertEquals(DiaSemana.SEGUNDA, dados.estudio().horario().get(0).diaSemana());
-        assertEquals(List.of("/api/arquivos/logo.png", "/api/arquivos/trabalho.jpg", "/api/arquivos/carla.jpg"),
+        assertEquals(List.of("/api/arquivos/logo.png", "/api/arquivos/trabalho.jpg", "/api/arquivos/carla.jpg",
+                "/api/arquivos/manicure.jpg"),
                 dados.fotos());
     }
 

@@ -657,6 +657,59 @@ class RotasComBancoRealTest {
     }
 
     @Test
+    @DisplayName("Foto do serviço: só o estúdio dono envia e remove, e aparece na vitrine e na busca")
+    void fotoDoServico() throws IOException, InterruptedException {
+        String servicos = "/api/empresas/" + outroEstudio.id() + "/servicos";
+        String servicoId = chamar("POST", servicos, Map.of("nome", "Manicure com foto", "duracaoMinutos", 30,
+                "preco", 40), outroEstudio.token(), 201).get("id").asText();
+        String foto = servicos + "/" + servicoId + "/foto";
+        assertTrue(servicoNaVitrine(servicoId).get("fotoUrl").isNull());
+
+        assertEquals(401, enviarArquivo(foto, "arquivo", PNG, null).statusCode());
+        assertEquals(403, enviarArquivo(foto, "arquivo", PNG, salao.token()).statusCode());
+        assertEquals(403, enviarArquivo(foto, "arquivo", PNG, cliente.token()).statusCode());
+        assertEquals(404, enviarArquivo("/api/empresas/" + salao.id() + "/servicos/" + servicoId + "/foto",
+                "arquivo", PNG, salao.token()).statusCode());
+        assertEquals(400, enviarArquivo(foto, "arquivo", "texto".getBytes(StandardCharsets.UTF_8),
+                outroEstudio.token()).statusCode());
+
+        HttpResponse<String> enviada = enviarArquivo(foto, "arquivo", PNG, outroEstudio.token());
+        assertEquals(200, enviada.statusCode(), enviada.body());
+        String primeira = json.readTree(enviada.body()).get("fotoUrl").asText();
+        assertEquals(200, abrir(primeira).statusCode());
+        assertEquals(primeira, servicoNaVitrine(servicoId).get("fotoUrl").asText());
+
+        // Editar o serviço mantém a foto
+        chamar("PUT", servicos + "/" + servicoId, Map.of("nome", "Manicure com foto", "duracaoMinutos", 40,
+                "preco", 45), outroEstudio.token(), 200);
+        assertEquals(primeira, servicoNaVitrine(servicoId).get("fotoUrl").asText());
+
+        String segunda = json.readTree(enviarArquivo(foto, "arquivo", JPEG, outroEstudio.token()).body())
+                .get("fotoUrl").asText();
+        assertEquals(404, abrir(primeira).statusCode());
+        JsonNode naBusca = get("/api/studios/pesquisa?texto=espaco", null).findParents("fotoUrl").stream()
+                .filter(s -> s.has("duracaoMinutos") && s.get("id").asText().equals(servicoId))
+                .findFirst().orElseThrow();
+        assertEquals(segunda, naBusca.get("fotoUrl").asText());
+
+        chamar("DELETE", foto, null, null, 401);
+        chamar("DELETE", foto, null, salao.token(), 403);
+        assertEquals(200, abrir(segunda).statusCode());
+        chamar("DELETE", foto, null, outroEstudio.token(), 204);
+        assertEquals(404, abrir(segunda).statusCode());
+        assertTrue(servicoNaVitrine(servicoId).get("fotoUrl").isNull());
+    }
+
+    private JsonNode servicoNaVitrine(String servicoId) throws IOException, InterruptedException {
+        for (JsonNode servico : get("/api/studios/" + outroEstudio.id() + "/servicos", null)) {
+            if (servicoId.equals(servico.get("id").asText())) {
+                return servico;
+            }
+        }
+        throw new AssertionError("Serviço fora da vitrine");
+    }
+
+    @Test
     @DisplayName("Portfólio: público para ver, só o dono muda, e aceita até 20 fotos")
     void portfolio() throws IOException, InterruptedException {
         String publico = "/api/studios/" + outroEstudio.id() + "/portfolio";
