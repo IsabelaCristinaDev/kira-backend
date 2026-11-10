@@ -287,6 +287,8 @@ class PrivacidadeComBancoRealTest {
         chamar("POST", "/api/empresas/" + estudio.id() + "/funcionarias",
                 Map.of("nome", "Carla", "comissaoPercentual", 10), estudio.token(), 201);
         String foto = enviarFoto("/api/empresas/" + estudio.id() + "/portfolio", estudio.token(), 201);
+        String fotoServico = enviarFoto("/api/empresas/" + estudio.id() + "/servicos/" + servico(estudio) + "/foto",
+                estudio.token(), 200);
 
         JsonNode dados = get(DADOS, estudio.token());
 
@@ -299,6 +301,8 @@ class PrivacidadeComBancoRealTest {
         assertEquals(foto, dadosDoEstudio.get("portfolio").get(0).get("url").asText());
         assertEquals(7, dadosDoEstudio.get("horario").size());
         assertTrue(dados.get("fotos").toString().contains(foto));
+        assertEquals(fotoServico, dadosDoEstudio.get("servicos").get(0).get("fotoUrl").asText());
+        assertTrue(dados.get("fotos").toString().contains(fotoServico));
     }
 
     // ---------- exclusão ----------
@@ -386,6 +390,9 @@ class PrivacidadeComBancoRealTest {
     void excluirEstudio() throws Exception {
         Conta estudio = novoEstudio("aurora", "45723174000110");
         String foto = enviarFoto("/api/empresas/" + estudio.id() + "/portfolio", estudio.token(), 201);
+        String servicoId = servico(estudio);
+        String fotoServico = enviarFoto("/api/empresas/" + estudio.id() + "/servicos/" + servicoId + "/foto",
+                estudio.token(), 200);
         Conta carol = novaCliente("carol", "39053344705");
         String futuro = agendar(carol, estudio, hoje.plusDays(4) + "T15:00:00");
         chamar("PUT", "/api/favoritas/" + estudio.id(), null, carol.token(), 204);
@@ -401,6 +408,8 @@ class PrivacidadeComBancoRealTest {
         assertEquals(0, contar("foto_portfolio", "empresa_id", estudio.id()));
         assertEquals(0, contar("favorita", "empresa_id", estudio.id()));
         assertEquals(404, abrir(foto));
+        assertEquals(404, abrir(fotoServico));
+        assertNull(jdbc.queryForObject("select foto_url from servico where id = ?::uuid", String.class, servicoId));
         assertNull(jdbc.queryForObject("select cnpj from empresa where id = ?::uuid", String.class, estudio.id()));
 
         cadastrarEstudio("aurora", "45723174000110", 201);

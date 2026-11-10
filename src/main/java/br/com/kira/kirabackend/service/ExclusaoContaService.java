@@ -107,7 +107,7 @@ public class ExclusaoContaService {
         verificacaoRepository.deleteByUsuarioId(usuarioId);
     }
 
-    /** Apaga o portfólio e as favoritas do estúdio e desativa funcionárias e serviços. Devolve as fotos a apagar. */
+    /** Apaga o portfólio, as favoritas e as fotos do estúdio e desativa funcionárias e serviços. Devolve as fotos a apagar. */
     private List<String> encerrarEstudio(Empresa empresa) {
         UUID id = empresa.getId();
         List<String> arquivos = new ArrayList<>();
@@ -124,6 +124,10 @@ public class ExclusaoContaService {
             funcionaria.setAtivo(false);
         }
         for (Servico servico : servicoRepository.findByEmpresaId(id)) {
+            if (servico.getFotoUrl() != null) {
+                arquivos.add(servico.getFotoUrl());
+            }
+            servico.setFotoUrl(null);
             servico.setAtivo(false);
         }
         return arquivos;
