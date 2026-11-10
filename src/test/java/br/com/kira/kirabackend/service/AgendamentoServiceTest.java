@@ -43,6 +43,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEvent;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -239,6 +240,40 @@ class AgendamentoServiceTest {
             verify(eventPublisher).publishEvent(evento.capture());
             AgendamentoCriadoEvent criado = assertInstanceOf(AgendamentoCriadoEvent.class, evento.getValue());
             assertSame(salvo, criado.getAgendamento());
+        }
+
+        @Test
+        @DisplayName("Guarda no agendamento o preço que o serviço tem no momento e devolve na resposta")
+        void deveGuardarOValorDoServicoNoAgendamento() {
+            servico.setPreco(new BigDecimal("80.00"));
+            mockarEntidadesDaCriacao();
+            mockarExpedientePadrao();
+            mockarAgendamentosNoIntervalo(List.of());
+            mockarSaveDevolvendoArgumento();
+
+            AgendamentoResponse response = service.criar(cliente.getId(), cliente.getId(), request(inicioValido));
+
+            ArgumentCaptor<Agendamento> captor = ArgumentCaptor.forClass(Agendamento.class);
+            verify(agendamentoRepository).save(captor.capture());
+            assertEquals(new BigDecimal("80.00"), captor.getValue().getValor());
+            assertEquals(new BigDecimal("80.00"), response.valor());
+        }
+
+        @Test
+        @DisplayName("Se o estúdio muda o preço do serviço depois, o valor do agendamento não muda")
+        void mudarOPrecoDoServicoNaoMudaOValorDoAgendamento() {
+            servico.setPreco(new BigDecimal("80.00"));
+            mockarEntidadesDaCriacao();
+            mockarExpedientePadrao();
+            mockarAgendamentosNoIntervalo(List.of());
+            mockarSaveDevolvendoArgumento();
+
+            service.criar(cliente.getId(), cliente.getId(), request(inicioValido));
+            servico.setPreco(new BigDecimal("120.00"));
+
+            ArgumentCaptor<Agendamento> captor = ArgumentCaptor.forClass(Agendamento.class);
+            verify(agendamentoRepository).save(captor.capture());
+            assertEquals(new BigDecimal("80.00"), captor.getValue().getValor());
         }
 
         @Test
@@ -1196,6 +1231,52 @@ class AgendamentoServiceTest {
             RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
                     () -> service.reagendarPelaEmpresa(id, empresaId, req));
             assertEquals("A funcionária não está livre neste horário", ex.getMessage());
+        }
+    }
+
+    @Nested
+    @DisplayName("Cancelar os futuros de uma conta excluída")
+    class CancelarFuturosDaContaExcluida {
+
+        private static final List<StatusAgendamento> AINDA_VAO_ACONTECER = List.of(
+                StatusAgendamento.PENDENTE, StatusAgendamento.CONFIRMADO, StatusAgendamento.REAGENDADO);
+
+        @Test
+        @DisplayName("Cliente: cancela os futuros, mesmo em cima da hora, sem avisar a cliente que saiu")
+        void cliente() {
+            Agendamento futuro = agendamentoExistente(StatusAgendamento.CONFIRMADO);
+            when(agendamentoRepository.findByClienteIdAndStatusInAndDataHoraInicioAfter(
+                    eq(cliente.getId()), eq(AINDA_VAO_ACONTECER), any(LocalDateTime.class)))
+                    .thenReturn(List.of(futuro));
+            when(agendamentoRepository.save(futuro)).thenReturn(futuro);
+
+            service.cancelarFuturosDaContaExcluida(cliente);
+
+            assertEquals(StatusAgendamento.CANCELADO, futuro.getStatus());
+            ArgumentCaptor<ApplicationEvent> evento = ArgumentCaptor.forClass(ApplicationEvent.class);
+            verify(eventPublisher).publishEvent(evento.capture());
+            assertInstanceOf(AgendamentoCanceladoEvent.class, evento.getValue());
+            verify(eventPublisher, never()).publishEvent(any(AvisoAgendamentoEvent.class));
+            verifyNoInteractions(cancelamentoClienteStrategy);
+        }
+
+        @Test
+        @DisplayName("Estúdio: cancela os futuros e avisa cada cliente")
+        void estudio() {
+            Agendamento futuro = agendamentoExistente(StatusAgendamento.PENDENTE);
+            when(agendamentoRepository.findByEmpresaIdAndStatusInAndDataHoraInicioAfter(
+                    eq(empresa.getId()), eq(AINDA_VAO_ACONTECER), any(LocalDateTime.class)))
+                    .thenReturn(List.of(futuro));
+            when(agendamentoRepository.save(futuro)).thenReturn(futuro);
+
+            service.cancelarFuturosDaContaExcluida(empresa);
+
+            assertEquals(StatusAgendamento.CANCELADO, futuro.getStatus());
+            ArgumentCaptor<AvisoAgendamentoEvent> aviso = ArgumentCaptor.forClass(AvisoAgendamentoEvent.class);
+            verify(eventPublisher).publishEvent(aviso.capture());
+            assertEquals(TipoAvisoAgendamento.CANCELADO_PELO_ESTUDIO, aviso.getValue().tipo());
+            assertEquals(futuro.getId(), aviso.getValue().agendamento().id());
+            verifyNoInteractions(cancelamentoEmpresaStrategy);
         }
     }
 }

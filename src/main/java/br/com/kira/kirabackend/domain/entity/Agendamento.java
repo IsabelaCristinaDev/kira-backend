@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -49,6 +50,14 @@ public class Agendamento {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private StatusAgendamento status = StatusAgendamento.PENDENTE;
+
+    /**
+     * Preço do serviço no momento do agendamento. Fica guardado aqui para que uma mudança
+     * de preço depois não altere o que a cliente combinou. Nulo nos agendamentos antigos,
+     * criados antes deste campo existir.
+     */
+    @Column(precision = 10, scale = 2)
+    private BigDecimal valor;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "forma_pagamento", length = 20)

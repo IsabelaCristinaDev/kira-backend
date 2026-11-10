@@ -49,4 +49,6 @@ public interface MensagemRepository extends JpaRepository<Mensagem, UUID> {
             where m.agendamento.id = :agendamentoId and m.lida = false and m.remetente.id <> :usuarioId
             """)
     int marcarRecebidasComoLidas(@Param("agendamentoId") UUID agendamentoId, @Param("usuarioId") UUID usuarioId);
+
+    List<Mensagem> findByRemetenteIdOrderByDataEnvioAsc(UUID remetenteId);
 }
