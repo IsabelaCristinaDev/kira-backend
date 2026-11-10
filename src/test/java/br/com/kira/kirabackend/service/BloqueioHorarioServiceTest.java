@@ -17,11 +17,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -134,5 +137,43 @@ class BloqueioHorarioServiceTest {
 
         assertThrows(RecursoNaoEncontradoException.class, () -> service.remover(funcionariaId, id));
         verify(bloqueioHorarioRepository, never()).deleteById(any());
+    }
+
+    @Test
+    @DisplayName("Lista os bloqueios da funcionária com o nome dela, o período e o motivo")
+    void listaBloqueiosDaFuncionaria() {
+        BloqueioHorario almoco = bloqueio(INICIO.withHour(12), INICIO.withHour(13), "Almoço");
+        BloqueioHorario curso = bloqueio(INICIO.plusDays(1), INICIO.plusDays(1).withHour(18), null);
+        when(bloqueioHorarioRepository.findByFuncionariaId(funcionaria.getId())).thenReturn(List.of(almoco, curso));
+
+        List<BloqueioHorarioResponse> bloqueios = service.listarPorFuncionaria(funcionaria.getId());
+
+        assertEquals(List.of(almoco.getId(), curso.getId()),
+                bloqueios.stream().map(BloqueioHorarioResponse::id).toList());
+        BloqueioHorarioResponse primeiro = bloqueios.get(0);
+        assertEquals(funcionaria.getId(), primeiro.funcionariaId());
+        assertEquals("Bia", primeiro.nomeFuncionaria());
+        assertEquals(INICIO.withHour(12), primeiro.dataHoraInicio());
+        assertEquals(INICIO.withHour(13), primeiro.dataHoraFim());
+        assertEquals("Almoço", primeiro.motivo());
+        assertNull(bloqueios.get(1).motivo());
+    }
+
+    @Test
+    @DisplayName("Funcionária sem bloqueios recebe lista vazia")
+    void listaVazia() {
+        when(bloqueioHorarioRepository.findByFuncionariaId(funcionaria.getId())).thenReturn(List.of());
+
+        assertTrue(service.listarPorFuncionaria(funcionaria.getId()).isEmpty());
+    }
+
+    private BloqueioHorario bloqueio(LocalDateTime inicio, LocalDateTime fim, String motivo) {
+        BloqueioHorario bloqueio = new BloqueioHorario();
+        bloqueio.setId(UUID.randomUUID());
+        bloqueio.setFuncionaria(funcionaria);
+        bloqueio.setDataHoraInicio(inicio);
+        bloqueio.setDataHoraFim(fim);
+        bloqueio.setMotivo(motivo);
+        return bloqueio;
     }
 }
