@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -22,4 +23,8 @@ public interface VerificacaoIdentidadeRepository extends JpaRepository<Verificac
 
     @Query("select distinct v.usuario.id from VerificacaoIdentidade v where v.status = :status")
     Set<UUID> idsDeUsuariosComStatus(@Param("status") StatusVerificacao status);
+
+    List<VerificacaoIdentidade> findByUsuarioIdOrderByDataCriacaoDesc(UUID usuarioId);
+
+    void deleteByUsuarioId(UUID usuarioId);
 }

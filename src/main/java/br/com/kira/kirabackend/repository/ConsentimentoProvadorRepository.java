@@ -9,4 +9,6 @@ import java.util.UUID;
 public interface ConsentimentoProvadorRepository extends JpaRepository<ConsentimentoProvador, UUID> {
 
     Optional<ConsentimentoProvador> findByUsuarioId(UUID usuarioId);
+
+    void deleteByUsuarioId(UUID usuarioId);
 }

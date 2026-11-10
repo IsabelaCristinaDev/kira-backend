@@ -16,4 +16,6 @@ public interface ContatoEmergenciaRepository extends JpaRepository<ContatoEmerge
     long countByClienteId(UUID clienteId);
 
     Optional<ContatoEmergencia> findByIdAndClienteId(UUID id, UUID clienteId);
+
+    void deleteByClienteId(UUID clienteId);
 }

@@ -40,6 +40,8 @@ public class AgendamentoService {
 
     private static final String AGENDAMENTO_NAO_ENCONTRADO = "Agendamento não encontrado";
     private static final String SO_OS_SEUS_AGENDAMENTOS = "Você só pode ver os seus próprios agendamentos";
+    private static final List<StatusAgendamento> AINDA_VAO_ACONTECER = List.of(
+            StatusAgendamento.PENDENTE, StatusAgendamento.CONFIRMADO, StatusAgendamento.REAGENDADO);
 
     private final AgendamentoRepository agendamentoRepository;
     private final UsuarioRepository usuarioRepository;
@@ -156,6 +158,28 @@ public class AgendamentoService {
         Agendamento salvo = agendamentoRepository.save(agendamento);
         eventPublisher.publishEvent(new AgendamentoCanceladoEvent(this, salvo));
         return avisarCliente(toResponse(salvo), TipoAvisoAgendamento.CANCELADO_PELO_ESTUDIO);
+    }
+
+    /**
+     * A conta foi excluída: os atendimentos que ainda iam acontecer são cancelados, sem o prazo mínimo
+     * do cancelamento comum. Quando é o estúdio que sai, cada cliente recebe o aviso do cancelamento.
+     */
+    public void cancelarFuturosDaContaExcluida(Usuario conta) {
+        LocalDateTime agora = LocalDateTime.now(KiraTimeZone.DEFAULT);
+        boolean estudio = conta instanceof Empresa;
+        List<Agendamento> futuros = estudio
+                ? agendamentoRepository.findByEmpresaIdAndStatusInAndDataHoraInicioAfter(
+                        conta.getId(), AINDA_VAO_ACONTECER, agora)
+                : agendamentoRepository.findByClienteIdAndStatusInAndDataHoraInicioAfter(
+                        conta.getId(), AINDA_VAO_ACONTECER, agora);
+        for (Agendamento agendamento : futuros) {
+            agendamento.setStatus(StatusAgendamento.CANCELADO);
+            Agendamento salvo = agendamentoRepository.save(agendamento);
+            eventPublisher.publishEvent(new AgendamentoCanceladoEvent(this, salvo));
+            if (estudio) {
+                avisarCliente(toResponse(salvo), TipoAvisoAgendamento.CANCELADO_PELO_ESTUDIO);
+            }
+        }
     }
 
     /** O estúdio confirma um agendamento novo ou remarcado. */
