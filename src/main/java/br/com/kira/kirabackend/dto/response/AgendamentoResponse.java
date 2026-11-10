@@ -4,6 +4,7 @@ import br.com.kira.kirabackend.domain.entity.Agendamento;
 import br.com.kira.kirabackend.domain.enums.FormaPagamento;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -21,6 +22,7 @@ public record AgendamentoResponse(
         LocalDateTime dataHoraInicio,
         LocalDateTime dataHoraFim,
         StatusAgendamento status,
+        BigDecimal valor,
         FormaPagamento formaPagamento,
         String observacoes
 ) {
@@ -39,6 +41,7 @@ public record AgendamentoResponse(
                 a.getDataHoraInicio(),
                 a.getDataHoraFim(),
                 a.getStatus(),
+                a.getValor(),
                 a.getFormaPagamento(),
                 a.getObservacoes()
         );

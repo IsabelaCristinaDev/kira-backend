@@ -108,6 +108,7 @@ public class AgendamentoService {
         agendamento.setServico(servico);
         agendamento.setDataHoraInicio(request.dataHoraInicio());
         agendamento.setDataHoraFim(dataHoraFim);
+        agendamento.setValor(servico.getPreco());
         agendamento.setFormaPagamento(request.formaPagamento());
         agendamento.setObservacoes(request.observacoes());
 
