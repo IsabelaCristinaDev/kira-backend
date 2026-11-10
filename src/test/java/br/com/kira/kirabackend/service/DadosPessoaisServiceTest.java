@@ -265,6 +265,7 @@ class DadosPessoaisServiceTest {
         when(servicoRepository.findByEmpresaId(id)).thenReturn(List.of(servico));
         Funcionaria funcionaria = new Funcionaria();
         funcionaria.setNome("Carla");
+        funcionaria.setFotoUrl("/api/arquivos/carla.jpg");
         when(funcionariaRepository.findByEmpresaId(id)).thenReturn(List.of(funcionaria));
         FotoPortfolio foto = new FotoPortfolio();
         foto.setUrl("/api/arquivos/trabalho.jpg");
@@ -289,7 +290,8 @@ class DadosPessoaisServiceTest {
         assertEquals("Carla", dados.estudio().funcionarias().get(0).nome());
         assertEquals("/api/arquivos/trabalho.jpg", dados.estudio().portfolio().get(0).url());
         assertEquals(DiaSemana.SEGUNDA, dados.estudio().horario().get(0).diaSemana());
-        assertEquals(List.of("/api/arquivos/logo.png", "/api/arquivos/trabalho.jpg"), dados.fotos());
+        assertEquals(List.of("/api/arquivos/logo.png", "/api/arquivos/trabalho.jpg", "/api/arquivos/carla.jpg"),
+                dados.fotos());
     }
 
     @Test

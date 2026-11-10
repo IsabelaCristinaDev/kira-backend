@@ -284,9 +284,11 @@ class PrivacidadeComBancoRealTest {
     @DisplayName("Exportar (estúdio): inclui serviços, funcionárias, portfólio e horário")
     void exportarEstudio() throws Exception {
         Conta estudio = novoEstudio("solar", "12345678000195");
-        chamar("POST", "/api/empresas/" + estudio.id() + "/funcionarias",
-                Map.of("nome", "Carla", "comissaoPercentual", 10), estudio.token(), 201);
+        String carla = chamar("POST", "/api/empresas/" + estudio.id() + "/funcionarias",
+                Map.of("nome", "Carla", "comissaoPercentual", 10), estudio.token(), 201).get("id").asText();
         String foto = enviarFoto("/api/empresas/" + estudio.id() + "/portfolio", estudio.token(), 201);
+        String fotoCarla = enviarFoto("/api/empresas/" + estudio.id() + "/funcionarias/" + carla + "/foto",
+                estudio.token(), 200);
 
         JsonNode dados = get(DADOS, estudio.token());
 
@@ -299,6 +301,8 @@ class PrivacidadeComBancoRealTest {
         assertEquals(foto, dadosDoEstudio.get("portfolio").get(0).get("url").asText());
         assertEquals(7, dadosDoEstudio.get("horario").size());
         assertTrue(dados.get("fotos").toString().contains(foto));
+        assertEquals(fotoCarla, dadosDoEstudio.get("funcionarias").get(0).get("fotoUrl").asText());
+        assertTrue(dados.get("fotos").toString().contains(fotoCarla));
     }
 
     // ---------- exclusão ----------
@@ -386,6 +390,10 @@ class PrivacidadeComBancoRealTest {
     void excluirEstudio() throws Exception {
         Conta estudio = novoEstudio("aurora", "45723174000110");
         String foto = enviarFoto("/api/empresas/" + estudio.id() + "/portfolio", estudio.token(), 201);
+        String funcionaria = chamar("POST", "/api/empresas/" + estudio.id() + "/funcionarias",
+                Map.of("nome", "Dora"), estudio.token(), 201).get("id").asText();
+        String fotoFuncionaria = enviarFoto("/api/empresas/" + estudio.id() + "/funcionarias/" + funcionaria + "/foto",
+                estudio.token(), 200);
         Conta carol = novaCliente("carol", "39053344705");
         String futuro = agendar(carol, estudio, hoje.plusDays(4) + "T15:00:00");
         chamar("PUT", "/api/favoritas/" + estudio.id(), null, carol.token(), 204);
@@ -401,6 +409,9 @@ class PrivacidadeComBancoRealTest {
         assertEquals(0, contar("foto_portfolio", "empresa_id", estudio.id()));
         assertEquals(0, contar("favorita", "empresa_id", estudio.id()));
         assertEquals(404, abrir(foto));
+        assertEquals(404, abrir(fotoFuncionaria));
+        assertNull(jdbc.queryForObject("select foto_url from funcionaria where id = ?::uuid", String.class,
+                funcionaria));
         assertNull(jdbc.queryForObject("select cnpj from empresa where id = ?::uuid", String.class, estudio.id()));
 
         cadastrarEstudio("aurora", "45723174000110", 201);
