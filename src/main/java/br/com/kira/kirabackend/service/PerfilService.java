@@ -100,7 +100,7 @@ public class PerfilService {
         return limpas.isEmpty() ? null : String.join(", ", limpas);
     }
 
-    private static List<String> separarEspecialidades(String especialidades) {
+    static List<String> separarEspecialidades(String especialidades) {
         if (especialidades == null || especialidades.isBlank()) {
             return List.of();
         }
