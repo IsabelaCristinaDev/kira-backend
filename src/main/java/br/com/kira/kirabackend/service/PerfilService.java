@@ -3,14 +3,18 @@ package br.com.kira.kirabackend.service;
 import br.com.kira.kirabackend.domain.entity.Cliente;
 import br.com.kira.kirabackend.domain.entity.Empresa;
 import br.com.kira.kirabackend.domain.entity.Endereco;
+import br.com.kira.kirabackend.domain.enums.CategoriaServico;
 import br.com.kira.kirabackend.dto.request.ClientePerfilRequest;
 import br.com.kira.kirabackend.dto.request.EmpresaPerfilRequest;
 import br.com.kira.kirabackend.dto.request.EnderecoRequest;
+import br.com.kira.kirabackend.dto.request.PreferenciasRequest;
 import br.com.kira.kirabackend.dto.response.ClientePerfilResponse;
 import br.com.kira.kirabackend.dto.response.EmpresaPerfilResponse;
 import br.com.kira.kirabackend.dto.response.EnderecoResponse;
+import br.com.kira.kirabackend.dto.response.PreferenciasResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.exception.AcessoNegadoException;
+import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +22,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -31,6 +36,8 @@ public class PerfilService {
     private final UsuarioRepository usuarioRepository;
     private final CoordenadasService coordenadasService;
 
+    // Transacional porque as preferências são carregadas sob demanda
+    @Transactional
     public ClientePerfilResponse obterCliente(UUID clienteId, UUID usuarioId) {
         return toResponse(buscarCliente(clienteId, usuarioId));
     }
@@ -45,6 +52,23 @@ public class PerfilService {
         cliente.setEndereco(paraEndereco(request.endereco()));
         coordenadasService.atualizarCliente(cliente, cliente.getEndereco(), request.latitude(), request.longitude());
         return toResponse(usuarioRepository.save(cliente));
+    }
+
+    @Transactional
+    public PreferenciasResponse obterPreferencias(UUID clienteId, UUID usuarioId) {
+        return new PreferenciasResponse(emOrdem(buscarCliente(clienteId, usuarioId).getPreferencias()));
+    }
+
+    /** Troca a lista inteira de preferências. Repetidas contam uma vez; OUTRO não é uma escolha da tela. */
+    @Transactional
+    public PreferenciasResponse atualizarPreferencias(UUID clienteId, UUID usuarioId, PreferenciasRequest request) {
+        Cliente cliente = buscarCliente(clienteId, usuarioId);
+        if (request.categorias().contains(CategoriaServico.OUTRO)) {
+            throw new RegraDeNegocioException("Categoria não aceita como preferência: OUTRO");
+        }
+        cliente.getPreferencias().clear();
+        cliente.getPreferencias().addAll(request.categorias());
+        return new PreferenciasResponse(emOrdem(cliente.getPreferencias()));
     }
 
     // O acesso à empresa já foi conferido no controller (AcessoEmpresa)
@@ -110,6 +134,11 @@ public class PerfilService {
                 .toList();
     }
 
+    // Sempre na ordem do enum, para a resposta não variar entre chamadas
+    private static List<CategoriaServico> emOrdem(Set<CategoriaServico> categorias) {
+        return categorias.stream().sorted().toList();
+    }
+
     private static ClientePerfilResponse toResponse(Cliente c) {
         return new ClientePerfilResponse(
                 c.getId(),
@@ -122,7 +151,8 @@ public class PerfilService {
                 EnderecoResponse.from(c.getEndereco()),
                 c.getLatitude(),
                 c.getLongitude(),
-                c.getFotoUrl());
+                c.getFotoUrl(),
+                emOrdem(c.getPreferencias()));
     }
 
     private static EmpresaPerfilResponse toResponse(Empresa e) {

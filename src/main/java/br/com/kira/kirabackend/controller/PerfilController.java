@@ -3,9 +3,11 @@ package br.com.kira.kirabackend.controller;
 import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.dto.request.ClientePerfilRequest;
 import br.com.kira.kirabackend.dto.request.EmpresaPerfilRequest;
+import br.com.kira.kirabackend.dto.request.PreferenciasRequest;
 import br.com.kira.kirabackend.dto.response.ClientePerfilResponse;
 import br.com.kira.kirabackend.dto.response.EmpresaPerfilResponse;
 import br.com.kira.kirabackend.dto.response.FotoPerfilResponse;
+import br.com.kira.kirabackend.dto.response.PreferenciasResponse;
 import br.com.kira.kirabackend.security.AcessoEmpresa;
 import br.com.kira.kirabackend.service.FotoPerfilService;
 import br.com.kira.kirabackend.service.PerfilService;
@@ -60,6 +62,21 @@ public class PerfilController {
             @AuthenticationPrincipal Usuario usuario,
             @RequestBody @Valid ClientePerfilRequest request) {
         return ResponseEntity.ok(perfilService.atualizarCliente(clienteId, usuario.getId(), request));
+    }
+
+    @GetMapping("/api/clientes/{clienteId}/preferencias")
+    public ResponseEntity<PreferenciasResponse> obterPreferencias(
+            @PathVariable UUID clienteId,
+            @AuthenticationPrincipal Usuario usuario) {
+        return ResponseEntity.ok(perfilService.obterPreferencias(clienteId, usuario.getId()));
+    }
+
+    @PutMapping("/api/clientes/{clienteId}/preferencias")
+    public ResponseEntity<PreferenciasResponse> atualizarPreferencias(
+            @PathVariable UUID clienteId,
+            @AuthenticationPrincipal Usuario usuario,
+            @RequestBody @Valid PreferenciasRequest request) {
+        return ResponseEntity.ok(perfilService.atualizarPreferencias(clienteId, usuario.getId(), request));
     }
 
     @GetMapping("/api/empresas/{empresaId}/perfil")
