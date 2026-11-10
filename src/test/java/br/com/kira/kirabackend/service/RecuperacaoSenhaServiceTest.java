@@ -20,8 +20,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.HexFormat;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -72,9 +76,19 @@ class RecuperacaoSenhaServiceTest {
         return LocalDateTime.now(KiraTimeZone.DEFAULT);
     }
 
+    // Calculado aqui, sem usar o código de produção: o banco guarda só o SHA-256 do código do e-mail
+    private static String resumo(String codigo) {
+        try {
+            byte[] bytes = MessageDigest.getInstance("SHA-256").digest(codigo.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(bytes);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     private TokenRecuperacaoSenha token(LocalDateTime expiracao, boolean usado) {
         TokenRecuperacaoSenha token = new TokenRecuperacaoSenha();
-        token.setToken("token-123");
+        token.setToken(resumo("token-123"));
         token.setUsuario(usuario);
         token.setDataExpiracao(expiracao);
         token.setUsado(usado);
@@ -113,12 +127,18 @@ class RecuperacaoSenhaServiceTest {
             ArgumentCaptor<TokenRecuperacaoSenha> captor = ArgumentCaptor.forClass(TokenRecuperacaoSenha.class);
             ordem.verify(tokenRepository).save(captor.capture());
             TokenRecuperacaoSenha salvo = captor.getValue();
-            ordem.verify(emailService).enviarEmailRecuperacaoSenha("ana@teste.com", salvo.getToken());
+            ArgumentCaptor<String> codigoEnviado = ArgumentCaptor.forClass(String.class);
+            ordem.verify(emailService).enviarEmailRecuperacaoSenha(org.mockito.ArgumentMatchers.eq("ana@teste.com"),
+                    codigoEnviado.capture());
+            String codigo = codigoEnviado.getValue();
 
             assertSame(usuario, salvo.getUsuario());
             assertFalse(salvo.getUsado());
             assertFalse(salvo.isExpirado());
-            assertDoesNotThrow(() -> UUID.fromString(salvo.getToken()));
+            assertDoesNotThrow(() -> UUID.fromString(codigo));
+            // O banco não guarda o código do e-mail, só o resumo dele
+            assertNotEquals(codigo, salvo.getToken());
+            assertEquals(resumo(codigo), salvo.getToken());
 
             // Expira em 30 minutos a partir de agora.
             assertFalse(salvo.getDataExpiracao().isBefore(antes.plusMinutes(30)));
@@ -149,7 +169,7 @@ class RecuperacaoSenhaServiceTest {
         @DisplayName("Redefinir criptografa a nova senha e marca o token como usado")
         void redefineSenhaEMarcaTokenComoUsado() {
             TokenRecuperacaoSenha token = token(agora().plusMinutes(10), false);
-            when(tokenRepository.findByToken("token-123")).thenReturn(Optional.of(token));
+            when(tokenRepository.findByToken(resumo("token-123"))).thenReturn(Optional.of(token));
             when(passwordEncoder.encode("novaSenha123")).thenReturn("$2a$10$hash-novo");
 
             service.redefinirSenha(new RedefinicaoSenhaRequest("token-123", "novaSenha123"));
@@ -165,7 +185,7 @@ class RecuperacaoSenhaServiceTest {
         @Test
         @DisplayName("Redefinir com token inválido dá erro")
         void tokenInvalido() {
-            when(tokenRepository.findByToken("nao-existe")).thenReturn(Optional.empty());
+            when(tokenRepository.findByToken(resumo("nao-existe"))).thenReturn(Optional.empty());
 
             RedefinicaoSenhaRequest req = new RedefinicaoSenhaRequest("nao-existe", "novaSenha123");
 
@@ -180,7 +200,7 @@ class RecuperacaoSenhaServiceTest {
         @DisplayName("Redefinir com token expirado dá erro")
         void tokenExpirado() {
             TokenRecuperacaoSenha token = token(agora().minus(Duration.ofSeconds(1)), false);
-            when(tokenRepository.findByToken("token-123")).thenReturn(Optional.of(token));
+            when(tokenRepository.findByToken(resumo("token-123"))).thenReturn(Optional.of(token));
 
             RedefinicaoSenhaRequest req = new RedefinicaoSenhaRequest("token-123", "novaSenha123");
 
@@ -196,7 +216,7 @@ class RecuperacaoSenhaServiceTest {
         @DisplayName("Redefinir com token já usado dá erro")
         void tokenJaUsado() {
             TokenRecuperacaoSenha token = token(agora().plusMinutes(10), true);
-            when(tokenRepository.findByToken("token-123")).thenReturn(Optional.of(token));
+            when(tokenRepository.findByToken(resumo("token-123"))).thenReturn(Optional.of(token));
 
             RedefinicaoSenhaRequest req = new RedefinicaoSenhaRequest("token-123", "novaSenha123");
 

@@ -126,18 +126,7 @@ public class AvaliacaoService {
     }
 
     private AvaliacaoResponse toResponse(Avaliacao a) {
-        return new AvaliacaoResponse(
-                a.getId(),
-                a.getAgendamento().getId(),
-                a.getCliente().getId(),
-                a.getCliente().getNome(),
-                a.getEmpresa().getId(),
-                a.getEmpresa().getNome(),
-                a.getTipoAvaliador(),
-                a.getNota(),
-                a.getComentario(),
-                a.getDataCriacao()
-        );
+        return AvaliacaoResponse.from(a);
     }
 
     // Empresa desativada responde como inexistente, igual à vitrine

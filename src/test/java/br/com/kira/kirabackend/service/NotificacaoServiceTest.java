@@ -232,7 +232,7 @@ class NotificacaoServiceTest {
     private AgendamentoResponse confirmado() {
         return new AgendamentoResponse(UUID.randomUUID(), usuarioId, "Camila", UUID.randomUUID(), "Espaço Aurora",
                 null, null, UUID.randomUUID(), "Corte feminino", 60, LocalDateTime.of(2026, 11, 6, 10, 0),
-                LocalDateTime.of(2026, 11, 6, 11, 0), StatusAgendamento.CONFIRMADO, null, null);
+                LocalDateTime.of(2026, 11, 6, 11, 0), StatusAgendamento.CONFIRMADO, null, null, null);
     }
 
     @ParameterizedTest

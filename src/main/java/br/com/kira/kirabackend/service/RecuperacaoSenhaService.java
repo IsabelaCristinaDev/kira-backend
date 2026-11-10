@@ -14,9 +14,17 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.util.HexFormat;
 import java.util.UUID;
 
+/**
+ * O código de redefinição vai só no e-mail. O banco guarda o SHA-256 dele, como faz com a senha:
+ * um resumo simples basta porque o código é aleatório, e permite achar o registro pela busca direta.
+ */
 @RequiredArgsConstructor
 @Service
 @Transactional
@@ -40,7 +48,7 @@ public class RecuperacaoSenhaService {
         String token = UUID.randomUUID().toString();
 
         TokenRecuperacaoSenha tokenRecuperacao = new TokenRecuperacaoSenha();
-        tokenRecuperacao.setToken(token);
+        tokenRecuperacao.setToken(resumo(token));
         tokenRecuperacao.setUsuario(usuario);
         tokenRecuperacao.setDataExpiracao(LocalDateTime.now(KiraTimeZone.DEFAULT).plusMinutes(30));
         tokenRecuperacao.setUsado(false);
@@ -52,7 +60,7 @@ public class RecuperacaoSenhaService {
 
     public void redefinirSenha(RedefinicaoSenhaRequest request) {
         TokenRecuperacaoSenha tokenRecuperacao = tokenRepository
-                .findByToken(request.token())
+                .findByToken(resumo(request.token()))
                 .orElseThrow(() -> new RegraDeNegocioException("Token inválido"));
 
         if (tokenRecuperacao.isExpirado()) {
@@ -69,5 +77,15 @@ public class RecuperacaoSenhaService {
 
         tokenRecuperacao.setUsado(true);
         tokenRepository.save(tokenRecuperacao);
+    }
+
+    static String resumo(String codigo) {
+        try {
+            byte[] bytes = MessageDigest.getInstance("SHA-256").digest(codigo.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(bytes);
+        } catch (NoSuchAlgorithmException e) {
+            // Toda JVM traz o SHA-256: só chega aqui com o ambiente quebrado
+            throw new IllegalStateException("SHA-256 indisponível", e);
+        }
     }
 }

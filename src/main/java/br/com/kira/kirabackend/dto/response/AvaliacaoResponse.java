@@ -1,5 +1,6 @@
 package br.com.kira.kirabackend.dto.response;
 
+import br.com.kira.kirabackend.domain.entity.Avaliacao;
 import br.com.kira.kirabackend.domain.enums.TipoAvaliador;
 
 import java.time.LocalDateTime;
@@ -16,4 +17,19 @@ public record AvaliacaoResponse(
         Integer nota,
         String comentario,
         LocalDateTime dataCriacao
-) {}
+) {
+    public static AvaliacaoResponse from(Avaliacao a) {
+        return new AvaliacaoResponse(
+                a.getId(),
+                a.getAgendamento().getId(),
+                a.getCliente().getId(),
+                a.getCliente().getNome(),
+                a.getEmpresa().getId(),
+                a.getEmpresa().getNome(),
+                a.getTipoAvaliador(),
+                a.getNota(),
+                a.getComentario(),
+                a.getDataCriacao()
+        );
+    }
+}

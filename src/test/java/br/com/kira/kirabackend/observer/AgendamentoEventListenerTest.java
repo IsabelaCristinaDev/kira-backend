@@ -36,7 +36,7 @@ class AgendamentoEventListenerTest {
         AgendamentoResponse agendamento = new AgendamentoResponse(UUID.randomUUID(), UUID.randomUUID(), "Camila",
                 UUID.randomUUID(), "Espaço Aurora", null, null, UUID.randomUUID(), "Corte feminino", 60,
                 LocalDateTime.of(2026, 11, 6, 10, 0), LocalDateTime.of(2026, 11, 6, 11, 0),
-                StatusAgendamento.CONFIRMADO, null, null);
+                StatusAgendamento.CONFIRMADO, null, null, null);
 
         listener.onAvisoAgendamento(new AvisoAgendamentoEvent(agendamento, TipoAvisoAgendamento.CANCELADO_PELO_ESTUDIO));
 
