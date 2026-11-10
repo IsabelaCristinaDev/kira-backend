@@ -135,7 +135,7 @@ public class PerfilService {
     }
 
     // Sempre na ordem do enum, para a resposta não variar entre chamadas
-    private static List<CategoriaServico> emOrdem(Set<CategoriaServico> categorias) {
+    static List<CategoriaServico> emOrdem(Set<CategoriaServico> categorias) {
         return categorias.stream().sorted().toList();
     }
 

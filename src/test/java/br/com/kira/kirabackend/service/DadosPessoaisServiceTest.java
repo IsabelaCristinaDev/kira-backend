@@ -16,6 +16,7 @@ import br.com.kira.kirabackend.domain.entity.Funcionaria;
 import br.com.kira.kirabackend.domain.entity.Mensagem;
 import br.com.kira.kirabackend.domain.entity.Servico;
 import br.com.kira.kirabackend.domain.entity.VerificacaoIdentidade;
+import br.com.kira.kirabackend.domain.enums.CategoriaServico;
 import br.com.kira.kirabackend.domain.enums.DiaSemana;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import br.com.kira.kirabackend.domain.enums.StatusVerificacao;
@@ -52,6 +53,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -100,6 +102,7 @@ class DadosPessoaisServiceTest {
         cliente.setLatitude(-16.6);
         cliente.setLongitude(-49.2);
         cliente.setFotoUrl("/api/arquivos/perfil.jpg");
+        cliente.getPreferencias().addAll(Set.of(CategoriaServico.UNHAS, CategoriaServico.CILIOS));
         return cliente;
     }
 
@@ -202,6 +205,7 @@ class DadosPessoaisServiceTest {
         assertEquals("52998224725", dados.conta().cpf());
         assertEquals("Goiania", dados.conta().endereco().cidade());
         assertEquals(-16.6, dados.conta().latitude());
+        assertEquals(List.of(CategoriaServico.CILIOS, CategoriaServico.UNHAS), dados.conta().preferencias());
         assertEquals(1, dados.agendamentos().size());
         assertEquals("Estúdio Bela", dados.agendamentos().get(0).nomeEmpresa());
         assertEquals(5, dados.avaliacoesFeitas().get(0).nota());
@@ -230,10 +234,12 @@ class DadosPessoaisServiceTest {
     void cliente_semDados() {
         Cliente cliente = cliente();
         cliente.setFotoUrl(null);
+        cliente.getPreferencias().clear();
         when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
 
         DadosPessoaisResponse dados = service.exportar(cliente.getId());
 
+        assertTrue(dados.conta().preferencias().isEmpty());
         assertTrue(dados.agendamentos().isEmpty());
         assertTrue(dados.fotos().isEmpty());
         assertNull(dados.consentimentos().provador());
@@ -274,6 +280,7 @@ class DadosPessoaisServiceTest {
         assertEquals(TipoUsuario.EMPRESA, dados.tipoConta());
         assertEquals("11222333000181", dados.conta().cnpj());
         assertEquals(List.of("Unha", "Cílios"), dados.conta().especialidades());
+        assertNull(dados.conta().preferencias());
         assertEquals(3, dados.avaliacoesFeitas().get(0).nota());
         assertEquals(5, dados.avaliacoesRecebidas().get(0).nota());
         assertTrue(dados.favoritas().isEmpty());
