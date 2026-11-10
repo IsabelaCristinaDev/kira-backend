@@ -92,6 +92,20 @@ class JwtTokenProviderTest {
     }
 
     @Test
+    @DisplayName("A expiração lida do token é a gravada nele, uma hora depois da emissão")
+    void extraiExpiracao() {
+        String token = provider.gerarToken(usuario, "CLIENTE");
+
+        Instant expiracao = provider.extrairExpiracao(token);
+
+        assertEquals(lerClaims(token).getExpiration().toInstant(), expiracao);
+        long segundosDepoisDaEmissao = expiracao.getEpochSecond() - provider.extrairEmissao(token).getEpochSecond();
+        // Emissão e expiração são lidas do relógio em momentos separados: pode virar um segundo entre elas
+        assertTrue(segundosDepoisDaEmissao >= 3600 && segundosDepoisDaEmissao <= 3601,
+                "expiração deveria ser 1h após a emissão, foi " + segundosDepoisDaEmissao + "s");
+    }
+
+    @Test
     @DisplayName("Token expirado é inválido")
     void tokenExpiradoEhInvalido() {
         String token = novoProvider(SECRET, -1_000L).gerarToken(usuario, "CLIENTE");

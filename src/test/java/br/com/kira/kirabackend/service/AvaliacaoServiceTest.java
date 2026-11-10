@@ -31,6 +31,7 @@ import java.util.UUID;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -355,5 +356,21 @@ class AvaliacaoServiceTest {
         assertThrows(RecursoNaoEncontradoException.class, () -> service.listarAvaliacoesEmpresa(empresaId));
         assertThrows(RecursoNaoEncontradoException.class, () -> service.mediaAvaliacaoEmpresa(empresaId));
         verifyNoInteractions(avaliacaoRepository);
+    }
+
+    @Test
+    @DisplayName("A média de empresa ativa é a calculada pelo banco")
+    void mediaDeEmpresaAtiva() {
+        when(avaliacaoRepository.calcularMediaAvaliacaoEmpresa(empresa.getId())).thenReturn(4.5);
+
+        assertEquals(4.5, service.mediaAvaliacaoEmpresa(empresa.getId()));
+    }
+
+    @Test
+    @DisplayName("Empresa sem avaliações tem média vazia, não zero, para o app não mostrar nota 0")
+    void mediaSemAvaliacoes() {
+        when(avaliacaoRepository.calcularMediaAvaliacaoEmpresa(empresa.getId())).thenReturn(null);
+
+        assertNull(service.mediaAvaliacaoEmpresa(empresa.getId()));
     }
 }
