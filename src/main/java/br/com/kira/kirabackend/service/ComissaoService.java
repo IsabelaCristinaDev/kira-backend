@@ -24,7 +24,7 @@ public class ComissaoService {
         if (agendamento.getFuncionaria() == null) return;
         if (agendamento.getFuncionaria().getComissaoPercentual() == null) return;
 
-        BigDecimal valorServico = agendamento.getServico().getPreco();
+        BigDecimal valorServico = agendamento.valorCombinado();
         BigDecimal percentual = agendamento.getFuncionaria().getComissaoPercentual();
 
         BigDecimal valorComissao = valorServico
