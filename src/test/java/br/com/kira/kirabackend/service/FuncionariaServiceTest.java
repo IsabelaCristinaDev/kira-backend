@@ -186,6 +186,47 @@ class FuncionariaServiceTest {
         verify(funcionariaRepository).findByEmpresaIdAndAtivoTrue(empresaId);
     }
 
+    @Test
+    @DisplayName("Atualizar troca nome, especialidades e comissão, sem mexer na empresa nem no status")
+    void deveAtualizarFuncionaria() {
+        Funcionaria funcionaria = new Funcionaria();
+        funcionaria.setId(UUID.randomUUID());
+        funcionaria.setNome("Bia");
+        funcionaria.setEspecialidades("Cílios");
+        funcionaria.setComissaoPercentual(new BigDecimal("30"));
+        funcionaria.setAtivo(true);
+        funcionaria.setEmpresa(empresa);
+        when(funcionariaRepository.findById(funcionaria.getId())).thenReturn(Optional.of(funcionaria));
+        FuncionariaRequest novosDados = new FuncionariaRequest(
+                "Beatriz", "Cílios, Sobrancelha", new BigDecimal("40"));
+
+        FuncionariaResponse response = service.atualizar(empresa.getId(), funcionaria.getId(), novosDados);
+
+        verify(funcionariaRepository).save(funcionaria);
+        assertEquals("Beatriz", funcionaria.getNome());
+        assertEquals("Cílios, Sobrancelha", funcionaria.getEspecialidades());
+        assertEquals(new BigDecimal("40"), funcionaria.getComissaoPercentual());
+        assertSame(empresa, funcionaria.getEmpresa());
+        assertEquals(funcionaria.getId(), response.id());
+        assertEquals("Beatriz", response.nome());
+        assertEquals(new BigDecimal("40"), response.comissaoPercentual());
+        assertTrue(response.ativo());
+    }
+
+    @Test
+    @DisplayName("Atualizar uma funcionária inexistente dá 404 e nada é salvo")
+    void atualizarInexistenteDa404() {
+        UUID funcionariaId = UUID.randomUUID();
+        UUID empresaId = empresa.getId();
+        FuncionariaRequest req = request("Bia");
+        when(funcionariaRepository.findById(funcionariaId)).thenReturn(Optional.empty());
+
+        RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
+                () -> service.atualizar(empresaId, funcionariaId, req));
+        assertEquals("Funcionária não encontrada", ex.getMessage());
+        verify(funcionariaRepository, never()).save(any());
+    }
+
     // ---------- foto ----------
 
     private Funcionaria funcionariaDaEmpresa(String fotoUrl) {

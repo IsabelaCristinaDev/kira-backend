@@ -2,6 +2,7 @@ package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.Cliente;
 import br.com.kira.kirabackend.domain.entity.Empresa;
+import br.com.kira.kirabackend.dto.response.EstudioResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.FavoritaRepository;
@@ -14,9 +15,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -83,5 +87,36 @@ class FavoritaServiceTest {
         assertThrows(RegraDeNegocioException.class, () -> service.salvar(empresa, empresaId));
         assertThrows(RegraDeNegocioException.class, () -> service.remover(empresa, empresaId));
         verifyNoInteractions(favoritaRepository);
+    }
+
+    @Test
+    @DisplayName("Lista os estúdios salvos pela cliente, no formato da vitrine e na ordem do banco")
+    void listaFavoritas() {
+        Empresa recente = new Empresa();
+        recente.setId(UUID.randomUUID());
+        Empresa antiga = new Empresa();
+        antiga.setId(UUID.randomUUID());
+        EstudioResponse vitrineRecente = vitrine(recente.getId(), "Estúdio Bella");
+        EstudioResponse vitrineAntiga = vitrine(antiga.getId(), "Studio Lash");
+        when(favoritaRepository.listarEmpresasAtivas(cliente.getId())).thenReturn(List.of(recente, antiga));
+        when(estudioService.toResponse(recente)).thenReturn(vitrineRecente);
+        when(estudioService.toResponse(antiga)).thenReturn(vitrineAntiga);
+
+        List<EstudioResponse> favoritas = service.listar(cliente);
+
+        assertEquals(List.of(vitrineRecente, vitrineAntiga), favoritas);
+    }
+
+    @Test
+    @DisplayName("Cliente sem favoritas recebe lista vazia")
+    void listaVazia() {
+        when(favoritaRepository.listarEmpresasAtivas(cliente.getId())).thenReturn(List.of());
+
+        assertTrue(service.listar(cliente).isEmpty());
+        verifyNoInteractions(estudioService);
+    }
+
+    private static EstudioResponse vitrine(UUID id, String nome) {
+        return new EstudioResponse(id, nome, null, null, null, null, null, null, null, null);
     }
 }
