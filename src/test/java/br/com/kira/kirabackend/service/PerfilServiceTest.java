@@ -3,15 +3,19 @@ package br.com.kira.kirabackend.service;
 import br.com.kira.kirabackend.domain.entity.Cliente;
 import br.com.kira.kirabackend.domain.entity.Empresa;
 import br.com.kira.kirabackend.domain.entity.Endereco;
+import br.com.kira.kirabackend.domain.enums.CategoriaServico;
 import br.com.kira.kirabackend.domain.enums.Genero;
 import br.com.kira.kirabackend.domain.enums.TipoEstabelecimento;
 import br.com.kira.kirabackend.dto.request.ClientePerfilRequest;
 import br.com.kira.kirabackend.dto.request.EmpresaPerfilRequest;
 import br.com.kira.kirabackend.dto.request.EnderecoRequest;
+import br.com.kira.kirabackend.dto.request.PreferenciasRequest;
 import br.com.kira.kirabackend.dto.response.ClientePerfilResponse;
 import br.com.kira.kirabackend.dto.response.EmpresaPerfilResponse;
+import br.com.kira.kirabackend.dto.response.PreferenciasResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.exception.AcessoNegadoException;
+import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.BuscaEstudioRepository.Coordenadas;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +32,7 @@ import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -252,6 +257,100 @@ class PerfilServiceTest {
 
             assertThrows(RecursoNaoEncontradoException.class, () -> service.atualizarEmpresa(id, request));
             verify(usuarioRepository, never()).save(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("Preferências da cliente")
+    class Preferencias {
+
+        private Cliente cliente;
+
+        @BeforeEach
+        void setUp() {
+            cliente = new Cliente();
+            cliente.setId(UUID.randomUUID());
+            cliente.getPreferencias().add(CategoriaServico.MASSAGEM);
+        }
+
+        @Test
+        @DisplayName("O perfil traz as preferências na ordem das categorias")
+        void perfilComPreferencias() {
+            cliente.getPreferencias().addAll(Set.of(CategoriaServico.CABELO, CategoriaServico.UNHAS));
+            when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
+
+            ClientePerfilResponse r = service.obterCliente(cliente.getId(), cliente.getId());
+
+            assertEquals(List.of(CategoriaServico.UNHAS, CategoriaServico.MASSAGEM, CategoriaServico.CABELO),
+                    r.preferencias());
+        }
+
+        @Test
+        @DisplayName("Devolve as preferências guardadas")
+        void obter() {
+            when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
+
+            PreferenciasResponse r = service.obterPreferencias(cliente.getId(), cliente.getId());
+
+            assertEquals(List.of(CategoriaServico.MASSAGEM), r.categorias());
+        }
+
+        @Test
+        @DisplayName("Troca a lista inteira, sem repetir, na ordem das categorias")
+        void atualizar() {
+            when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
+
+            PreferenciasResponse r = service.atualizarPreferencias(cliente.getId(), cliente.getId(),
+                    new PreferenciasRequest(List.of(CategoriaServico.CABELO, CategoriaServico.CILIOS, CategoriaServico.CABELO)));
+
+            assertEquals(List.of(CategoriaServico.CILIOS, CategoriaServico.CABELO), r.categorias());
+            assertEquals(Set.of(CategoriaServico.CILIOS, CategoriaServico.CABELO), cliente.getPreferencias());
+        }
+
+        @Test
+        @DisplayName("Lista vazia apaga as preferências")
+        void apagar() {
+            when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
+
+            PreferenciasResponse r = service.atualizarPreferencias(cliente.getId(), cliente.getId(),
+                    new PreferenciasRequest(List.of()));
+
+            assertEquals(List.of(), r.categorias());
+            assertEquals(Set.of(), cliente.getPreferencias());
+        }
+
+        @Test
+        @DisplayName("OUTRO não é uma preferência válida e nada muda")
+        void outroRecusado() {
+            when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
+            PreferenciasRequest request = new PreferenciasRequest(List.of(CategoriaServico.CABELO, CategoriaServico.OUTRO));
+            UUID id = cliente.getId();
+
+            assertThrows(RegraDeNegocioException.class, () -> service.atualizarPreferencias(id, id, request));
+            assertEquals(Set.of(CategoriaServico.MASSAGEM), cliente.getPreferencias());
+        }
+
+        @Test
+        @DisplayName("Preferências de outra conta são recusadas")
+        void outraConta() {
+            PreferenciasRequest request = new PreferenciasRequest(List.of(CategoriaServico.CABELO));
+            UUID outra = UUID.randomUUID();
+            UUID id = cliente.getId();
+
+            assertThrows(AcessoNegadoException.class, () -> service.obterPreferencias(id, outra));
+            assertThrows(AcessoNegadoException.class, () -> service.atualizarPreferencias(id, outra, request));
+            verifyNoInteractions(usuarioRepository);
+        }
+
+        @Test
+        @DisplayName("Conta que não é cliente não tem preferências")
+        void naoCliente() {
+            Empresa empresa = new Empresa();
+            empresa.setId(UUID.randomUUID());
+            when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+            UUID id = empresa.getId();
+
+            assertThrows(RecursoNaoEncontradoException.class, () -> service.obterPreferencias(id, id));
         }
     }
 }

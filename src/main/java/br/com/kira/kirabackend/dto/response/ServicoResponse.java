@@ -13,7 +13,8 @@ public record ServicoResponse(
         Integer duracaoMinutos,
         BigDecimal preco,
         Boolean ativo,
-        CategoriaServico categoria
+        CategoriaServico categoria,
+        String fotoUrl
 ) {
     public static ServicoResponse from(Servico servico) {
         return new ServicoResponse(
@@ -23,6 +24,7 @@ public record ServicoResponse(
                 servico.getDuracaoMinutos(),
                 servico.getPreco(),
                 servico.getAtivo(),
-                CategoriaServico.escolhidaOuPeloNome(servico.getCategoria(), servico.getNome()));
+                CategoriaServico.escolhidaOuPeloNome(servico.getCategoria(), servico.getNome()),
+                servico.getFotoUrl());
     }
 }

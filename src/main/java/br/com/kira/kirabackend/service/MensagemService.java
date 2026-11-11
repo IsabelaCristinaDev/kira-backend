@@ -136,14 +136,6 @@ public class MensagemService {
     }
 
     private MensagemResponse toResponse(Mensagem m) {
-        return new MensagemResponse(
-                m.getId(),
-                m.getAgendamento().getId(),
-                m.getRemetente().getId(),
-                m.getRemetente().getNome(),
-                m.getConteudo(),
-                m.getLida(),
-                m.getDataEnvio()
-        );
+        return MensagemResponse.from(m);
     }
 }
