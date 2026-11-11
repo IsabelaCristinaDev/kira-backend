@@ -19,6 +19,7 @@ public class AgendamentoEventListener {
     private final ComissaoService comissaoService;
     private final NotificacaoService notificacaoService;
 
+    // Nos logs, a cliente aparece pelo ID: o nome é dado pessoal (LGPD) e não ajuda a investigar nada.
     // Síncronos de propósito: rodar em outra thread lendo cliente/empresa (lazy) usa a mesma sessão
     // do Hibernate ao mesmo tempo que a requisição e quebra o cancelamento com erro 500.
     @EventListener
@@ -26,7 +27,7 @@ public class AgendamentoEventListener {
         var agendamento = event.getAgendamento();
         log.info("Agendamento criado: {} - Cliente: {} - Empresa: {}",
                 agendamento.getId(),
-                agendamento.getCliente().getNome(),
+                agendamento.getCliente().getId(),
                 agendamento.getEmpresa().getNome());
     }
 
@@ -35,7 +36,7 @@ public class AgendamentoEventListener {
         var agendamento = event.getAgendamento();
         log.info("Agendamento cancelado: {} - Cliente: {} - Empresa: {}",
                 agendamento.getId(),
-                agendamento.getCliente().getNome(),
+                agendamento.getCliente().getId(),
                 agendamento.getEmpresa().getNome());
     }
 
@@ -44,7 +45,7 @@ public class AgendamentoEventListener {
         var agendamento = event.getAgendamento();
         log.info("Atendimento concluído: {} - Cliente: {} - Empresa: {}",
                 agendamento.getId(),
-                agendamento.getCliente().getNome(),
+                agendamento.getCliente().getId(),
                 agendamento.getEmpresa().getNome());
         comissaoService.calcularERegistrarComissao(agendamento);
     }

@@ -1,6 +1,7 @@
 package br.com.kira.kirabackend.security;
 
 import br.com.kira.kirabackend.domain.entity.Cliente;
+import br.com.kira.kirabackend.util.KiraTimeZone;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,6 +17,9 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+
+import java.time.Instant;
+import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -99,6 +103,42 @@ class JwtAuthenticationFilterTest {
         assertTrue(autenticacao.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_USER")));
         verify(filterChain).doFilter(request, response);
+    }
+
+    private Cliente clienteQueTrocouASenhaEm(LocalDateTime trocaDeSenha, Instant emissaoDoToken) {
+        Cliente cliente = new Cliente();
+        cliente.setEmail("ana@teste.com");
+        cliente.setSenhaAlteradaEm(trocaDeSenha);
+        request.addHeader("Authorization", "Bearer token-valido");
+        when(jwtTokenProvider.tokenValido("token-valido")).thenReturn(true);
+        when(jwtTokenProvider.extrairEmail("token-valido")).thenReturn("ana@teste.com");
+        when(jwtTokenProvider.extrairEmissao("token-valido")).thenReturn(emissaoDoToken);
+        when(userDetailsService.loadUserByUsername("ana@teste.com")).thenReturn(cliente);
+        return cliente;
+    }
+
+    @Test
+    @DisplayName("Token emitido antes da troca de senha não autentica: a sessão foi encerrada")
+    void tokenAnteriorATrocaDeSenhaNaoAutentica() throws Exception {
+        LocalDateTime troca = LocalDateTime.of(2026, 11, 7, 10, 0, 0);
+        Instant umSegundoAntes = troca.atZone(KiraTimeZone.DEFAULT).toInstant().minusSeconds(1);
+        clienteQueTrocouASenhaEm(troca, umSegundoAntes);
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        assertNull(autenticacaoAtual());
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    @DisplayName("Token emitido no mesmo segundo da troca de senha, ou depois, autentica")
+    void tokenPosteriorATrocaDeSenhaAutentica() throws Exception {
+        LocalDateTime troca = LocalDateTime.of(2026, 11, 7, 10, 0, 0);
+        Cliente cliente = clienteQueTrocouASenhaEm(troca, troca.atZone(KiraTimeZone.DEFAULT).toInstant());
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        assertSame(cliente, autenticacaoAtual().getPrincipal());
     }
 
     @Test

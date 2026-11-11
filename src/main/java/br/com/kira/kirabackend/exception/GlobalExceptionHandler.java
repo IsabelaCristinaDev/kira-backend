@@ -3,6 +3,7 @@ package br.com.kira.kirabackend.exception;
 import br.com.kira.kirabackend.util.KiraTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -39,7 +40,8 @@ public class GlobalExceptionHandler {
                         LocalDateTime.now(KiraTimeZone.DEFAULT),
                         401,
                         "CREDENCIAIS_INVALIDAS",
-                        "Usuário inexistente ou senha inválida",
+                        // Mesma mensagem para e-mail sem conta, senha errada e conta inativa
+                        "E-mail ou senha inválidos",
                         request.getRequestURI(),
                         null));
     }
@@ -106,6 +108,18 @@ public class GlobalExceptionHandler {
     }
 
     // 503: a IA de compatibilidade está fora do ar. O app segue com a ordem que já calcula
+    // O Retry-After diz ao app quantos segundos esperar antes de tentar de novo
+    @ExceptionHandler(TentativasExcedidasException.class)
+    public ResponseEntity<ErroResponse> handleTentativasExcedidas(
+            TentativasExcedidasException ex,
+            HttpServletRequest request) {
+        ResponseEntity<ErroResponse> erro = resposta(HttpStatus.TOO_MANY_REQUESTS, "TENTATIVAS_EXCEDIDAS",
+                ex.getMessage(), request);
+        return ResponseEntity.status(erro.getStatusCode())
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.esperaEmSegundos()))
+                .body(erro.getBody());
+    }
+
     @ExceptionHandler(CompatibilidadeIndisponivelException.class)
     public ResponseEntity<ErroResponse> handleCompatibilidadeIndisponivel(
             CompatibilidadeIndisponivelException ex,

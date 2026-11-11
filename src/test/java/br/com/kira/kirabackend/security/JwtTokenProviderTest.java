@@ -52,6 +52,17 @@ class JwtTokenProviderTest {
     }
 
     @Test
+    @DisplayName("O momento de emissão (iat) do token sai em segundos inteiros, igual ao do JWT")
+    void extraiEmissao() {
+        Instant antes = Instant.now().minusSeconds(1);
+
+        Instant emissao = provider.extrairEmissao(provider.gerarToken(usuario, "CLIENTE"));
+
+        assertEquals(0, emissao.getNano());
+        assertTrue(emissao.isAfter(antes) && !emissao.isAfter(Instant.now()), emissao.toString());
+    }
+
+    @Test
     @DisplayName("Token gerado é válido e devolve o e-mail certo")
     void tokenGeradoEhValido() {
         String token = provider.gerarToken(usuario, "CLIENTE");

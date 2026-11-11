@@ -74,6 +74,9 @@ public class WebSocketAutenticacaoInterceptor implements ChannelInterceptor {
         if (!(usuario instanceof Usuario conta)) {
             throw new MessageDeliveryException("Conexão sem autenticação");
         }
+        if (conta.tokenAnteriorATrocaDeSenha(jwtTokenProvider.extrairEmissao(token))) {
+            throw new MessageDeliveryException("Sessão encerrada: a senha foi trocada");
+        }
         conexoesAoVivo.registrar(stomp.getSessionId(), conta.getId(), jwtTokenProvider.extrairExpiracao(token));
         return new UsernamePasswordAuthenticationToken(usuario, null, usuario.getAuthorities());
     }

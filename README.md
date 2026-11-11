@@ -188,6 +188,61 @@ O código fica em `br.com.kira.kirabackend`, organizado em camadas:
 - O acesso a recursos de outra empresa ou de outra cliente é bloqueado nos services.
 - As senhas são guardadas com BCrypt, e os segredos ficam apenas no `.env`.
 
+### Limite de tentativas de login
+
+Os números ficam em `kira.security.rate-limit` no `application.yml`. Os contadores ficam em memória e zeram quando a API reinicia.
+
+| Chave | Regra | Resposta |
+|---|---|---|
+| IP + conta | 5 senhas erradas em 15 min | `429` com `Retry-After`, só para esse IP nessa conta |
+| IP | 20 senhas erradas em 15 min, em qualquer conta | `429` com `Retry-After` |
+| Conta | a partir de 5 falhas: atraso de 1 s, 2 s, 4 s, até 8 s, e verificação extra | a conta nunca é bloqueada, para ninguém conseguir trancar a conta de outra pessoa |
+| Conta | 10 falhas | e-mail de aviso ao dono, no máximo 1 por hora |
+
+- Login certo zera as falhas daquele IP naquela conta.
+- E-mail sem conta, senha errada e conta inativa recebem a mesma resposta (`401`, "E-mail ou senha inválidos") e levam o mesmo tempo, porque o BCrypt roda nos três casos.
+- A verificação extra é a interface `VerificacaoHumana`. Hoje ela sempre aprova. Para usar um CAPTCHA, basta criar outra implementação.
+- O log registra o IP e o e-mail mascarado (`is***@gmail.com`), nunca a senha.
+
+**Limitações conhecidas:**
+
+- **O atraso progressivo ocupa uma thread durante a espera.** Cada login atrasado segura uma das threads do Tomcat (200 por padrão) por até 8 s. Um ataque vindo de muitos IPs, errando muitas contas ao mesmo tempo, poderia esgotá-las e deixar a API lenta para todos. O limite de 20 falhas por IP reduz bastante esse risco, mas não o elimina. O atraso acontece fora da transação, então não segura conexões do banco.
+- **Os contadores ficam na memória de cada instância.** Com mais de uma instância da API, cada uma conta separado. Para um limite compartilhado, seria preciso um armazenamento comum, como o Redis.
+
+**Pendência:**
+
+- **CAPTCHA:** quando for integrado, a API deve devolver um código próprio (por exemplo, `CAPTCHA_OBRIGATORIO`) quando a verificação extra for exigida, para o front saber que precisa mostrar o desafio. Hoje ela responderia o mesmo `401` da senha errada. O ponto exato está marcado com `TODO(CAPTCHA)` no `ProtecaoLogin`.
+
+### Recuperação de senha
+
+- O pedido (`POST /api/auth/recuperar-senha`) sempre responde `200` com "Se o e-mail estiver cadastrado, enviaremos as instruções.", no mesmo tempo, exista a conta ou não. A busca da conta e o envio rodam em segundo plano.
+- Limites: 3 pedidos por hora por e-mail e 10 por hora por IP. A troca de senha (`POST /api/auth/redefinir-senha`) aceita 10 tentativas a cada 15 min por IP. Passou disso, `429` com `Retry-After`.
+- O token tem 32 bytes do `SecureRandom`, vale 15 minutos e só pode ser usado uma vez. O banco guarda apenas o SHA-256 dele. Um pedido novo invalida os anteriores.
+- Ao redefinir, todas as sessões são encerradas: os refresh tokens são apagados, e o JWT emitido antes da troca (`senhaAlteradaEm`) deixa de valer na API e no WebSocket. O chat que estiver aberto é fechado na hora.
+
+### Diagnóstico de IP (primeiro deploy)
+
+Atrás de um proxy, o IP que chega à API é o do proxy. O `FORWARD_HEADERS_STRATEGY` diz ao Spring como achar o IP real, e o valor certo depende do proxy. O `X-Forwarded-For` nunca é lido à mão, porque o cliente consegue inventá-lo.
+
+1. Suba com `FORWARD_HEADERS_STRATEGY=none` e `REGISTRAR_HEADERS_IP=true`. Com `framework`, o Spring apaga os headers antes do log, e o diagnóstico não mostra nada.
+2. Faça alguns logins e veja no log as linhas `Diagnóstico de IP`.
+3. Escolha a estratégia (`framework` usa o primeiro IP do `X-Forwarded-For`; `native` usa o último que não é de rede interna). Confirme que um `X-Forwarded-For` inventado pelo cliente não muda o IP usado.
+4. **Desligue o `REGISTRAR_HEADERS_IP` e remova o código marcado com `TODO(LGPD)`**: IP é dado pessoal.
+
+## Limitações conhecidas
+
+### Datas sem fuso horário
+
+- **Como está hoje:** as datas são gravadas no horário de Brasília (`LocalDateTime.now(KiraTimeZone.DEFAULT)`), sem a informação de fuso, em colunas `timestamp without time zone` (25 colunas). O Postgres roda em UTC.
+- **Por que funciona:** toda gravação e leitura passa pela API, que sempre usa o horário de Brasília.
+- **Onde atrapalha:**
+  - SQL escrito à mão: o `now()` do banco está 3 horas à frente das datas gravadas (por exemplo, `now() - interval '1 minute'` vira uma data no futuro para a API);
+  - relatórios e integrações precisam saber que as datas estão em horário de Brasília;
+  - se o horário de verão voltar, a hora repetida na virada fica ambígua.
+- **Para avaliar no futuro:** usar `Instant` no código e `timestamptz` no banco, com `hibernate.jdbc.time_zone=UTC`. Os dados existentes seriam convertidos com `ALTER COLUMN ... TYPE timestamptz USING coluna AT TIME ZONE 'America/Sao_Paulo'`.
+
+As limitações do limite de tentativas de login estão na seção [Segurança](#segurança).
+
 ## Testes
 
 ```bash
