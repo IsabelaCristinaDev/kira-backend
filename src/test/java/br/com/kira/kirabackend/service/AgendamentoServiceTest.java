@@ -38,6 +38,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEvent;
@@ -62,6 +63,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -207,6 +209,16 @@ class AgendamentoServiceTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
+    /** A trava só protege se vier antes da leitura dos agendamentos do dia, e a gravação depois das duas. */
+    private void conferirTravaAntesDaConferenciaDoHorario() {
+        InOrder ordem = inOrder(usuarioRepository, agendamentoRepository);
+        ordem.verify(usuarioRepository).travarEmpresaParaAgendar(empresa.getId());
+        ordem.verify(agendamentoRepository).findByEmpresaIdAndStatusNotAndDataHoraInicioBeforeAndDataHoraFimAfter(
+                eq(empresa.getId()), eq(StatusAgendamento.CANCELADO),
+                any(LocalDateTime.class), any(LocalDateTime.class));
+        ordem.verify(agendamentoRepository).save(any(Agendamento.class));
+    }
+
     // ---------- criar ----------
 
     @Nested
@@ -240,6 +252,19 @@ class AgendamentoServiceTest {
             verify(eventPublisher).publishEvent(evento.capture());
             AgendamentoCriadoEvent criado = assertInstanceOf(AgendamentoCriadoEvent.class, evento.getValue());
             assertSame(salvo, criado.getAgendamento());
+        }
+
+        @Test
+        @DisplayName("Trava a empresa antes de conferir o horário, para pedidos simultâneos não pegarem o mesmo horário")
+        void deveTravarEmpresaAntesDeConferirOHorario() {
+            mockarEntidadesDaCriacao();
+            mockarExpedientePadrao();
+            mockarAgendamentosNoIntervalo(List.of());
+            mockarSaveDevolvendoArgumento();
+
+            service.criar(cliente.getId(), cliente.getId(), request(inicioValido));
+
+            conferirTravaAntesDaConferenciaDoHorario();
         }
 
         @Test
@@ -861,6 +886,21 @@ class AgendamentoServiceTest {
             assertFalse(agendamento.getLembreteEnviado());
             assertEquals(StatusAgendamento.REAGENDADO, response.status());
             verify(agendamentoRepository).save(agendamento);
+        }
+
+        @Test
+        @DisplayName("Reagendar também trava a empresa antes de conferir o novo horário")
+        void deveTravarEmpresaAntesDeConferirONovoHorario() {
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.CONFIRMADO);
+            when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+            mockarExpedientePadrao();
+            mockarAgendamentosNoIntervalo(List.of());
+            mockarSaveDevolvendoArgumento();
+
+            service.reagendarPelaEmpresa(agendamento.getId(), empresa.getId(),
+                    new ReagendamentoRequest(inicioValido.withHour(14), null));
+
+            conferirTravaAntesDaConferenciaDoHorario();
         }
 
         @Test
