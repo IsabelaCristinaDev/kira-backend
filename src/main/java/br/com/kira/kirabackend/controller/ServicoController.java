@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -58,6 +59,26 @@ public class ServicoController {
             @AuthenticationPrincipal Usuario usuario) {
         acessoEmpresa.exigirEmpresa(empresaId, usuario);
         servicoService.desativar(empresaId, id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/foto")
+    public ResponseEntity<ServicoResponse> definirFoto(
+            @PathVariable UUID empresaId,
+            @PathVariable UUID id,
+            @RequestParam("arquivo") MultipartFile arquivo,
+            @AuthenticationPrincipal Usuario usuario) {
+        acessoEmpresa.exigirEmpresa(empresaId, usuario);
+        return ResponseEntity.ok(servicoService.definirFoto(empresaId, id, arquivo));
+    }
+
+    @DeleteMapping("/{id}/foto")
+    public ResponseEntity<Void> removerFoto(
+            @PathVariable UUID empresaId,
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Usuario usuario) {
+        acessoEmpresa.exigirEmpresa(empresaId, usuario);
+        servicoService.removerFoto(empresaId, id);
         return ResponseEntity.noContent().build();
     }
 }

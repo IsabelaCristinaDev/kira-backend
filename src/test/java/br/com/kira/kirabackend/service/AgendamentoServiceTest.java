@@ -1402,4 +1402,50 @@ class AgendamentoServiceTest {
             verify(agendamentoRepository, never()).save(any());
         }
     }
+
+    @Nested
+    @DisplayName("Cancelar os futuros de uma conta excluída")
+    class CancelarFuturosDaContaExcluida {
+
+        private static final List<StatusAgendamento> AINDA_VAO_ACONTECER = List.of(
+                StatusAgendamento.PENDENTE, StatusAgendamento.CONFIRMADO, StatusAgendamento.REAGENDADO);
+
+        @Test
+        @DisplayName("Cliente: cancela os futuros, mesmo em cima da hora, sem avisar a cliente que saiu")
+        void cliente() {
+            Agendamento futuro = agendamentoExistente(StatusAgendamento.CONFIRMADO);
+            when(agendamentoRepository.findByClienteIdAndStatusInAndDataHoraInicioAfter(
+                    eq(cliente.getId()), eq(AINDA_VAO_ACONTECER), any(LocalDateTime.class)))
+                    .thenReturn(List.of(futuro));
+            when(agendamentoRepository.save(futuro)).thenReturn(futuro);
+
+            service.cancelarFuturosDaContaExcluida(cliente);
+
+            assertEquals(StatusAgendamento.CANCELADO, futuro.getStatus());
+            ArgumentCaptor<ApplicationEvent> evento = ArgumentCaptor.forClass(ApplicationEvent.class);
+            verify(eventPublisher).publishEvent(evento.capture());
+            assertInstanceOf(AgendamentoCanceladoEvent.class, evento.getValue());
+            verify(eventPublisher, never()).publishEvent(any(AvisoAgendamentoEvent.class));
+            verifyNoInteractions(cancelamentoClienteStrategy);
+        }
+
+        @Test
+        @DisplayName("Estúdio: cancela os futuros e avisa cada cliente")
+        void estudio() {
+            Agendamento futuro = agendamentoExistente(StatusAgendamento.PENDENTE);
+            when(agendamentoRepository.findByEmpresaIdAndStatusInAndDataHoraInicioAfter(
+                    eq(empresa.getId()), eq(AINDA_VAO_ACONTECER), any(LocalDateTime.class)))
+                    .thenReturn(List.of(futuro));
+            when(agendamentoRepository.save(futuro)).thenReturn(futuro);
+
+            service.cancelarFuturosDaContaExcluida(empresa);
+
+            assertEquals(StatusAgendamento.CANCELADO, futuro.getStatus());
+            ArgumentCaptor<AvisoAgendamentoEvent> aviso = ArgumentCaptor.forClass(AvisoAgendamentoEvent.class);
+            verify(eventPublisher).publishEvent(aviso.capture());
+            assertEquals(TipoAvisoAgendamento.CANCELADO_PELO_ESTUDIO, aviso.getValue().tipo());
+            assertEquals(futuro.getId(), aviso.getValue().agendamento().id());
+            verifyNoInteractions(cancelamentoEmpresaStrategy);
+        }
+    }
 }

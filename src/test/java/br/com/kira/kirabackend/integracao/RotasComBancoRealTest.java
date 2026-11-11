@@ -397,7 +397,15 @@ class RotasComBancoRealTest {
                 Map.of("agendamentoId", concluido, "nota", 5, "comentario", "Ótimo"), bia.token(), 201);
         chamar("POST", "/api/avaliacoes/empresa", Map.of("agendamentoId", concluido, "nota", 4), estudio.token(), 201);
         get("/api/avaliacoes/cliente/" + bia.id(), bia.token());
-        chamar("GET", "/api/avaliacoes/cliente/" + bia.id(), null, estudio.token(), 403);
+        // O estúdio que atende a cliente vê as avaliações dela; um estúdio sem agendamento com ela, não
+        JsonNode daCliente = get("/api/avaliacoes/cliente/" + bia.id(), estudio.token());
+        assertEquals(1, daCliente.size());
+        assertEquals(4, daCliente.get(0).get("nota").asInt());
+        assertEquals("EMPRESA", daCliente.get(0).get("tipoAvaliador").asText());
+        JsonNode negado = chamar("GET", "/api/avaliacoes/cliente/" + bia.id(), null, outroEstudio.token(), 403);
+        assertEquals("ACESSO_NEGADO", negado.get("erro").asText());
+        chamar("GET", "/api/avaliacoes/cliente/" + bia.id(), null, ana.token(), 403);
+        chamar("GET", "/api/avaliacoes/cliente/" + bia.id(), null, null, 401);
         assertEquals(5, get("/api/avaliacoes/minhas", bia.token()).get(0).get("nota").asInt());
         // O estúdio vê as que ele fez, para saber quais atendimentos já avaliou
         JsonNode doEstudio = get("/api/avaliacoes/minhas", estudio.token());
@@ -408,6 +416,35 @@ class RotasComBancoRealTest {
         get("/api/avaliacoes/empresa/" + estudio.id() + "/media", null);
         get("/api/studios/" + estudio.id() + "/avaliacoes", null);
         get("/api/studios/" + estudio.id() + "/media", null);
+    }
+
+    @Test
+    @DisplayName("Preferências: só a dona vê e troca, valores fora da lista dão 400, e aparecem no perfil")
+    void preferencias() throws IOException, InterruptedException {
+        String rota = "/api/clientes/" + outraCliente.id() + "/preferencias";
+
+        assertEquals(0, get(rota, outraCliente.token()).get("categorias").size());
+
+        JsonNode salvas = chamar("PUT", rota, Map.of("categorias", List.of("UNHAS", "CABELO", "UNHAS")),
+                outraCliente.token(), 200);
+        assertEquals("[\"UNHAS\",\"CABELO\"]", salvas.get("categorias").toString());
+        assertEquals(salvas.get("categorias"), get(rota, outraCliente.token()).get("categorias"));
+        assertEquals(salvas.get("categorias"),
+                get("/api/clientes/" + outraCliente.id() + "/perfil", outraCliente.token()).get("preferencias"));
+
+        chamar("PUT", rota, Map.of("categorias", List.of("TATUAGEM")), outraCliente.token(), 400);
+        chamar("PUT", rota, Map.of("categorias", List.of("OUTRO")), outraCliente.token(), 400);
+        chamar("PUT", rota, Map.of(), outraCliente.token(), 400);
+        assertEquals(salvas.get("categorias"), get(rota, outraCliente.token()).get("categorias"));
+
+        // Outra cliente e estúdio não leem nem trocam
+        chamar("GET", rota, null, cliente.token(), 403);
+        chamar("PUT", rota, Map.of("categorias", List.of("CABELO")), cliente.token(), 403);
+        chamar("GET", "/api/clientes/" + salao.id() + "/preferencias", null, salao.token(), 404);
+        chamar("GET", rota, null, null, 401);
+
+        JsonNode vazias = chamar("PUT", rota, Map.of("categorias", List.of()), outraCliente.token(), 200);
+        assertEquals(0, vazias.get("categorias").size());
     }
 
     @Test
@@ -577,6 +614,107 @@ class RotasComBancoRealTest {
         assertEquals(404, abrir(segunda).statusCode());
         assertTrue(get("/api/clientes/" + outraCliente.id() + "/perfil", token).get("fotoUrl").isNull());
         chamar("DELETE", FOTO_DE_PERFIL, null, token, 204);
+    }
+
+    @Test
+    @DisplayName("Foto da funcionária: só o estúdio dono envia e remove, e editar não mexe na foto")
+    void fotoDaFuncionaria() throws IOException, InterruptedException {
+        String funcionariaId = novaFuncionaria("Iara");
+        String cadastro = "/api/empresas/" + estudio.id() + "/funcionarias/" + funcionariaId;
+        String foto = cadastro + "/foto";
+
+        assertEquals(401, enviarArquivo(foto, "arquivo", PNG, null).statusCode());
+        assertEquals(403, enviarArquivo(foto, "arquivo", PNG, salao.token()).statusCode());
+        assertEquals(403, enviarArquivo(foto, "arquivo", PNG, cliente.token()).statusCode());
+        assertEquals(404, enviarArquivo("/api/empresas/" + salao.id() + "/funcionarias/" + funcionariaId + "/foto",
+                "arquivo", PNG, salao.token()).statusCode());
+        assertEquals(400, enviarArquivo(foto, "arquivo", "texto".getBytes(StandardCharsets.UTF_8),
+                estudio.token()).statusCode());
+
+        HttpResponse<String> enviada = enviarArquivo(foto, "arquivo", PNG, estudio.token());
+        assertEquals(200, enviada.statusCode(), enviada.body());
+        String primeira = json.readTree(enviada.body()).get("fotoUrl").asText();
+        assertEquals(200, abrir(primeira).statusCode());
+        assertEquals(primeira, fotoNaVitrine(funcionariaId));
+
+        // O app reenvia a foto no PUT: o campo é ignorado e a foto continua a que foi enviada
+        Map<String, Object> edicao = new HashMap<>(Map.of("nome", "Iara Souza", "comissaoPercentual", 10));
+        edicao.put("fotoUrl", "https://exemplo.com/outra.png");
+        JsonNode editada = chamar("PUT", cadastro, edicao, estudio.token(), 200);
+        assertEquals(primeira, editada.get("fotoUrl").asText());
+
+        String segunda = json.readTree(enviarArquivo(foto, "arquivo", JPEG, estudio.token()).body())
+                .get("fotoUrl").asText();
+        assertNotEquals(primeira, segunda);
+        assertEquals(404, abrir(primeira).statusCode());
+
+        chamar("DELETE", foto, null, null, 401);
+        chamar("DELETE", foto, null, salao.token(), 403);
+        assertEquals(200, abrir(segunda).statusCode());
+        chamar("DELETE", foto, null, estudio.token(), 204);
+        assertEquals(404, abrir(segunda).statusCode());
+        assertTrue(get("/api/empresas/" + estudio.id() + "/funcionarias", estudio.token()).findParents("id").stream()
+                .filter(f -> f.get("id").asText().equals(funcionariaId)).findFirst().orElseThrow()
+                .get("fotoUrl").isNull());
+    }
+
+    private String fotoNaVitrine(String funcionariaId) throws IOException, InterruptedException {
+        return get("/api/studios/" + estudio.id() + "/funcionarias", null).findParents("id").stream()
+                .filter(f -> f.get("id").asText().equals(funcionariaId)).findFirst().orElseThrow()
+                .get("fotoUrl").asText();
+    }
+
+    @Test
+    @DisplayName("Foto do serviço: só o estúdio dono envia e remove, e aparece na vitrine e na busca")
+    void fotoDoServico() throws IOException, InterruptedException {
+        String servicos = "/api/empresas/" + outroEstudio.id() + "/servicos";
+        String servicoId = chamar("POST", servicos, Map.of("nome", "Manicure com foto", "duracaoMinutos", 30,
+                "preco", 40), outroEstudio.token(), 201).get("id").asText();
+        String foto = servicos + "/" + servicoId + "/foto";
+        assertTrue(servicoNaVitrine(servicoId).get("fotoUrl").isNull());
+
+        assertEquals(401, enviarArquivo(foto, "arquivo", PNG, null).statusCode());
+        assertEquals(403, enviarArquivo(foto, "arquivo", PNG, salao.token()).statusCode());
+        assertEquals(403, enviarArquivo(foto, "arquivo", PNG, cliente.token()).statusCode());
+        assertEquals(404, enviarArquivo("/api/empresas/" + salao.id() + "/servicos/" + servicoId + "/foto",
+                "arquivo", PNG, salao.token()).statusCode());
+        assertEquals(400, enviarArquivo(foto, "arquivo", "texto".getBytes(StandardCharsets.UTF_8),
+                outroEstudio.token()).statusCode());
+
+        HttpResponse<String> enviada = enviarArquivo(foto, "arquivo", PNG, outroEstudio.token());
+        assertEquals(200, enviada.statusCode(), enviada.body());
+        String primeira = json.readTree(enviada.body()).get("fotoUrl").asText();
+        assertEquals(200, abrir(primeira).statusCode());
+        assertEquals(primeira, servicoNaVitrine(servicoId).get("fotoUrl").asText());
+
+        // Editar o serviço mantém a foto
+        chamar("PUT", servicos + "/" + servicoId, Map.of("nome", "Manicure com foto", "duracaoMinutos", 40,
+                "preco", 45), outroEstudio.token(), 200);
+        assertEquals(primeira, servicoNaVitrine(servicoId).get("fotoUrl").asText());
+
+        String segunda = json.readTree(enviarArquivo(foto, "arquivo", JPEG, outroEstudio.token()).body())
+                .get("fotoUrl").asText();
+        assertEquals(404, abrir(primeira).statusCode());
+        JsonNode naBusca = get("/api/studios/pesquisa?texto=espaco", null).findParents("fotoUrl").stream()
+                .filter(s -> s.has("duracaoMinutos") && s.get("id").asText().equals(servicoId))
+                .findFirst().orElseThrow();
+        assertEquals(segunda, naBusca.get("fotoUrl").asText());
+
+        chamar("DELETE", foto, null, null, 401);
+        chamar("DELETE", foto, null, salao.token(), 403);
+        assertEquals(200, abrir(segunda).statusCode());
+        chamar("DELETE", foto, null, outroEstudio.token(), 204);
+        assertEquals(404, abrir(segunda).statusCode());
+        assertTrue(servicoNaVitrine(servicoId).get("fotoUrl").isNull());
+    }
+
+    private JsonNode servicoNaVitrine(String servicoId) throws IOException, InterruptedException {
+        for (JsonNode servico : get("/api/studios/" + outroEstudio.id() + "/servicos", null)) {
+            if (servicoId.equals(servico.get("id").asText())) {
+                return servico;
+            }
+        }
+        throw new AssertionError("Serviço fora da vitrine");
     }
 
     @Test

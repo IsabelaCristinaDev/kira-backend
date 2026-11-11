@@ -16,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -24,10 +25,12 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -42,6 +45,9 @@ class FuncionariaServiceTest {
     @Mock
     private UsuarioRepository usuarioRepository;
 
+    @Mock
+    private ImagensEnviadas imagens;
+
     @InjectMocks
     private FuncionariaService service;
 
@@ -54,7 +60,7 @@ class FuncionariaServiceTest {
     }
 
     private FuncionariaRequest request(String nome) {
-        return new FuncionariaRequest(nome, null, "Cílios", new BigDecimal("30"));
+        return new FuncionariaRequest(nome, "Cílios", new BigDecimal("30"));
     }
 
     @Test
@@ -181,7 +187,7 @@ class FuncionariaServiceTest {
     }
 
     @Test
-    @DisplayName("Atualizar troca nome, foto, especialidades e comissão, sem mexer na empresa nem no status")
+    @DisplayName("Atualizar troca nome, especialidades e comissão, sem mexer na empresa nem no status")
     void deveAtualizarFuncionaria() {
         Funcionaria funcionaria = new Funcionaria();
         funcionaria.setId(UUID.randomUUID());
@@ -192,13 +198,12 @@ class FuncionariaServiceTest {
         funcionaria.setEmpresa(empresa);
         when(funcionariaRepository.findById(funcionaria.getId())).thenReturn(Optional.of(funcionaria));
         FuncionariaRequest novosDados = new FuncionariaRequest(
-                "Beatriz", "/arquivos/beatriz.jpg", "Cílios, Sobrancelha", new BigDecimal("40"));
+                "Beatriz", "Cílios, Sobrancelha", new BigDecimal("40"));
 
         FuncionariaResponse response = service.atualizar(empresa.getId(), funcionaria.getId(), novosDados);
 
         verify(funcionariaRepository).save(funcionaria);
         assertEquals("Beatriz", funcionaria.getNome());
-        assertEquals("/arquivos/beatriz.jpg", funcionaria.getFotoUrl());
         assertEquals("Cílios, Sobrancelha", funcionaria.getEspecialidades());
         assertEquals(new BigDecimal("40"), funcionaria.getComissaoPercentual());
         assertSame(empresa, funcionaria.getEmpresa());
@@ -220,5 +225,125 @@ class FuncionariaServiceTest {
                 () -> service.atualizar(empresaId, funcionariaId, req));
         assertEquals("Funcionária não encontrada", ex.getMessage());
         verify(funcionariaRepository, never()).save(any());
+    }
+
+    // ---------- foto ----------
+
+    private Funcionaria funcionariaDaEmpresa(String fotoUrl) {
+        Funcionaria funcionaria = new Funcionaria();
+        funcionaria.setId(UUID.randomUUID());
+        funcionaria.setNome("Bia");
+        funcionaria.setAtivo(true);
+        funcionaria.setEmpresa(empresa);
+        funcionaria.setFotoUrl(fotoUrl);
+        return funcionaria;
+    }
+
+    private final MockMultipartFile arquivo =
+            new MockMultipartFile("arquivo", "foto.png", "image/png", new byte[]{1, 2, 3});
+
+    @Test
+    @DisplayName("Editar a funcionária não mexe na foto, que tem rota própria")
+    void atualizarNaoMexeNaFoto() {
+        Funcionaria funcionaria = funcionariaDaEmpresa("/api/arquivos/atual.png");
+        when(funcionariaRepository.findById(funcionaria.getId())).thenReturn(Optional.of(funcionaria));
+
+        FuncionariaResponse response = service.atualizar(empresa.getId(), funcionaria.getId(), request("Bia Souza"));
+
+        assertEquals("Bia Souza", response.nome());
+        assertEquals("/api/arquivos/atual.png", response.fotoUrl());
+        assertEquals("/api/arquivos/atual.png", funcionaria.getFotoUrl());
+        verifyNoInteractions(imagens);
+    }
+
+    @Test
+    @DisplayName("Cadastrar a funcionária começa sem foto")
+    void cadastrarComecaSemFoto() {
+        when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+
+        FuncionariaResponse response = service.cadastrar(empresa.getId(), request("Bia"));
+
+        assertNull(response.fotoUrl());
+        verifyNoInteractions(imagens);
+    }
+
+    @Test
+    @DisplayName("Enviar foto guarda a nova, grava o endereço e apaga a anterior")
+    void definirFotoTrocaEApagaAnterior() {
+        Funcionaria funcionaria = funcionariaDaEmpresa("/api/arquivos/antiga.png");
+        when(funcionariaRepository.findById(funcionaria.getId())).thenReturn(Optional.of(funcionaria));
+        when(imagens.guardar(arquivo)).thenReturn("/api/arquivos/nova.png");
+
+        FuncionariaResponse response = service.definirFoto(empresa.getId(), funcionaria.getId(), arquivo);
+
+        assertEquals("/api/arquivos/nova.png", response.fotoUrl());
+        assertEquals("/api/arquivos/nova.png", funcionaria.getFotoUrl());
+        verify(funcionariaRepository).save(funcionaria);
+        verify(imagens).apagarSemFalhar("/api/arquivos/antiga.png");
+    }
+
+    @Test
+    @DisplayName("Se gravar a funcionária falhar, a foto nova é apagada e a antiga fica")
+    void definirFotoFalhaAoSalvarApagaANova() {
+        Funcionaria funcionaria = funcionariaDaEmpresa("/api/arquivos/antiga.png");
+        UUID empresaId = empresa.getId();
+        UUID funcionariaId = funcionaria.getId();
+        when(funcionariaRepository.findById(funcionariaId)).thenReturn(Optional.of(funcionaria));
+        when(imagens.guardar(arquivo)).thenReturn("/api/arquivos/nova.png");
+        doThrow(new IllegalStateException("banco fora")).when(funcionariaRepository).save(funcionaria);
+
+        assertThrows(IllegalStateException.class, () -> service.definirFoto(empresaId, funcionariaId, arquivo));
+
+        verify(imagens).apagarSemFalhar("/api/arquivos/nova.png");
+        verify(imagens, never()).apagarSemFalhar("/api/arquivos/antiga.png");
+    }
+
+    @Test
+    @DisplayName("Imagem recusada não muda a foto da funcionária")
+    void definirFotoRecusada() {
+        Funcionaria funcionaria = funcionariaDaEmpresa("/api/arquivos/antiga.png");
+        UUID empresaId = empresa.getId();
+        UUID funcionariaId = funcionaria.getId();
+        when(funcionariaRepository.findById(funcionariaId)).thenReturn(Optional.of(funcionaria));
+        when(imagens.guardar(arquivo)).thenThrow(new RegraDeNegocioException("A foto precisa ser JPG, PNG ou WEBP"));
+
+        assertThrows(RegraDeNegocioException.class, () -> service.definirFoto(empresaId, funcionariaId, arquivo));
+
+        assertEquals("/api/arquivos/antiga.png", funcionaria.getFotoUrl());
+        verify(funcionariaRepository, never()).save(any());
+        verify(imagens, never()).apagarSemFalhar(any());
+    }
+
+    @Test
+    @DisplayName("Foto de funcionária de outra empresa responde como inexistente e nada é guardado")
+    void fotoDeFuncionariaDeOutraEmpresa() {
+        Empresa outra = new Empresa();
+        outra.setId(UUID.randomUUID());
+        Funcionaria funcionaria = funcionariaDaEmpresa("/api/arquivos/antiga.png");
+        funcionaria.setEmpresa(outra);
+        UUID empresaId = empresa.getId();
+        UUID funcionariaId = funcionaria.getId();
+        when(funcionariaRepository.findById(funcionariaId)).thenReturn(Optional.of(funcionaria));
+
+        assertThrows(RecursoNaoEncontradoException.class,
+                () -> service.definirFoto(empresaId, funcionariaId, arquivo));
+        assertThrows(RecursoNaoEncontradoException.class, () -> service.removerFoto(empresaId, funcionariaId));
+
+        assertEquals("/api/arquivos/antiga.png", funcionaria.getFotoUrl());
+        verify(funcionariaRepository, never()).save(any());
+        verifyNoInteractions(imagens);
+    }
+
+    @Test
+    @DisplayName("Remover a foto limpa o endereço e apaga o arquivo")
+    void removerFoto() {
+        Funcionaria funcionaria = funcionariaDaEmpresa("/api/arquivos/antiga.png");
+        when(funcionariaRepository.findById(funcionaria.getId())).thenReturn(Optional.of(funcionaria));
+
+        service.removerFoto(empresa.getId(), funcionaria.getId());
+
+        assertNull(funcionaria.getFotoUrl());
+        verify(funcionariaRepository).save(funcionaria);
+        verify(imagens).apagarSemFalhar("/api/arquivos/antiga.png");
     }
 }

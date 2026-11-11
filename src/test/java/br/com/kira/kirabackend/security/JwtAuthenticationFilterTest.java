@@ -16,6 +16,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -150,6 +151,21 @@ class JwtAuthenticationFilterTest {
         when(jwtTokenProvider.tokenValido("token-valido")).thenReturn(true);
         when(jwtTokenProvider.extrairEmail("token-valido")).thenReturn("ana@teste.com");
         when(userDetailsService.loadUserByUsername("ana@teste.com")).thenReturn(cliente);
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        assertNull(autenticacaoAtual());
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    @DisplayName("Token de conta que não existe mais (excluída) não autentica, mas a requisição segue")
+    void tokenDeContaExcluidaNaoAutentica() throws Exception {
+        request.addHeader("Authorization", "Bearer token-valido");
+        when(jwtTokenProvider.tokenValido("token-valido")).thenReturn(true);
+        when(jwtTokenProvider.extrairEmail("token-valido")).thenReturn("ana@teste.com");
+        when(userDetailsService.loadUserByUsername("ana@teste.com"))
+                .thenThrow(new UsernameNotFoundException("Usuário não encontrado"));
 
         filter.doFilterInternal(request, response, filterChain);
 
