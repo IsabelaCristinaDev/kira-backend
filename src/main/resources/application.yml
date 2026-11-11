@@ -58,8 +58,19 @@ kira:
     # No servidor, coloque o endereço real do front (ex.: https://kira.exemplo.com)
     origens: ${KIRA_CORS_ORIGENS:http://localhost:8080,http://localhost:3000,http://localhost:5173,http://localhost:4200}
   arquivos:
-    # Pasta das fotos enviadas. Fora do Git (.gitignore)
+    # Onde as fotos ficam: "local" (pasta, o padrão) ou "s3" (MinIO no local, Cloudflare R2 no servidor)
+    tipo: ${KIRA_ARQUIVOS_TIPO:local}
+    # Pasta das fotos enviadas, quando o tipo é local. Fora do Git (.gitignore)
     pasta: ${KIRA_ARQUIVOS_PASTA:./uploads}
+    s3:
+      endpoint: ${KIRA_S3_ENDPOINT:http://localhost:9000}
+      # Criado na subida da API, se não existir (no R2, crie pelo painel). Fica privado: as fotos saem pela API
+      bucket: ${KIRA_S3_BUCKET:kira-arquivos}
+      # No R2, use auto
+      regiao: ${KIRA_S3_REGIAO:us-east-1}
+      # Sem valor padrão: as chaves vêm só do .env
+      access-key: ${KIRA_S3_ACCESS_KEY:}
+      secret-key: ${KIRA_S3_SECRET_KEY:}
   notificacoes:
     web:
       # Sem as chaves no .env, as notificações ficam desligadas e o resto funciona
