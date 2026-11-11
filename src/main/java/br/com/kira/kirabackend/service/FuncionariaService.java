@@ -10,6 +10,7 @@ import br.com.kira.kirabackend.repository.FuncionariaRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -20,6 +21,7 @@ public class FuncionariaService {
 
     private final FuncionariaRepository funcionariaRepository;
     private final UsuarioRepository usuarioRepository;
+    private final ImagensEnviadas imagens;
 
     public FuncionariaResponse cadastrar(UUID empresaId, FuncionariaRequest request) {
         Empresa empresa = (Empresa) usuarioRepository.findById(empresaId)
@@ -31,7 +33,6 @@ public class FuncionariaService {
 
         Funcionaria funcionaria = new Funcionaria();
         funcionaria.setNome(request.nome());
-        funcionaria.setFotoUrl(request.fotoUrl());
         funcionaria.setEspecialidades(request.especialidades());
         funcionaria.setComissaoPercentual(request.comissaoPercentual());
         funcionaria.setEmpresa(empresa);
@@ -53,7 +54,6 @@ public class FuncionariaService {
         Funcionaria funcionaria = buscarDaEmpresa(empresaId, id);
 
         funcionaria.setNome(request.nome());
-        funcionaria.setFotoUrl(request.fotoUrl());
         funcionaria.setEspecialidades(request.especialidades());
         funcionaria.setComissaoPercentual(request.comissaoPercentual());
 
@@ -67,6 +67,30 @@ public class FuncionariaService {
 
         funcionaria.setAtivo(false);
         funcionariaRepository.save(funcionaria);
+    }
+
+    /** Troca a foto da funcionária. A anterior só é apagada depois que a nova foi gravada. */
+    public FuncionariaResponse definirFoto(UUID empresaId, UUID id, MultipartFile arquivo) {
+        Funcionaria funcionaria = buscarDaEmpresa(empresaId, id);
+        String fotoAnterior = funcionaria.getFotoUrl();
+        String fotoNova = imagens.guardar(arquivo);
+        funcionaria.setFotoUrl(fotoNova);
+        try {
+            funcionariaRepository.save(funcionaria);
+        } catch (RuntimeException e) {
+            imagens.apagarSemFalhar(fotoNova);
+            throw e;
+        }
+        imagens.apagarSemFalhar(fotoAnterior);
+        return toResponse(funcionaria);
+    }
+
+    public void removerFoto(UUID empresaId, UUID id) {
+        Funcionaria funcionaria = buscarDaEmpresa(empresaId, id);
+        String fotoAnterior = funcionaria.getFotoUrl();
+        funcionaria.setFotoUrl(null);
+        funcionariaRepository.save(funcionaria);
+        imagens.apagarSemFalhar(fotoAnterior);
     }
 
     /** Funcionária de outra empresa é tratada como inexistente na rota desta empresa. */

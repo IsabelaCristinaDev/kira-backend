@@ -296,12 +296,37 @@ class AvaliacaoServiceTest {
     }
 
     @Test
-    @DisplayName("Outra conta não vê as avaliações recebidas pela cliente")
+    @DisplayName("Outra cliente não vê as avaliações recebidas pela cliente")
     void outraContaNaoVeAvaliacoesDaCliente() {
         UUID clienteId = cliente.getId();
-        UUID outraConta = UUID.randomUUID();
+        Cliente outraCliente = new Cliente();
+        outraCliente.setId(UUID.randomUUID());
 
-        assertThrows(AcessoNegadoException.class, () -> service.listarAvaliacoesCliente(clienteId, outraConta));
+        assertThrows(AcessoNegadoException.class, () -> service.listarAvaliacoesCliente(clienteId, outraCliente));
+        verifyNoInteractions(avaliacaoRepository, agendamentoRepository);
+    }
+
+    @Test
+    @DisplayName("O estúdio que atende a cliente vê as avaliações recebidas por ela")
+    void estudioComAgendamentoVeAvaliacoesDaCliente() {
+        when(agendamentoRepository.existsByClienteIdAndEmpresaId(cliente.getId(), empresa.getId())).thenReturn(true);
+        when(avaliacaoRepository.findByClienteIdAndTipoAvaliador(cliente.getId(), TipoAvaliador.EMPRESA))
+                .thenReturn(List.of(avaliacao(TipoAvaliador.EMPRESA)));
+
+        List<AvaliacaoResponse> avaliacoes = service.listarAvaliacoesCliente(cliente.getId(), empresa);
+
+        assertEquals(1, avaliacoes.size());
+        assertEquals(TipoAvaliador.EMPRESA, avaliacoes.get(0).tipoAvaliador());
+        verify(avaliacaoRepository, never()).findByClienteIdAndTipoAvaliador(cliente.getId(), TipoAvaliador.CLIENTE);
+    }
+
+    @Test
+    @DisplayName("O estúdio sem agendamento com a cliente não vê as avaliações dela")
+    void estudioSemAgendamentoNaoVeAvaliacoesDaCliente() {
+        UUID clienteId = cliente.getId();
+        when(agendamentoRepository.existsByClienteIdAndEmpresaId(clienteId, empresa.getId())).thenReturn(false);
+
+        assertThrows(AcessoNegadoException.class, () -> service.listarAvaliacoesCliente(clienteId, empresa));
         verifyNoInteractions(avaliacaoRepository);
     }
 
@@ -339,11 +364,13 @@ class AvaliacaoServiceTest {
         when(avaliacaoRepository.findByClienteIdAndTipoAvaliador(cliente.getId(), TipoAvaliador.EMPRESA))
                 .thenReturn(List.of(avaliacao(TipoAvaliador.EMPRESA)));
 
-        List<AvaliacaoResponse> avaliacoes = service.listarAvaliacoesCliente(cliente.getId(), cliente.getId());
+        List<AvaliacaoResponse> avaliacoes = service.listarAvaliacoesCliente(cliente.getId(), cliente);
 
         assertEquals(1, avaliacoes.size());
         assertEquals(TipoAvaliador.EMPRESA, avaliacoes.get(0).tipoAvaliador());
         verify(avaliacaoRepository, never()).findByClienteIdAndTipoAvaliador(cliente.getId(), TipoAvaliador.CLIENTE);
+        // A própria cliente não depende de agendamento
+        verifyNoInteractions(agendamentoRepository);
     }
 
     @Test

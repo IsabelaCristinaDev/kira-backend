@@ -25,6 +25,6 @@ jobs:
       # Sem Docker esses testes são ignorados sem dar erro, e o CI passaria sem testar o banco nem a subida da aplicação
       - name: Conferir que os testes com banco rodaram
         run: |
-          for teste in KiraBackendApplicationTests integracao.RotasComBancoRealTest integracao.ConexaoAoVivoComBancoRealTest; do
+          for teste in KiraBackendApplicationTests integracao.RotasComBancoRealTest integracao.ConexaoAoVivoComBancoRealTest integracao.PrivacidadeComBancoRealTest; do
             grep -q 'skipped="0"' "target/surefire-reports/TEST-br.com.kira.kirabackend.$teste.xml"
           done

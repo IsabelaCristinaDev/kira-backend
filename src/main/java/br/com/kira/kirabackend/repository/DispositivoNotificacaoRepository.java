@@ -35,4 +35,6 @@ public interface DispositivoNotificacaoRepository extends JpaRepository<Disposit
     List<DispositivoNotificacao> findByUsuarioIdIn(Collection<UUID> usuarioIds);
 
     void deleteByEndpointAndUsuarioId(String endpoint, UUID usuarioId);
+
+    void deleteByUsuarioId(UUID usuarioId);
 }

@@ -15,6 +15,7 @@ API REST da KIRA, plataforma de agendamento de serviços de beleza. Projeto dese
 - **Cliente:** favoritas, contatos de emergência e foto de perfil.
 - **Provador virtual:** simulação de resultado com IA (Cloudflare Workers AI), condicionada ao consentimento da usuária, que pode ser revogado.
 - **Verificação de identidade:** compara a foto do documento com a selfie pelo kira-verify-ai e guarda só o resultado. Pode ser exigida para agendar e para aparecer na vitrine.
+- **Privacidade (LGPD):** a conta logada baixa uma cópia dos próprios dados (`GET /api/perfil/dados`) e pode excluir a conta confirmando a senha (`DELETE /api/perfil`). A exclusão anonimiza os dados pessoais e mantém o histórico de atendimentos com o nome "Conta excluída".
 
 > O pagamento é feito no estúdio. O sistema só registra a forma (dinheiro, cartão de crédito ou de débito, ou Pix), informada ao agendar ou ao concluir o atendimento. Não há integração com gateway de pagamento.
 

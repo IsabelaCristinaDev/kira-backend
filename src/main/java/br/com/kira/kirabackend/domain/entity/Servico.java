@@ -42,6 +42,10 @@ public class Servico {
     @Column(length = 20)
     private CategoriaServico categoria;
 
+    // Endereço da foto enviada pela rota própria (/api/arquivos/...). Nula enquanto não houver foto
+    @Column(name = "foto_url", length = 500)
+    private String fotoUrl;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "empresa_id", nullable = false)
     private Empresa empresa;
