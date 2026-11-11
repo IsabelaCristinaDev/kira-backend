@@ -38,7 +38,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (token != null && jwtTokenProvider.tokenValido(token)) {
             var email = jwtTokenProvider.extrairEmail(token);
             UserDetails userDetails = buscarConta(email);
-            // Conta desativada ou excluída depois do login: o token ainda é válido, mas não pode autenticar
+            // Conta desativada, suspensa preventivamente (ativo = false) ou excluída depois do login:
+            // o token ainda é válido, mas perde o acesso na hora, sem esperar expirar
             if (userDetails == null || !userDetails.isEnabled()) {
                 filterChain.doFilter(request, response);
                 return;

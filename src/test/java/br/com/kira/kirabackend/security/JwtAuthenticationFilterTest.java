@@ -102,7 +102,7 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    @DisplayName("Token válido de conta desativada não autentica, mas a requisição segue")
+    @DisplayName("Token válido de conta desativada ou suspensa não autentica, mas a requisição segue")
     void tokenDeContaDesativadaNaoAutentica() throws Exception {
         Cliente cliente = new Cliente();
         cliente.setEmail("ana@teste.com");
