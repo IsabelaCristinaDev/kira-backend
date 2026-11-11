@@ -15,6 +15,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -101,8 +102,8 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    @DisplayName("Token válido de perfil suspenso não autentica")
-    void perfilSuspensoNaoAutentica() throws Exception {
+    @DisplayName("Token válido de conta desativada ou suspensa não autentica, mas a requisição segue")
+    void tokenDeContaDesativadaNaoAutentica() throws Exception {
         Cliente cliente = new Cliente();
         cliente.setEmail("ana@teste.com");
         cliente.setAtivo(false);
@@ -110,6 +111,21 @@ class JwtAuthenticationFilterTest {
         when(jwtTokenProvider.tokenValido("token-valido")).thenReturn(true);
         when(jwtTokenProvider.extrairEmail("token-valido")).thenReturn("ana@teste.com");
         when(userDetailsService.loadUserByUsername("ana@teste.com")).thenReturn(cliente);
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        assertNull(autenticacaoAtual());
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    @DisplayName("Token de conta que não existe mais (excluída) não autentica, mas a requisição segue")
+    void tokenDeContaExcluidaNaoAutentica() throws Exception {
+        request.addHeader("Authorization", "Bearer token-valido");
+        when(jwtTokenProvider.tokenValido("token-valido")).thenReturn(true);
+        when(jwtTokenProvider.extrairEmail("token-valido")).thenReturn("ana@teste.com");
+        when(userDetailsService.loadUserByUsername("ana@teste.com"))
+                .thenThrow(new UsernameNotFoundException("Usuário não encontrado"));
 
         filter.doFilterInternal(request, response, filterChain);
 

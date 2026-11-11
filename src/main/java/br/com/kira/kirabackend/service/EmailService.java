@@ -1,17 +1,23 @@
 package br.com.kira.kirabackend.service;
 
+import jakarta.annotation.PostConstruct;
 import br.com.kira.kirabackend.domain.entity.Agendamento;
 import br.com.kira.kirabackend.observer.DenunciaRiscoImediatoEvent;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.format.DateTimeFormatter;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EmailService {
@@ -21,20 +27,50 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
+    // Endereço do app web: o link de redefinição de senha abre a tela de nova senha
+    @Value("${kira.frontend-url}")
+    private String frontendUrl;
+
+    // Conta que envia os e-mails (MAIL_USERNAME e MAIL_PASSWORD). Vazias, nenhum e-mail sai
+    @Value("${spring.mail.username:}")
+    private String usuarioEmail;
+
+    @Value("${spring.mail.password:}")
+    private String senhaEmail;
+
+    // A API sobe mesmo sem e-mail, mas o aviso sai na subida, e não só quando alguém tenta recuperar a senha
+    @PostConstruct
+    void avisarSeEmailNaoConfigurado() {
+        if (!StringUtils.hasText(usuarioEmail) || !StringUtils.hasText(senhaEmail)) {
+            log.warn("E-mail não configurado: defina MAIL_USERNAME e MAIL_PASSWORD. "
+                    + "Boas-vindas, recuperação de senha e lembretes não serão enviados");
+        }
+    }
+
+    // Assíncrono e tolerante a falha: a resposta da API é a mesma exista o e-mail ou não,
+    // sem esperar o SMTP nem devolver erro quando ele falha.
+    @Async
     public void enviarEmailRecuperacaoSenha(String destinatario, String token) {
+        String link = StringUtils.trimTrailingCharacter(frontendUrl, '/') + "/redefinir-senha?token=" + token;
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(destinatario);
         message.setSubject("KIRA — Recuperação de Senha");
         message.setText(
                 "Olá!\n\n" +
                         "Recebemos uma solicitação para redefinir a senha da sua conta KIRA.\n\n" +
-                        "Use o token abaixo para redefinir sua senha:\n\n" +
+                        "Abra o link abaixo para criar uma nova senha:\n\n" +
+                        link + "\n\n" +
+                        "Se o link não abrir, use este código na tela de nova senha:\n\n" +
                         token + "\n\n" +
-                        "Este token expira em 30 minutos.\n\n" +
+                        "O link e o código expiram em 30 minutos.\n\n" +
                         "Se você não solicitou a recuperação de senha, ignore este email.\n\n" +
                         "Equipe KIRA"
         );
-        mailSender.send(message);
+        try {
+            mailSender.send(message);
+        } catch (MailException e) {
+            log.warn("Falha ao enviar e-mail de recuperação de senha para {}: {}", destinatario, e.getMessage());
+        }
     }
 
     @Retryable(
@@ -116,6 +152,9 @@ public class EmailService {
         mailSender.send(message);
     }
 
+    // Assíncrono e tolerante a falha: o cadastro não deve travar nem falhar
+    // por indisponibilidade do servidor SMTP.
+    @Async
     public void enviarEmailBoasVindas(String destinatario, String nome) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(destinatario);
@@ -130,6 +169,10 @@ public class EmailService {
                         "Acesse agora e comece a usar!\n\n" +
                         "Equipe KIRA"
         );
-        mailSender.send(message);
+        try {
+            mailSender.send(message);
+        } catch (MailException e) {
+            log.warn("Falha ao enviar e-mail de boas-vindas para {}: {}", destinatario, e.getMessage());
+        }
     }
 }

@@ -9,6 +9,7 @@ import br.com.kira.kirabackend.domain.enums.TipoAvaliador;
 import br.com.kira.kirabackend.dto.request.AvaliacaoRequest;
 import br.com.kira.kirabackend.dto.response.AvaliacaoResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
+import br.com.kira.kirabackend.exception.AcessoNegadoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.AvaliacaoRepository;
@@ -27,6 +28,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import br.com.kira.kirabackend.repository.UsuarioRepository;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -36,6 +38,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class AvaliacaoServiceTest {
@@ -45,6 +49,9 @@ class AvaliacaoServiceTest {
 
     @Mock
     private AgendamentoRepository agendamentoRepository;
+
+    @Mock
+    private UsuarioRepository usuarioRepository;
 
     @InjectMocks
     private AvaliacaoService service;
@@ -68,6 +75,9 @@ class AvaliacaoServiceTest {
         agendamento.setCliente(cliente);
         agendamento.setEmpresa(empresa);
         agendamento.setStatus(StatusAgendamento.CONCLUIDO);
+
+        // Nos testes, a empresa é ativa por padrão; os casos de empresa desativada sobrescrevem
+        lenient().when(usuarioRepository.existsEmpresaAtivaById(empresa.getId())).thenReturn(true);
     }
 
     // ---------- helpers ----------
@@ -136,8 +146,11 @@ class AvaliacaoServiceTest {
             agendamento.setStatus(status);
             mockarAgendamento();
 
+            UUID clienteId = cliente.getId();
+            AvaliacaoRequest req = request(5);
+
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.avaliarComoCliente(cliente.getId(), request(5)));
+                    () -> service.avaliarComoCliente(clienteId, req));
             verify(avaliacaoRepository, never()).save(any());
         }
 
@@ -147,8 +160,11 @@ class AvaliacaoServiceTest {
             mockarAgendamento();
             mockarJaAvaliado(TipoAvaliador.CLIENTE, true);
 
+            UUID clienteId = cliente.getId();
+            AvaliacaoRequest req = request(5);
+
             RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
-                    () -> service.avaliarComoCliente(cliente.getId(), request(5)));
+                    () -> service.avaliarComoCliente(clienteId, req));
             assertEquals("Você já avaliou este atendimento", ex.getMessage());
             verify(avaliacaoRepository, never()).save(any());
         }
@@ -158,8 +174,11 @@ class AvaliacaoServiceTest {
         void clienteDeOutroAtendimentoNaoAvalia() {
             mockarAgendamento();
 
-            assertThrows(RegraDeNegocioException.class,
-                    () -> service.avaliarComoCliente(UUID.randomUUID(), request(1)));
+            UUID idDeFora = UUID.randomUUID();
+            AvaliacaoRequest req = request(1);
+
+            assertThrows(AcessoNegadoException.class,
+                    () -> service.avaliarComoCliente(idDeFora, req));
             verify(avaliacaoRepository, never()).save(any());
         }
 
@@ -168,8 +187,11 @@ class AvaliacaoServiceTest {
         void agendamentoInexistente() {
             when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.empty());
 
+            UUID clienteId = cliente.getId();
+            AvaliacaoRequest req = request(5);
+
             assertThrows(RecursoNaoEncontradoException.class,
-                    () -> service.avaliarComoCliente(cliente.getId(), request(5)));
+                    () -> service.avaliarComoCliente(clienteId, req));
         }
     }
 
@@ -202,8 +224,11 @@ class AvaliacaoServiceTest {
             agendamento.setStatus(status);
             mockarAgendamento();
 
+            UUID empresaId = empresa.getId();
+            AvaliacaoRequest req = request(5);
+
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.avaliarComoEmpresa(empresa.getId(), request(5)));
+                    () -> service.avaliarComoEmpresa(empresaId, req));
             verify(avaliacaoRepository, never()).save(any());
         }
 
@@ -213,8 +238,11 @@ class AvaliacaoServiceTest {
             mockarAgendamento();
             mockarJaAvaliado(TipoAvaliador.EMPRESA, true);
 
+            UUID empresaId = empresa.getId();
+            AvaliacaoRequest req = request(5);
+
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.avaliarComoEmpresa(empresa.getId(), request(5)));
+                    () -> service.avaliarComoEmpresa(empresaId, req));
             verify(avaliacaoRepository, never()).save(any());
         }
 
@@ -223,8 +251,11 @@ class AvaliacaoServiceTest {
         void outraEmpresaNaoAvalia() {
             mockarAgendamento();
 
-            assertThrows(RegraDeNegocioException.class,
-                    () -> service.avaliarComoEmpresa(UUID.randomUUID(), request(1)));
+            UUID idDeFora = UUID.randomUUID();
+            AvaliacaoRequest req = request(1);
+
+            assertThrows(AcessoNegadoException.class,
+                    () -> service.avaliarComoEmpresa(idDeFora, req));
             verify(avaliacaoRepository, never()).save(any());
         }
     }
@@ -265,15 +296,91 @@ class AvaliacaoServiceTest {
     }
 
     @Test
+    @DisplayName("Outra cliente não vê as avaliações recebidas pela cliente")
+    void outraContaNaoVeAvaliacoesDaCliente() {
+        UUID clienteId = cliente.getId();
+        Cliente outraCliente = new Cliente();
+        outraCliente.setId(UUID.randomUUID());
+
+        assertThrows(AcessoNegadoException.class, () -> service.listarAvaliacoesCliente(clienteId, outraCliente));
+        verifyNoInteractions(avaliacaoRepository, agendamentoRepository);
+    }
+
+    @Test
+    @DisplayName("O estúdio que atende a cliente vê as avaliações recebidas por ela")
+    void estudioComAgendamentoVeAvaliacoesDaCliente() {
+        when(agendamentoRepository.existsByClienteIdAndEmpresaId(cliente.getId(), empresa.getId())).thenReturn(true);
+        when(avaliacaoRepository.findByClienteIdAndTipoAvaliador(cliente.getId(), TipoAvaliador.EMPRESA))
+                .thenReturn(List.of(avaliacao(TipoAvaliador.EMPRESA)));
+
+        List<AvaliacaoResponse> avaliacoes = service.listarAvaliacoesCliente(cliente.getId(), empresa);
+
+        assertEquals(1, avaliacoes.size());
+        assertEquals(TipoAvaliador.EMPRESA, avaliacoes.get(0).tipoAvaliador());
+        verify(avaliacaoRepository, never()).findByClienteIdAndTipoAvaliador(cliente.getId(), TipoAvaliador.CLIENTE);
+    }
+
+    @Test
+    @DisplayName("O estúdio sem agendamento com a cliente não vê as avaliações dela")
+    void estudioSemAgendamentoNaoVeAvaliacoesDaCliente() {
+        UUID clienteId = cliente.getId();
+        when(agendamentoRepository.existsByClienteIdAndEmpresaId(clienteId, empresa.getId())).thenReturn(false);
+
+        assertThrows(AcessoNegadoException.class, () -> service.listarAvaliacoesCliente(clienteId, empresa));
+        verifyNoInteractions(avaliacaoRepository);
+    }
+
+    @Test
+    @DisplayName("Minhas avaliações traz apenas as feitas pela própria cliente")
+    void minhasAvaliacoesSoTrazAsDaCliente() {
+        when(avaliacaoRepository.findByClienteIdAndTipoAvaliador(cliente.getId(), TipoAvaliador.CLIENTE))
+                .thenReturn(List.of(avaliacao(TipoAvaliador.CLIENTE)));
+
+        List<AvaliacaoResponse> avaliacoes = service.listarMinhasAvaliacoes(cliente);
+
+        assertEquals(1, avaliacoes.size());
+        assertEquals(TipoAvaliador.CLIENTE, avaliacoes.get(0).tipoAvaliador());
+        verify(avaliacaoRepository, never()).findByClienteIdAndTipoAvaliador(cliente.getId(), TipoAvaliador.EMPRESA);
+    }
+
+    @Test
+    @DisplayName("Minhas avaliações do estúdio traz as que ele fez das clientes")
+    void minhasAvaliacoesDoEstudioTrazAsQueEleFez() {
+        when(avaliacaoRepository.findByEmpresaIdAndTipoAvaliador(empresa.getId(), TipoAvaliador.EMPRESA))
+                .thenReturn(List.of(avaliacao(TipoAvaliador.EMPRESA)));
+
+        List<AvaliacaoResponse> avaliacoes = service.listarMinhasAvaliacoes(empresa);
+
+        assertEquals(1, avaliacoes.size());
+        assertEquals(TipoAvaliador.EMPRESA, avaliacoes.get(0).tipoAvaliador());
+        assertEquals(agendamento.getId(), avaliacoes.get(0).agendamentoId());
+        // As avaliações que o estúdio recebeu têm rota própria (/empresa/{id})
+        verify(avaliacaoRepository, never()).findByEmpresaIdAndTipoAvaliador(empresa.getId(), TipoAvaliador.CLIENTE);
+    }
+
+    @Test
     @DisplayName("A listagem do cliente traz apenas as avaliações feitas por empresas")
     void listagemDoClienteSoTrazAvaliacoesDeEmpresas() {
         when(avaliacaoRepository.findByClienteIdAndTipoAvaliador(cliente.getId(), TipoAvaliador.EMPRESA))
                 .thenReturn(List.of(avaliacao(TipoAvaliador.EMPRESA)));
 
-        List<AvaliacaoResponse> avaliacoes = service.listarAvaliacoesCliente(cliente.getId());
+        List<AvaliacaoResponse> avaliacoes = service.listarAvaliacoesCliente(cliente.getId(), cliente);
 
         assertEquals(1, avaliacoes.size());
         assertEquals(TipoAvaliador.EMPRESA, avaliacoes.get(0).tipoAvaliador());
         verify(avaliacaoRepository, never()).findByClienteIdAndTipoAvaliador(cliente.getId(), TipoAvaliador.CLIENTE);
+        // A própria cliente não depende de agendamento
+        verifyNoInteractions(agendamentoRepository);
+    }
+
+    @Test
+    @DisplayName("Avaliações e média de empresa desativada dão 404")
+    void empresaDesativadaDa404() {
+        UUID empresaId = empresa.getId();
+        when(usuarioRepository.existsEmpresaAtivaById(empresaId)).thenReturn(false);
+
+        assertThrows(RecursoNaoEncontradoException.class, () -> service.listarAvaliacoesEmpresa(empresaId));
+        assertThrows(RecursoNaoEncontradoException.class, () -> service.mediaAvaliacaoEmpresa(empresaId));
+        verifyNoInteractions(avaliacaoRepository);
     }
 }

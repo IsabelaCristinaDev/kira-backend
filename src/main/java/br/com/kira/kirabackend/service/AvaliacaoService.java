@@ -2,14 +2,18 @@ package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.Agendamento;
 import br.com.kira.kirabackend.domain.entity.Avaliacao;
+import br.com.kira.kirabackend.domain.entity.Empresa;
+import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import br.com.kira.kirabackend.domain.enums.TipoAvaliador;
 import br.com.kira.kirabackend.dto.request.AvaliacaoRequest;
 import br.com.kira.kirabackend.dto.response.AvaliacaoResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
+import br.com.kira.kirabackend.exception.AcessoNegadoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.AvaliacaoRepository;
+import br.com.kira.kirabackend.repository.UsuarioRepository;
 import jakarta.transaction.Transactional;
 
 import lombok.RequiredArgsConstructor;
@@ -27,13 +31,14 @@ public class AvaliacaoService {
 
     private final AvaliacaoRepository avaliacaoRepository;
     private final AgendamentoRepository agendamentoRepository;
+    private final UsuarioRepository usuarioRepository;
 
     public AvaliacaoResponse avaliarComoCliente(UUID clienteId, AvaliacaoRequest request) {
         Agendamento agendamento = agendamentoRepository.findById(request.agendamentoId())
                 .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
 
         if (!agendamento.getCliente().getId().equals(clienteId)) {
-            throw new RegraDeNegocioException("Você não participou deste atendimento");
+            throw new AcessoNegadoException("Você não participou deste atendimento");
         }
 
         if (agendamento.getStatus() != StatusAgendamento.CONCLUIDO) {
@@ -61,7 +66,7 @@ public class AvaliacaoService {
                 .orElseThrow(() -> new RecursoNaoEncontradoException(AGENDAMENTO_NAO_ENCONTRADO));
 
         if (!agendamento.getEmpresa().getId().equals(empresaId)) {
-            throw new RegraDeNegocioException("Este atendimento não pertence ao seu estabelecimento");
+            throw new AcessoNegadoException("Este atendimento não pertence ao seu estabelecimento");
         }
 
         if (agendamento.getStatus() != StatusAgendamento.CONCLUIDO) {
@@ -85,6 +90,7 @@ public class AvaliacaoService {
     }
 
     public List<AvaliacaoResponse> listarAvaliacoesEmpresa(UUID empresaId) {
+        exigirEmpresaAtiva(empresaId);
         return avaliacaoRepository
                 .findByEmpresaIdAndTipoAvaliador(empresaId, TipoAvaliador.CLIENTE)
                 .stream()
@@ -92,7 +98,14 @@ public class AvaliacaoService {
                 .toList();
     }
 
-    public List<AvaliacaoResponse> listarAvaliacoesCliente(UUID clienteId) {
+    /**
+     * As avaliações que a cliente recebeu dos estúdios. Veem a própria cliente e os estúdios
+     * com quem ela tem ao menos um agendamento, em qualquer status.
+     */
+    public List<AvaliacaoResponse> listarAvaliacoesCliente(UUID clienteId, Usuario usuario) {
+        if (!podeVerAvaliacoesDaCliente(clienteId, usuario)) {
+            throw new AcessoNegadoException("Você só pode ver as suas avaliações");
+        }
         return avaliacaoRepository
                 .findByClienteIdAndTipoAvaliador(clienteId, TipoAvaliador.EMPRESA)
                 .stream()
@@ -100,22 +113,38 @@ public class AvaliacaoService {
                 .toList();
     }
 
+    /**
+     * As avaliações que a conta logada fez: a cliente, as dos estúdios; o estúdio, as das clientes.
+     * Com elas, a tela sabe quais atendimentos já avaliou. As recebidas têm rotas próprias.
+     */
+    public List<AvaliacaoResponse> listarMinhasAvaliacoes(Usuario usuario) {
+        List<Avaliacao> feitas = usuario instanceof Empresa
+                ? avaliacaoRepository.findByEmpresaIdAndTipoAvaliador(usuario.getId(), TipoAvaliador.EMPRESA)
+                : avaliacaoRepository.findByClienteIdAndTipoAvaliador(usuario.getId(), TipoAvaliador.CLIENTE);
+        return feitas.stream().map(this::toResponse).toList();
+    }
+
+    private boolean podeVerAvaliacoesDaCliente(UUID clienteId, Usuario usuario) {
+        if (clienteId.equals(usuario.getId())) {
+            return true;
+        }
+        return usuario instanceof Empresa
+                && agendamentoRepository.existsByClienteIdAndEmpresaId(clienteId, usuario.getId());
+    }
+
     public Double mediaAvaliacaoEmpresa(UUID empresaId) {
+        exigirEmpresaAtiva(empresaId);
         return avaliacaoRepository.calcularMediaAvaliacaoEmpresa(empresaId);
     }
 
     private AvaliacaoResponse toResponse(Avaliacao a) {
-        return new AvaliacaoResponse(
-                a.getId(),
-                a.getAgendamento().getId(),
-                a.getCliente().getId(),
-                a.getCliente().getNome(),
-                a.getEmpresa().getId(),
-                a.getEmpresa().getNome(),
-                a.getTipoAvaliador(),
-                a.getNota(),
-                a.getComentario(),
-                a.getDataCriacao()
-        );
+        return AvaliacaoResponse.from(a);
+    }
+
+    // Empresa desativada responde como inexistente, igual à vitrine
+    private void exigirEmpresaAtiva(UUID empresaId) {
+        if (!usuarioRepository.existsEmpresaAtivaById(empresaId)) {
+            throw new RecursoNaoEncontradoException("Empresa não encontrada");
+        }
     }
 }

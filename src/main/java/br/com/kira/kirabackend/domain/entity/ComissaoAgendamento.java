@@ -6,6 +6,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import br.com.kira.kirabackend.util.KiraTimeZone;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -44,6 +46,6 @@ public class ComissaoAgendamento {
 
     @PrePersist
     protected void aoPersistir() {
-        this.dataCalculo = LocalDateTime.now();
+        this.dataCalculo = LocalDateTime.now(KiraTimeZone.DEFAULT);
     }
 }

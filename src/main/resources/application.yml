@@ -2,26 +2,36 @@ spring:
   application:
     name: kira-backend
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://127.0.0.1:5433/kira_db}
-    username: ${SPRING_DATASOURCE_USERNAME:kira_user}
-    password: ${SPRING_DATASOURCE_PASSWORD:REMOVIDO}
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      # O Provador envia duas fotos de uma vez; a verificação, até três (frente, verso e selfie), e o app as reduz antes
+      max-request-size: 11MB
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    # Desligado por padrão: no servidor, o SQL de cada requisição enche o log. No local, ligue com MOSTRAR_SQL=true
+    show-sql: ${MOSTRAR_SQL:false}
     open-in-view: false
   mail:
     host: smtp.gmail.com
     port: 587
-    username: ${MAIL_USERNAME:seuemail@gmail.com}
-    password: ${MAIL_PASSWORD:suasenha}
+    # Sem valor padrão: segredo vem só do .env. Vazias, a API sobe e avisa no log que o e-mail está desligado
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
           auth: true
           starttls:
             enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
 
 server:
   port: ${SERVER_PORT:8081}
@@ -38,9 +48,71 @@ management:
 jwt:
   secret: ${JWT_SECRET}
   expiration: 3600000
-  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION}
 
 kira:
+  # Endereço do app web, usado no link do e-mail de recuperação de senha
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  cors:
+    # Endereços do app web que podem chamar a API e abrir o WebSocket, separados por vírgula.
+    # No servidor, coloque o endereço real do front (ex.: https://kira.exemplo.com)
+    origens: ${KIRA_CORS_ORIGENS:http://localhost:8080,http://localhost:3000,http://localhost:5173,http://localhost:4200}
+  arquivos:
+    # Pasta das fotos enviadas. Fora do Git (.gitignore)
+    pasta: ${KIRA_ARQUIVOS_PASTA:./uploads}
+  notificacoes:
+    web:
+      # Sem as chaves no .env, as notificações ficam desligadas e o resto funciona
+      chave-publica: ${VAPID_PUBLIC_KEY:}
+      chave-privada: ${VAPID_PRIVATE_KEY:}
+      assunto: ${VAPID_SUBJECT:}
+  provador:
+    # Muda quando o texto jurídico do consentimento muda: quem aceitou a versão antiga precisa aceitar de novo
+    versao-consentimento: ${PROVADOR_VERSAO_CONSENTIMENTO:v1}
+    tamanho-maximo-bytes: ${PROVADOR_TAMANHO_MAXIMO_BYTES:5242880}
+    # Prévias por pessoa por dia: cada uma consome a cota da Cloudflare
+    limite-diario: ${PROVADOR_LIMITE_DIARIO:5}
+    cloudflare:
+      # Sem as credenciais no .env, o resto da API funciona e a geração responde erro
+      account-id: ${CLOUDFLARE_ACCOUNT_ID:}
+      api-token: ${CLOUDFLARE_API_TOKEN:}
+      modelo: ${CLOUDFLARE_MODELO:@cf/black-forest-labs/flux-2-klein-4b}
+      base-url: ${CLOUDFLARE_BASE_URL:https://api.cloudflare.com/client/v4}
+      timeout-conexao-ms: ${CLOUDFLARE_TIMEOUT_CONEXAO_MS:5000}
+      timeout-leitura-ms: ${CLOUDFLARE_TIMEOUT_LEITURA_MS:90000}
+    compatibilidade:
+      # kira-ai (Python, da Wanessa): ordena os estúdios pela semelhança do portfólio com a referência.
+      # Porta 8001 porque a 8000 é do kira-verify-ai
+      base-url: ${KIRA_AI_URL:http://localhost:8001}
+      timeout-conexao-ms: ${KIRA_AI_TIMEOUT_CONEXAO_MS:2000}
+      # Cada chamada leva cerca de 2 s em CPU; a primeira carrega o modelo e demora mais
+      timeout-leitura-ms: ${KIRA_AI_TIMEOUT_LEITURA_MS:30000}
+  verificacao:
+    # true: cliente sem verificação não agenda, e estúdio sem verificação sai da vitrine e não recebe agendamento
+    obrigatoria: ${VERIFICACAO_OBRIGATORIA:false}
+    # Muda quando o texto do consentimento muda: a versão aceita fica gravada em cada tentativa
+    versao-consentimento: ${VERIFICACAO_VERSAO_CONSENTIMENTO:v1}
+    tamanho-maximo-bytes: ${VERIFICACAO_TAMANHO_MAXIMO_BYTES:5242880}
+    # Envios por pessoa. Tentativa sem resposta do serviço (PENDING) não conta
+    limite-tentativas: ${VERIFICACAO_LIMITE_TENTATIVAS:3}
+    servico:
+      # kira-verify-ai: módulo do kira-ai (POST /verify/identity), no mesmo endereço do KIRA_AI_URL
+      base-url: ${VERIFY_SERVICE_URL:http://localhost:8001}
+      # Opcional: o kira-ai de hoje não pede chave. Se um dia pedir, vai no header X-Service-Key
+      chave: ${VERIFY_SERVICE_KEY:}
+      timeout-conexao-ms: ${VERIFY_TIMEOUT_CONEXAO_MS:3000}
+      # A comparação facial é pesada: ajustar depois das medidas do serviço
+      timeout-leitura-ms: ${VERIFY_TIMEOUT_LEITURA_MS:30000}
+  geocodificacao:
+    # Transforma o endereço em coordenadas pelo Nominatim (OpenStreetMap). Sem chave
+    ativa: ${GEOCODIFICACAO_ATIVA:true}
+    base-url: ${GEOCODIFICACAO_BASE_URL:https://nominatim.openstreetmap.org}
+    # O serviço exige que o sistema se identifique
+    user-agent: ${GEOCODIFICACAO_USER_AGENT:KiraBackend/1.0 (TCC SENAI FATESG)}
+    # O serviço público aceita no máximo uma consulta por segundo
+    intervalo-ms: ${GEOCODIFICACAO_INTERVALO_MS:1100}
+    timeout-conexao-ms: ${GEOCODIFICACAO_TIMEOUT_CONEXAO_MS:2000}
+    timeout-leitura-ms: ${GEOCODIFICACAO_TIMEOUT_LEITURA_MS:3000}
   lembrete:
     antecedencia-horas: ${LEMBRETE_ANTECEDENCIA_HORAS:24}
     cron: ${LEMBRETE_CRON:0 0 * * * *}

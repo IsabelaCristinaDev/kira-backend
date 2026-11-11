@@ -5,16 +5,21 @@ import br.com.kira.kirabackend.domain.entity.Empresa;
 import br.com.kira.kirabackend.domain.entity.RefreshToken;
 import br.com.kira.kirabackend.domain.entity.Servico;
 import br.com.kira.kirabackend.domain.entity.Usuario;
+import br.com.kira.kirabackend.domain.enums.CategoriaServico;
 import br.com.kira.kirabackend.domain.enums.Genero;
 import br.com.kira.kirabackend.domain.enums.TipoEstabelecimento;
 import br.com.kira.kirabackend.dto.request.ClienteRegistroRequest;
 import br.com.kira.kirabackend.dto.request.EmpresaRegistroRequest;
+import br.com.kira.kirabackend.dto.request.EnderecoRequest;
 import br.com.kira.kirabackend.dto.request.LoginRequest;
 import br.com.kira.kirabackend.dto.request.RefreshTokenRequest;
 import br.com.kira.kirabackend.dto.request.ServicoRegistroRequest;
+import br.com.kira.kirabackend.dto.request.TrocaSenhaRequest;
 import br.com.kira.kirabackend.dto.response.LoginResponse;
+import br.com.kira.kirabackend.exception.DocumentoJaCadastradoException;
 import br.com.kira.kirabackend.exception.EmailJaCadastradoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
+import br.com.kira.kirabackend.repository.BuscaEstudioRepository.Coordenadas;
 import br.com.kira.kirabackend.repository.RefreshTokenRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
@@ -33,6 +38,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -40,6 +46,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -55,6 +62,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -91,6 +99,11 @@ class AuthServiceTest {
 
     @Mock
     private EmailService emailService;
+
+    // A regra das coordenadas é a de verdade; só o serviço externo é simulado
+    @Spy
+    private CoordenadasService coordenadasService =
+            new CoordenadasService(e -> Optional.of(new Coordenadas(-16.68, -49.25)));
 
     @InjectMocks
     private AuthService service;
@@ -144,10 +157,10 @@ class AuthServiceTest {
     }
 
     private Servico registrarEmpresaComUmServico(String preco, String duracao) {
-        when(usuarioRepository.existsByEmail("estudio@teste.com")).thenReturn(false);
+        when(usuarioRepository.existsByEmailIgnoreCase("estudio@teste.com")).thenReturn(false);
 
         service.registrarEmpresa(registroEmpresa(null,
-                List.of(new ServicoRegistroRequest("Corte", preco, duracao))));
+                List.of(new ServicoRegistroRequest("Corte", preco, duracao, null))));
 
         ArgumentCaptor<Servico> captor = ArgumentCaptor.forClass(Servico.class);
         verify(servicoRepository).save(captor.capture());
@@ -163,7 +176,7 @@ class AuthServiceTest {
         private LoginResponse logar(Usuario usuario, String tipoEsperado) {
             when(authenticationManager.authenticate(any()))
                     .thenReturn(new UsernamePasswordAuthenticationToken(usuario, null, usuario.getAuthorities()));
-            when(usuarioRepository.findByEmail(usuario.getEmail())).thenReturn(Optional.of(usuario));
+            when(usuarioRepository.findByEmailIgnoreCase(usuario.getEmail())).thenReturn(Optional.of(usuario));
             when(jwtTokenProvider.gerarToken(usuario, tipoEsperado)).thenReturn("jwt-" + tipoEsperado);
 
             return service.login(new LoginRequest(usuario.getEmail(), "senha12345"));
@@ -245,8 +258,10 @@ class AuthServiceTest {
         void refreshInexistente() {
             when(refreshTokenRepository.findByToken("nao-existe")).thenReturn(Optional.empty());
 
+            RefreshTokenRequest req = new RefreshTokenRequest("nao-existe");
+
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.refreshToken(new RefreshTokenRequest("nao-existe")));
+                    () -> service.refreshToken(req));
             verifyNoInteractions(jwtTokenProvider);
         }
 
@@ -256,8 +271,26 @@ class AuthServiceTest {
             when(refreshTokenRepository.findByToken("refresh-antigo"))
                     .thenReturn(Optional.of(refreshToken(cliente(), agora().minusMinutes(1), false)));
 
+            RefreshTokenRequest req = new RefreshTokenRequest("refresh-antigo");
+
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.refreshToken(new RefreshTokenRequest("refresh-antigo")));
+                    () -> service.refreshToken(req));
+            verifyNoInteractions(jwtTokenProvider);
+            verify(refreshTokenRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Refresh de conta desativada dá erro e não gera token novo")
+        void refreshDeContaDesativada() {
+            Cliente cliente = cliente();
+            cliente.setAtivo(false);
+            when(refreshTokenRepository.findByToken("refresh-antigo"))
+                    .thenReturn(Optional.of(refreshToken(cliente, agora().plusDays(1), false)));
+
+            RefreshTokenRequest req = new RefreshTokenRequest("refresh-antigo");
+
+            assertThrows(RegraDeNegocioException.class,
+                    () -> service.refreshToken(req));
             verifyNoInteractions(jwtTokenProvider);
             verify(refreshTokenRepository, never()).save(any());
         }
@@ -268,8 +301,10 @@ class AuthServiceTest {
             when(refreshTokenRepository.findByToken("refresh-antigo"))
                     .thenReturn(Optional.of(refreshToken(cliente(), agora().plusDays(1), true)));
 
+            RefreshTokenRequest req = new RefreshTokenRequest("refresh-antigo");
+
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.refreshToken(new RefreshTokenRequest("refresh-antigo")));
+                    () -> service.refreshToken(req));
             verifyNoInteractions(jwtTokenProvider);
             verify(refreshTokenRepository, never()).save(any());
         }
@@ -312,10 +347,12 @@ class AuthServiceTest {
         @Test
         @DisplayName("Cadastro de cliente com e-mail repetido dá erro de e-mail já cadastrado")
         void clienteEmailRepetido() {
-            when(usuarioRepository.existsByEmail("ana@teste.com")).thenReturn(true);
+            when(usuarioRepository.existsByEmailIgnoreCase("ana@teste.com")).thenReturn(true);
+
+            ClienteRegistroRequest req = registroCliente();
 
             EmailJaCadastradoException ex = assertThrows(EmailJaCadastradoException.class,
-                    () -> service.registrarCliente(registroCliente()));
+                    () -> service.registrarCliente(req));
             assertEquals("Email já cadastrado", ex.getMessage());
             verify(usuarioRepository, never()).save(any());
             verifyNoInteractions(emailService);
@@ -324,10 +361,12 @@ class AuthServiceTest {
         @Test
         @DisplayName("Cadastro de empresa com e-mail repetido dá erro de e-mail já cadastrado")
         void empresaEmailRepetido() {
-            when(usuarioRepository.existsByEmail("estudio@teste.com")).thenReturn(true);
+            when(usuarioRepository.existsByEmailIgnoreCase("estudio@teste.com")).thenReturn(true);
+
+            EmpresaRegistroRequest req = registroEmpresa(null, null);
 
             assertThrows(EmailJaCadastradoException.class,
-                    () -> service.registrarEmpresa(registroEmpresa(null, null)));
+                    () -> service.registrarEmpresa(req));
             verify(usuarioRepository, never()).save(any());
             verifyNoInteractions(servicoRepository, emailService);
         }
@@ -335,7 +374,7 @@ class AuthServiceTest {
         @Test
         @DisplayName("Cadastro de cliente salva a senha criptografada, nunca em texto puro")
         void clienteSenhaCriptografada() {
-            when(usuarioRepository.existsByEmail("ana@teste.com")).thenReturn(false);
+            when(usuarioRepository.existsByEmailIgnoreCase("ana@teste.com")).thenReturn(false);
             when(passwordEncoder.encode("senha12345")).thenReturn("$2a$10$hash");
 
             service.registrarCliente(registroCliente());
@@ -351,7 +390,7 @@ class AuthServiceTest {
         @Test
         @DisplayName("Cadastro de empresa salva a senha criptografada, nunca em texto puro")
         void empresaSenhaCriptografada() {
-            when(usuarioRepository.existsByEmail("estudio@teste.com")).thenReturn(false);
+            when(usuarioRepository.existsByEmailIgnoreCase("estudio@teste.com")).thenReturn(false);
             when(passwordEncoder.encode("senha12345")).thenReturn("$2a$10$hash");
 
             service.registrarEmpresa(registroEmpresa(null, null));
@@ -365,7 +404,7 @@ class AuthServiceTest {
         @Test
         @DisplayName("Especialidades são juntas com \", \"")
         void especialidadesJuntasComVirgula() {
-            when(usuarioRepository.existsByEmail("estudio@teste.com")).thenReturn(false);
+            when(usuarioRepository.existsByEmailIgnoreCase("estudio@teste.com")).thenReturn(false);
 
             service.registrarEmpresa(registroEmpresa(List.of("Cílios", "Sobrancelha", "Unhas"), null));
 
@@ -377,7 +416,7 @@ class AuthServiceTest {
         @Test
         @DisplayName("Lista de especialidades vazia não grava nada")
         void especialidadesVazias() {
-            when(usuarioRepository.existsByEmail("estudio@teste.com")).thenReturn(false);
+            when(usuarioRepository.existsByEmailIgnoreCase("estudio@teste.com")).thenReturn(false);
 
             service.registrarEmpresa(registroEmpresa(List.of(), null));
 
@@ -389,11 +428,11 @@ class AuthServiceTest {
         @Test
         @DisplayName("Cadastro de empresa cria os serviços ligados à empresa")
         void empresaCriaServicos() {
-            when(usuarioRepository.existsByEmail("estudio@teste.com")).thenReturn(false);
+            when(usuarioRepository.existsByEmailIgnoreCase("estudio@teste.com")).thenReturn(false);
 
             service.registrarEmpresa(registroEmpresa(null, List.of(
-                    new ServicoRegistroRequest("Corte", "R$ 50", "45 min"),
-                    new ServicoRegistroRequest("Escova", "80,00", "1h"))));
+                    new ServicoRegistroRequest("Corte", "R$ 50", "45 min", null),
+                    new ServicoRegistroRequest("Escova", "80,00", "1h", CategoriaServico.ESTETICA))));
 
             ArgumentCaptor<Usuario> empresaCaptor = ArgumentCaptor.forClass(Usuario.class);
             verify(usuarioRepository).save(empresaCaptor.capture());
@@ -405,17 +444,91 @@ class AuthServiceTest {
 
             assertEquals(List.of("Corte", "Escova"), servicos.stream().map(Servico::getNome).toList());
             assertTrue(servicos.stream().allMatch(s -> s.getEmpresa() == empresa));
+            // Sem categoria, deduz pelo nome; com categoria, usa a escolhida
+            assertEquals(List.of(CategoriaServico.CABELO, CategoriaServico.ESTETICA),
+                    servicos.stream().map(Servico::getCategoria).toList());
         }
 
         @Test
         @DisplayName("Cadastro de empresa sem serviços não salva nenhum serviço")
         void empresaSemServicos() {
-            when(usuarioRepository.existsByEmail("estudio@teste.com")).thenReturn(false);
+            when(usuarioRepository.existsByEmailIgnoreCase("estudio@teste.com")).thenReturn(false);
 
             service.registrarEmpresa(registroEmpresa(null, null));
 
             verifyNoInteractions(servicoRepository);
             verify(emailService).enviarEmailBoasVindas(eq("estudio@teste.com"), anyString());
+        }
+
+        @Test
+        @DisplayName("E-mail é salvo em minúsculas e sem espaços, e a checagem de repetido usa esse valor")
+        void emailNormalizado() {
+            service.registrarCliente(new ClienteRegistroRequest("Ana", "  Ana@Teste.COM ", "senha12345",
+                    "11999999999", "123.456.789-00", LocalDate.of(1995, 5, 10), Genero.FEMININO,
+                    null, null, null));
+
+            verify(usuarioRepository).existsByEmailIgnoreCase("ana@teste.com");
+            ArgumentCaptor<Usuario> captor = ArgumentCaptor.forClass(Usuario.class);
+            verify(usuarioRepository).save(captor.capture());
+            assertEquals("ana@teste.com", captor.getValue().getEmail());
+        }
+
+        @Test
+        @DisplayName("Cadastro de cliente com CPF repetido dá erro de CPF já cadastrado")
+        void clienteCpfRepetido() {
+            when(usuarioRepository.existsClienteByCpf("123.456.789-00")).thenReturn(true);
+            ClienteRegistroRequest request = registroCliente();
+
+            DocumentoJaCadastradoException ex = assertThrows(DocumentoJaCadastradoException.class,
+                    () -> service.registrarCliente(request));
+            assertEquals("CPF já cadastrado", ex.getMessage());
+            verify(usuarioRepository, never()).save(any());
+            verifyNoInteractions(emailService);
+        }
+
+        @Test
+        @DisplayName("Cadastro de empresa com CNPJ repetido dá erro de CNPJ já cadastrado")
+        void empresaCnpjRepetido() {
+            when(usuarioRepository.existsEmpresaByCnpj("12.345.678/0001-90")).thenReturn(true);
+            EmpresaRegistroRequest request = registroEmpresa(null, null);
+
+            DocumentoJaCadastradoException ex = assertThrows(DocumentoJaCadastradoException.class,
+                    () -> service.registrarEmpresa(request));
+            assertEquals("CNPJ já cadastrado", ex.getMessage());
+            verify(usuarioRepository, never()).save(any());
+            verifyNoInteractions(servicoRepository, emailService);
+        }
+
+        @Test
+        @DisplayName("Cadastro de empresa com CPF repetido dá erro de CPF já cadastrado")
+        void empresaCpfRepetido() {
+            when(usuarioRepository.existsEmpresaByCpf("123.456.789-00")).thenReturn(true);
+            EmpresaRegistroRequest request = new EmpresaRegistroRequest("Estúdio Kira", "estudio@teste.com",
+                    "senha12345", "11988888888", null, "123.456.789-00", null, null, null, null,
+                    null, null, null, TipoEstabelecimento.AUTONOMA);
+
+            DocumentoJaCadastradoException ex = assertThrows(DocumentoJaCadastradoException.class,
+                    () -> service.registrarEmpresa(request));
+            assertEquals("CPF já cadastrado", ex.getMessage());
+            verify(usuarioRepository, never()).save(any());
+        }
+
+        @ParameterizedTest
+        @NullAndEmptySource
+        @ValueSource(strings = {"   "})
+        @DisplayName("CNPJ e CPF vazios da empresa viram null e não são checados")
+        void empresaDocumentosVaziosViramNulo(String vazio) {
+            service.registrarEmpresa(new EmpresaRegistroRequest("Estúdio Kira", "estudio@teste.com",
+                    "senha12345", "11988888888", vazio, vazio, null, null, null, null,
+                    null, null, null, TipoEstabelecimento.ESTABELECIMENTO));
+
+            verify(usuarioRepository, never()).existsEmpresaByCnpj(any());
+            verify(usuarioRepository, never()).existsEmpresaByCpf(any());
+            ArgumentCaptor<Usuario> captor = ArgumentCaptor.forClass(Usuario.class);
+            verify(usuarioRepository).save(captor.capture());
+            Empresa salva = (Empresa) captor.getValue();
+            assertNull(salva.getCnpj());
+            assertNull(salva.getCpf());
         }
     }
 
@@ -462,6 +575,8 @@ class AuthServiceTest {
                 "'1h30',        90",
                 "'1h 30min',    90",
                 "'1 h 15 min',  75",
+                "'1h 30 minutos', 90",
+                "'2 horas 30 minutos', 150",
                 "'2 horas',     120",
                 "'2H',          120"
         })
@@ -474,12 +589,145 @@ class AuthServiceTest {
 
         @ParameterizedTest(name = "\"{0}\" = 0 min")
         @NullAndEmptySource
-        @ValueSource(strings = {"a combinar"})
-        @DisplayName("Duração vazia, nula ou sem número vira zero")
-        void duracaoVaziaViraZero(String bruto) {
+        @ValueSource(strings = {"a combinar", "99999999999", "99999999999h", "40000000h", "1h99999999999"})
+        @DisplayName("Duração vazia, nula, sem número ou grande demais vira zero em vez de estourar")
+        void duracaoInvalidaViraZero(String bruto) {
             Servico servico = registrarEmpresaComUmServico("50", bruto);
 
             assertEquals(0, servico.getDuracaoMinutos());
+        }
+
+        @Test
+        @DisplayName("Duração gigante é processada rápido (sem backtracking na regex)")
+        void duracaoGiganteNaoTravaARegex() {
+            String bruto = "1".repeat(100_000);
+
+            Servico servico = assertTimeoutPreemptively(Duration.ofSeconds(1),
+                    () -> registrarEmpresaComUmServico("50", bruto));
+            assertEquals(0, servico.getDuracaoMinutos());
+        }
+    }
+
+    @Nested
+    @DisplayName("Coordenadas no cadastro")
+    class CoordenadasNoCadastro {
+
+        private final EnderecoRequest endereco =
+                new EnderecoRequest("74000000", "Avenida Goiás", "10", null, "Centro", "Goiânia", "GO");
+
+        @Test
+        @DisplayName("Cliente sem GPS recebe as coordenadas do endereço")
+        void clienteSemGps() {
+            service.registrarCliente(new ClienteRegistroRequest("Ana", "ana@teste.com", "senha12345", "11999999999",
+                    "123.456.789-00", LocalDate.of(1995, 5, 10), Genero.FEMININO, endereco, null, null));
+
+            ArgumentCaptor<Cliente> captor = ArgumentCaptor.forClass(Cliente.class);
+            verify(usuarioRepository).save(captor.capture());
+            assertEquals(-16.68, captor.getValue().getLatitude());
+            assertEquals(-49.25, captor.getValue().getLongitude());
+        }
+
+        @Test
+        @DisplayName("Cliente com GPS mantém o GPS")
+        void clienteComGps() {
+            service.registrarCliente(new ClienteRegistroRequest("Ana", "ana@teste.com", "senha12345", "11999999999",
+                    "123.456.789-00", LocalDate.of(1995, 5, 10), Genero.FEMININO, endereco, -1.0, -2.0));
+
+            ArgumentCaptor<Cliente> captor = ArgumentCaptor.forClass(Cliente.class);
+            verify(usuarioRepository).save(captor.capture());
+            assertEquals(-1.0, captor.getValue().getLatitude());
+            assertEquals(-2.0, captor.getValue().getLongitude());
+        }
+
+        @Test
+        @DisplayName("Estúdio recebe as coordenadas do endereço, mesmo enviando as do celular")
+        void estudio() {
+            service.registrarEmpresa(new EmpresaRegistroRequest("Estúdio Kira", "estudio@teste.com", "senha12345",
+                    "11988888888", "12.345.678/0001-90", null, "Estúdio de beleza", null, endereco, -1.0, -2.0,
+                    null, null, TipoEstabelecimento.ESTABELECIMENTO));
+
+            ArgumentCaptor<Empresa> captor = ArgumentCaptor.forClass(Empresa.class);
+            verify(usuarioRepository).save(captor.capture());
+            assertEquals(-16.68, captor.getValue().getLatitude());
+            assertEquals(-49.25, captor.getValue().getLongitude());
+        }
+    }
+
+    @Nested
+    @DisplayName("trocarSenha")
+    class TrocarSenha {
+
+        @Test
+        @DisplayName("Com a senha atual certa, grava a nova, derruba as outras sessões e devolve tokens novos")
+        void trocaComSenhaCerta() {
+            Cliente cliente = cliente();
+            cliente.setSenhaHash("hash-atual");
+            when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
+            when(passwordEncoder.matches("Atual1234", "hash-atual")).thenReturn(true);
+            when(passwordEncoder.matches("Nova12345", "hash-atual")).thenReturn(false);
+            when(passwordEncoder.encode("Nova12345")).thenReturn("hash-novo");
+            when(jwtTokenProvider.gerarToken(cliente, "CLIENTE")).thenReturn("jwt-novo");
+
+            LoginResponse response = service.trocarSenha(cliente, new TrocaSenhaRequest("Atual1234", "Nova12345"));
+
+            assertEquals("hash-novo", cliente.getSenhaHash());
+            verify(usuarioRepository).save(cliente);
+            InOrder ordem = inOrder(refreshTokenRepository);
+            ordem.verify(refreshTokenRepository).deleteByUsuarioId(cliente.getId());
+            ordem.verify(refreshTokenRepository).save(any(RefreshToken.class));
+            assertEquals("jwt-novo", response.token());
+            assertNotNull(response.refreshToken());
+            assertEquals("CLIENTE", response.tipo());
+            assertEquals(cliente.getId(), response.id());
+        }
+
+        @Test
+        @DisplayName("Empresa também troca a senha e recebe o tipo EMPRESA")
+        void empresaTroca() {
+            Empresa empresa = empresa();
+            empresa.setSenhaHash("hash-atual");
+            when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+            when(passwordEncoder.matches("Atual1234", "hash-atual")).thenReturn(true);
+            when(passwordEncoder.matches("Nova12345", "hash-atual")).thenReturn(false);
+            when(passwordEncoder.encode("Nova12345")).thenReturn("hash-novo");
+            when(jwtTokenProvider.gerarToken(empresa, "EMPRESA")).thenReturn("jwt-novo");
+
+            LoginResponse response = service.trocarSenha(empresa, new TrocaSenhaRequest("Atual1234", "Nova12345"));
+
+            assertEquals("EMPRESA", response.tipo());
+            assertEquals("hash-novo", empresa.getSenhaHash());
+        }
+
+        @Test
+        @DisplayName("Senha atual errada dá erro e não muda nada")
+        void senhaAtualErrada() {
+            Cliente cliente = cliente();
+            cliente.setSenhaHash("hash-atual");
+            when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
+            when(passwordEncoder.matches("Errada123", "hash-atual")).thenReturn(false);
+            TrocaSenhaRequest request = new TrocaSenhaRequest("Errada123", "Nova12345");
+
+            RegraDeNegocioException erro = assertThrows(RegraDeNegocioException.class,
+                    () -> service.trocarSenha(cliente, request));
+
+            assertEquals("Senha atual incorreta", erro.getMessage());
+            assertEquals("hash-atual", cliente.getSenhaHash());
+            verify(usuarioRepository, never()).save(any());
+            verifyNoInteractions(refreshTokenRepository);
+        }
+
+        @Test
+        @DisplayName("Nova senha igual à atual dá erro")
+        void novaIgualAtual() {
+            Cliente cliente = cliente();
+            cliente.setSenhaHash("hash-atual");
+            when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
+            when(passwordEncoder.matches("Atual1234", "hash-atual")).thenReturn(true);
+            TrocaSenhaRequest request = new TrocaSenhaRequest("Atual1234", "Atual1234");
+
+            assertThrows(RegraDeNegocioException.class, () -> service.trocarSenha(cliente, request));
+            verify(usuarioRepository, never()).save(any());
+            verifyNoInteractions(refreshTokenRepository);
         }
     }
 }

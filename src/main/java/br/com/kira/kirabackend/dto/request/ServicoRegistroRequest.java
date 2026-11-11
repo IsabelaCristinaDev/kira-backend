@@ -1,5 +1,7 @@
 package br.com.kira.kirabackend.dto.request;
 
+import br.com.kira.kirabackend.domain.enums.CategoriaServico;
+
 import jakarta.validation.constraints.NotBlank;
 
 public record ServicoRegistroRequest(
@@ -10,5 +12,7 @@ public record ServicoRegistroRequest(
         String preco,
 
         @NotBlank(message = "Duração do serviço é obrigatória")
-        String duracao
+        String duracao,
+        // Opcional: sem ela, a categoria é deduzida pelo nome
+        CategoriaServico categoria
 ) {}

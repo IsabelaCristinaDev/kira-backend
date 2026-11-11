@@ -5,7 +5,7 @@ import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.domain.enums.TipoEstabelecimento;
 import br.com.kira.kirabackend.dto.response.EnderecoResponse;
 import br.com.kira.kirabackend.dto.response.EstudioResponse;
-import br.com.kira.kirabackend.dto.response.FuncionariaResponse;
+import br.com.kira.kirabackend.dto.response.FuncionariaPublicaResponse;
 import br.com.kira.kirabackend.dto.response.ServicoResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.repository.AvaliacaoRepository;
@@ -18,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
 @RequiredArgsConstructor
 @Service
 @Transactional
@@ -27,20 +29,16 @@ public class EstudioService {
     private final AvaliacaoRepository avaliacaoRepository;
     private final FuncionariaRepository funcionariaRepository;
     private final ServicoRepository servicoRepository;
+    private final ExigenciaVerificacao exigenciaVerificacao;
 
     public List<EstudioResponse> listarTodos() {
-        return usuarioRepository.findAll()
-                .stream()
-                .filter(Empresa.class::isInstance)
-                .map(u -> toResponse((Empresa) u))
+        return empresasAtivas()
+                .map(this::toResponse)
                 .toList();
     }
 
     public List<EstudioResponse> buscarPorNome(String nome) {
-        return usuarioRepository.findAll()
-                .stream()
-                .filter(Empresa.class::isInstance)
-                .map(u -> (Empresa) u)
+        return empresasAtivas()
                 .filter(e -> e.getNome().toLowerCase()
                         .contains(nome.toLowerCase()))
                 .map(this::toResponse)
@@ -51,29 +49,23 @@ public class EstudioService {
         Usuario usuario = usuarioRepository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Estúdio não encontrado"));
 
-        if (!(usuario instanceof Empresa)) {
+        // Empresa desativada responde como inexistente, para não aparecer na vitrine
+        if (!(usuario instanceof Empresa empresa) || !empresa.isEnabled()) {
             throw new RecursoNaoEncontradoException("Estúdio não encontrado");
         }
 
-        Empresa empresa = (Empresa) usuario;
         return toResponse(empresa);
     }
 
     public List<EstudioResponse> buscarPorTipo(TipoEstabelecimento tipo) {
-        return usuarioRepository.findAll()
-                .stream()
-                .filter(Empresa.class::isInstance)
-                .map(u -> (Empresa) u)
+        return empresasAtivas()
                 .filter(e -> e.getTipoEstabelecimento() == tipo)
                 .map(this::toResponse)
                 .toList();
     }
 
     public List<EstudioResponse> buscarPorCidade(String cidade) {
-        return usuarioRepository.findAll()
-                .stream()
-                .filter(Empresa.class::isInstance)
-                .map(u -> (Empresa) u)
+        return empresasAtivas()
                 .filter(e -> e.getEndereco() != null
                         && e.getEndereco().getCidade() != null
                         && e.getEndereco().getCidade().toLowerCase()
@@ -82,33 +74,35 @@ public class EstudioService {
                 .toList();
     }
 
-    public List<FuncionariaResponse> listarFuncionarias(UUID empresaId) {
+    public List<FuncionariaPublicaResponse> listarFuncionarias(UUID empresaId) {
+        exigirEmpresaAtiva(empresaId);
         return funcionariaRepository.findByEmpresaIdAndAtivoTrue(empresaId)
                 .stream()
-                .map(f -> new FuncionariaResponse(
-                        f.getId(),
-                        f.getNome(),
-                        f.getFotoUrl(),
-                        f.getEspecialidades(),
-                        f.getAtivo(),
-                        f.getComissaoPercentual()))
+                .map(FuncionariaPublicaResponse::from)
                 .toList();
     }
 
     public List<ServicoResponse> listarServicos(UUID empresaId) {
+        exigirEmpresaAtiva(empresaId);
         return servicoRepository.findByEmpresaIdAndAtivoTrue(empresaId)
                 .stream()
-                .map(s -> new ServicoResponse(
-                        s.getId(),
-                        s.getNome(),
-                        s.getDescricao(),
-                        s.getDuracaoMinutos(),
-                        s.getPreco(),
-                        s.getAtivo()))
+                .map(ServicoResponse::from)
                 .toList();
     }
 
-    private EstudioResponse toResponse(Empresa empresa) {
+    // Com a verificação obrigatória, estúdio sem verificação fica fora da vitrine. O perfil (buscarPorId) continua
+    // abrindo, para favoritas e histórico, mas o agendamento é recusado
+    private Stream<Empresa> empresasAtivas() {
+        Predicate<UUID> naVitrine = exigenciaVerificacao.naVitrine();
+        return usuarioRepository.findAll()
+                .stream()
+                .filter(Empresa.class::isInstance)
+                .map(Empresa.class::cast)
+                .filter(Empresa::isEnabled)
+                .filter(empresa -> naVitrine.test(empresa.getId()));
+    }
+
+    EstudioResponse toResponse(Empresa empresa) {
         Double media = avaliacaoRepository
                 .calcularMediaAvaliacaoEmpresa(empresa.getId());
         return new EstudioResponse(
@@ -119,6 +113,16 @@ public class EstudioService {
                 empresa.getTelefone(),
                 empresa.getFotoUrl(),
                 empresa.getTipoEstabelecimento(),
-                media
+                media,
+                empresa.getLatitude(),
+                empresa.getLongitude()
         );
-    }}
+    }
+
+    // Empresa desativada responde como inexistente, igual à vitrine
+    private void exigirEmpresaAtiva(UUID empresaId) {
+        if (!usuarioRepository.existsEmpresaAtivaById(empresaId)) {
+            throw new RecursoNaoEncontradoException("Estúdio não encontrado");
+        }
+    }
+}

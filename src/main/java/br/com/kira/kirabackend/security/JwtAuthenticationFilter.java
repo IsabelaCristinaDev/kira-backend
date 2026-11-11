@@ -9,6 +9,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -36,9 +37,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         if (token != null && jwtTokenProvider.tokenValido(token)) {
             var email = jwtTokenProvider.extrairEmail(token);
-            UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-            // Perfil suspenso (ativo = false) perde o acesso na hora, sem esperar o token expirar.
-            if (!userDetails.isEnabled()) {
+            UserDetails userDetails = buscarConta(email);
+            // Conta desativada, suspensa preventivamente (ativo = false) ou excluída depois do login:
+            // o token ainda é válido, mas perde o acesso na hora, sem esperar expirar
+            if (userDetails == null || !userDetails.isEnabled()) {
                 filterChain.doFilter(request, response);
                 return;
             }
@@ -48,6 +50,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    // A conta excluída troca o e-mail, então o token antigo aponta para um e-mail que não existe mais
+    private UserDetails buscarConta(String email) {
+        try {
+            return userDetailsService.loadUserByUsername(email);
+        } catch (UsernameNotFoundException e) {
+            return null;
+        }
     }
 
     private String recuperarToken(HttpServletRequest request) {

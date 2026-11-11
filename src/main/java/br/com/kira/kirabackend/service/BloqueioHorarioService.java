@@ -53,8 +53,10 @@ public class BloqueioHorarioService {
                 .toList();
     }
 
-    public void remover(UUID id) {
+    public void remover(UUID funcionariaId, UUID id) {
+        // Bloqueio de outra funcionária é tratado como inexistente nesta rota
         bloqueioHorarioRepository.findById(id)
+                .filter(b -> funcionariaId.equals(b.getFuncionaria().getId()))
                 .orElseThrow(() -> new RecursoNaoEncontradoException("Bloqueio não encontrado"));
         bloqueioHorarioRepository.deleteById(id);
     }

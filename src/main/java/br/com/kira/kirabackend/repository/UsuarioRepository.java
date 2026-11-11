@@ -2,16 +2,34 @@ package br.com.kira.kirabackend.repository;
 
 import br.com.kira.kirabackend.domain.entity.Usuario;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Repository
 
 public interface UsuarioRepository extends JpaRepository<Usuario, UUID> {
 
-    Optional<Usuario> findByEmail(String email);
+    Optional<Usuario> findByEmailIgnoreCase(String email);
 
-    boolean existsByEmail(String email);
+    boolean existsByEmailIgnoreCase(String email);
+
+    @Query("select count(c) > 0 from Cliente c where c.cpf = :cpf")
+    boolean existsClienteByCpf(String cpf);
+
+    @Query("select count(e) > 0 from Empresa e where e.cpf = :cpf")
+    boolean existsEmpresaByCpf(String cpf);
+
+    @Query("select count(e) > 0 from Empresa e where e.cnpj = :cnpj")
+    boolean existsEmpresaByCnpj(String cnpj);
+
+    @Query("select count(e) > 0 from Empresa e where e.id = :id and e.ativo = true")
+    boolean existsEmpresaAtivaById(UUID id);
+
+    @Query("select u.id from Usuario u where u.id in :ids and u.ativo = true")
+    Set<UUID> findIdsAtivos(Collection<UUID> ids);
 }

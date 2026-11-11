@@ -40,6 +40,12 @@ public class AvaliacaoController {
                 .body(avaliacaoService.avaliarComoEmpresa(usuario.getId(), request));
     }
 
+    @GetMapping("/minhas")
+    public ResponseEntity<List<AvaliacaoResponse>> listarMinhasAvaliacoes(
+            @AuthenticationPrincipal Usuario usuario) {
+        return ResponseEntity.ok(avaliacaoService.listarMinhasAvaliacoes(usuario));
+    }
+
     @GetMapping("/empresa/{empresaId}")
     public ResponseEntity<List<AvaliacaoResponse>> listarAvaliacoesEmpresa(
             @PathVariable UUID empresaId) {
@@ -48,8 +54,9 @@ public class AvaliacaoController {
 
     @GetMapping("/cliente/{clienteId}")
     public ResponseEntity<List<AvaliacaoResponse>> listarAvaliacoesCliente(
+            @AuthenticationPrincipal Usuario usuario,
             @PathVariable UUID clienteId) {
-        return ResponseEntity.ok(avaliacaoService.listarAvaliacoesCliente(clienteId));
+        return ResponseEntity.ok(avaliacaoService.listarAvaliacoesCliente(clienteId, usuario));
     }
 
     @GetMapping("/empresa/{empresaId}/media")

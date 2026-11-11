@@ -1,5 +1,7 @@
 package br.com.kira.kirabackend.dto.request;
 
+import br.com.kira.kirabackend.domain.enums.CategoriaServico;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -19,5 +21,7 @@ public record ServicoRequest(
 
         @NotNull(message = "Preço é obrigatório")
         @Positive(message = "Preço deve ser maior que zero")
-        BigDecimal preco
+        BigDecimal preco,
+        // Opcional: sem ela, a categoria é deduzida pelo nome
+        CategoriaServico categoria
 ) {}

@@ -5,14 +5,18 @@ import br.com.kira.kirabackend.domain.entity.Empresa;
 import br.com.kira.kirabackend.domain.entity.Endereco;
 import br.com.kira.kirabackend.domain.entity.RefreshToken;
 import br.com.kira.kirabackend.domain.entity.Servico;
+import br.com.kira.kirabackend.domain.enums.CategoriaServico;
 import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.dto.request.ClienteRegistroRequest;
 import br.com.kira.kirabackend.dto.request.EmpresaRegistroRequest;
 import br.com.kira.kirabackend.dto.request.LoginRequest;
 import br.com.kira.kirabackend.dto.request.RefreshTokenRequest;
 import br.com.kira.kirabackend.dto.request.ServicoRegistroRequest;
+import br.com.kira.kirabackend.dto.request.TrocaSenhaRequest;
 import br.com.kira.kirabackend.dto.response.LoginResponse;
+import br.com.kira.kirabackend.exception.DocumentoJaCadastradoException;
 import br.com.kira.kirabackend.exception.EmailJaCadastradoException;
+import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.RefreshTokenRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
@@ -32,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -41,6 +46,7 @@ import java.util.regex.Pattern;
 public class AuthService {
 
     private final UsuarioRepository usuarioRepository;
+    private final CoordenadasService coordenadasService;
     private final ServicoRepository servicoRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
@@ -58,7 +64,7 @@ public class AuthService {
                 data.email(), data.senha());
         var auth = authenticationManager.authenticate(usernamePassword);
 
-        var usuario = usuarioRepository.findByEmail(data.email())
+        var usuario = usuarioRepository.findByEmailIgnoreCase(data.email())
                 .orElseThrow();
 
         String tipoUsuario = usuario.getClass().getSimpleName().toUpperCase();
@@ -66,7 +72,7 @@ public class AuthService {
                 (UserDetails) auth.getPrincipal(), tipoUsuario);
         var refreshToken = gerarERegistrarRefreshToken(usuario);
 
-        return new LoginResponse(token, refreshToken, tipoUsuario, usuario.getNome(), usuario.getEmail());
+        return new LoginResponse(token, refreshToken, tipoUsuario, usuario.getNome(), usuario.getEmail(), usuario.getId());
     }
 
     @Transactional
@@ -79,11 +85,15 @@ public class AuthService {
         }
 
         Usuario usuario = refreshTokenEntity.getUsuario();
+        if (!usuario.isEnabled()) {
+            throw new RegraDeNegocioException("Conta desativada");
+        }
+
         String tipoUsuario = Hibernate.getClass(usuario).getSimpleName().toUpperCase();
         var novoToken = jwtTokenProvider.gerarToken(usuario, tipoUsuario);
         var novoRefreshToken = gerarERegistrarRefreshToken(usuario);
 
-        return new LoginResponse(novoToken, novoRefreshToken, tipoUsuario, usuario.getNome(), usuario.getEmail());
+        return new LoginResponse(novoToken, novoRefreshToken, tipoUsuario, usuario.getNome(), usuario.getEmail(), usuario.getId());
     }
 
     @Transactional
@@ -93,6 +103,33 @@ public class AuthService {
                     refreshTokenEntity.setRevogado(true);
                     refreshTokenRepository.save(refreshTokenEntity);
                 });
+    }
+
+    /**
+     * Troca a senha da conta logada. Confere a senha atual, grava a nova e apaga os refresh tokens
+     * da conta, para as outras sessões não renovarem mais. Quem trocou recebe uma sessão nova.
+     */
+    @Transactional
+    public LoginResponse trocarSenha(Usuario logado, TrocaSenhaRequest data) {
+        Usuario usuario = usuarioRepository.findById(logado.getId())
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Usuário não encontrado"));
+
+        if (!passwordEncoder.matches(data.senhaAtual(), usuario.getSenhaHash())) {
+            throw new RegraDeNegocioException("Senha atual incorreta");
+        }
+        if (passwordEncoder.matches(data.novaSenha(), usuario.getSenhaHash())) {
+            throw new RegraDeNegocioException("A nova senha deve ser diferente da atual");
+        }
+
+        usuario.setSenhaHash(passwordEncoder.encode(data.novaSenha()));
+        usuarioRepository.save(usuario);
+
+        String tipoUsuario = Hibernate.getClass(usuario).getSimpleName().toUpperCase();
+        var token = jwtTokenProvider.gerarToken(usuario, tipoUsuario);
+        // Apaga todos os refresh tokens da conta antes de criar o desta sessão
+        var refreshToken = gerarERegistrarRefreshToken(usuario);
+
+        return new LoginResponse(token, refreshToken, tipoUsuario, usuario.getNome(), usuario.getEmail(), usuario.getId());
     }
 
     private String gerarERegistrarRefreshToken(Usuario usuario) {
@@ -112,33 +149,28 @@ public class AuthService {
     }
 
     public void registrarCliente(ClienteRegistroRequest data) {
-        if (usuarioRepository.existsByEmail(data.email())) {
+        String email = normalizarEmail(data.email());
+        if (usuarioRepository.existsByEmailIgnoreCase(email)) {
             throw new EmailJaCadastradoException();
+        }
+        if (usuarioRepository.existsClienteByCpf(data.cpf())) {
+            throw new DocumentoJaCadastradoException("CPF já cadastrado");
         }
 
         Cliente cliente = new Cliente();
         cliente.setNome(data.nome());
-        cliente.setEmail(data.email());
+        cliente.setEmail(email);
         cliente.setSenhaHash(passwordEncoder.encode(data.senha()));
         cliente.setTelefone(data.telefone());
         cliente.setCpf(data.cpf());
         cliente.setDataNascimento(data.dataNascimento());
         cliente.setGenero(data.genero());
-        cliente.setLatitude(data.latitude());
-        cliente.setLongitude(data.longitude());
 
         if (data.endereco() != null) {
-            Endereco endereco = new Endereco();
-            endereco.setCep(data.endereco().cep());
-            endereco.setLogradouro(data.endereco().logradouro());
-            endereco.setNumero(data.endereco().numero());
-            endereco.setComplemento(data.endereco().complemento());
-            endereco.setBairro(data.endereco().bairro());
-            endereco.setCidade(data.endereco().cidade());
-            endereco.setEstado(data.endereco().estado());
-            cliente.setEndereco(endereco);
+            cliente.setEndereco(data.endereco().paraEndereco());
 
         }
+        coordenadasService.atualizarCliente(cliente, cliente.getEndereco(), data.latitude(), data.longitude());
         usuarioRepository.save(cliente);
         emailService.enviarEmailBoasVindas(cliente.getEmail(), cliente.getNome());
 
@@ -146,38 +178,39 @@ public class AuthService {
 
     @Transactional
     public void registrarEmpresa(EmpresaRegistroRequest data) {
-        if (usuarioRepository.existsByEmail(data.email())) {
+        String email = normalizarEmail(data.email());
+        // CNPJ e CPF são opcionais; texto vazio vira null para não colidir na restrição unique do banco
+        String cnpj = vazioParaNulo(data.cnpj());
+        String cpf = vazioParaNulo(data.cpf());
+
+        if (usuarioRepository.existsByEmailIgnoreCase(email)) {
             throw new EmailJaCadastradoException();
+        }
+        if (cnpj != null && usuarioRepository.existsEmpresaByCnpj(cnpj)) {
+            throw new DocumentoJaCadastradoException("CNPJ já cadastrado");
+        }
+        if (cpf != null && usuarioRepository.existsEmpresaByCpf(cpf)) {
+            throw new DocumentoJaCadastradoException("CPF já cadastrado");
         }
 
         Empresa empresa = new Empresa();
         empresa.setNome(data.nome());
-        empresa.setEmail(data.email());
+        empresa.setEmail(email);
         empresa.setSenhaHash(passwordEncoder.encode(data.senha()));
         empresa.setTelefone(data.telefone());
-        empresa.setCnpj(data.cnpj());
-        empresa.setCpf(data.cpf());
+        empresa.setCnpj(cnpj);
+        empresa.setCpf(cpf);
         empresa.setDescricao(data.descricao());
         empresa.setDataNascimento(data.dataNascimento());
-        empresa.setLatitude(data.latitude());
-        empresa.setLongitude(data.longitude());
         empresa.setTipoEstabelecimento(data.tipoEstabelecimento());
 
         if (data.especialidades() != null && !data.especialidades().isEmpty()) {
             empresa.setEspecialidades(String.join(", ", data.especialidades()));
         }
 
-        if (data.endereco() != null) {
-            Endereco endereco = new Endereco();
-            endereco.setCep(data.endereco().cep());
-            endereco.setLogradouro(data.endereco().logradouro());
-            endereco.setNumero(data.endereco().numero());
-            endereco.setComplemento(data.endereco().complemento());
-            endereco.setBairro(data.endereco().bairro());
-            endereco.setCidade(data.endereco().cidade());
-            endereco.setEstado(data.endereco().estado());
-            empresa.setEndereco(endereco);
-        }
+        Endereco endereco = data.endereco() != null ? data.endereco().paraEndereco() : null;
+        coordenadasService.atualizarEstudio(empresa, endereco, data.latitude(), data.longitude());
+        empresa.setEndereco(endereco);
 
         usuarioRepository.save(empresa);
         emailService.enviarEmailBoasVindas(empresa.getEmail(), empresa.getNome());
@@ -188,10 +221,19 @@ public class AuthService {
                 servico.setNome(servicoData.nome());
                 servico.setPreco(parsePreco(servicoData.preco()));
                 servico.setDuracaoMinutos(parseDuracaoMinutos(servicoData.duracao()));
+                servico.setCategoria(CategoriaServico.escolhidaOuPeloNome(servicoData.categoria(), servicoData.nome()));
                 servico.setEmpresa(empresa);
                 servicoRepository.save(servico);
             }
         }
+    }
+
+    private static String normalizarEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static String vazioParaNulo(String valor) {
+        return valor == null || valor.isBlank() ? null : valor.trim();
     }
 
     /**
@@ -220,7 +262,7 @@ public class AuthService {
     }
 
     private static final Pattern DURACAO_COM_HORAS =
-            Pattern.compile("(\\d+)\\s*h(?:oras?)?\\s*(?:(\\d+)\\s*(?:min(?:utos?)?)?)?", Pattern.CASE_INSENSITIVE);
+            Pattern.compile("(?<!\\d)(\\d++)\\s*+h(?:oras?)?\\s*+(\\d++)?", Pattern.CASE_INSENSITIVE);
     private static final Pattern NUMERO = Pattern.compile("\\d+");
 
     /**
@@ -230,13 +272,17 @@ public class AuthService {
     private Integer parseDuracaoMinutos(String bruto) {
         if (bruto == null) return 0;
 
-        Matcher horas = DURACAO_COM_HORAS.matcher(bruto);
-        if (horas.find()) {
-            int minutos = horas.group(2) != null ? Integer.parseInt(horas.group(2)) : 0;
-            return Integer.parseInt(horas.group(1)) * 60 + minutos;
-        }
+        try {
+            Matcher horas = DURACAO_COM_HORAS.matcher(bruto);
+            if (horas.find()) {
+                int minutos = horas.group(2) != null ? Integer.parseInt(horas.group(2)) : 0;
+                return Math.addExact(Math.multiplyExact(Integer.parseInt(horas.group(1)), 60), minutos);
+            }
 
-        Matcher numero = NUMERO.matcher(bruto);
-        return numero.find() ? Integer.parseInt(numero.group()) : 0;
+            Matcher numero = NUMERO.matcher(bruto);
+            return numero.find() ? Integer.parseInt(numero.group()) : 0;
+        } catch (NumberFormatException | ArithmeticException e) {
+            return 0;
+        }
     }
 }

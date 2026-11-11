@@ -1,5 +1,7 @@
 package br.com.kira.kirabackend.controller;
 
+import br.com.kira.kirabackend.domain.entity.Usuario;
+import br.com.kira.kirabackend.security.AcessoEmpresa;
 import br.com.kira.kirabackend.dto.request.FuncionariaRequest;
 import br.com.kira.kirabackend.dto.response.FuncionariaResponse;
 import br.com.kira.kirabackend.service.FuncionariaService;
@@ -7,7 +9,9 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -19,11 +23,14 @@ import java.util.UUID;
 public class FuncionariaController {
 
     private final FuncionariaService funcionariaService;
+    private final AcessoEmpresa acessoEmpresa;
 
     @PostMapping
     public ResponseEntity<FuncionariaResponse> cadastrar(
             @PathVariable UUID empresaId,
+            @AuthenticationPrincipal Usuario usuario,
             @RequestBody @Valid FuncionariaRequest request) {
+        acessoEmpresa.exigirEmpresa(empresaId, usuario);
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(funcionariaService.cadastrar(empresaId, request));
@@ -39,15 +46,39 @@ public class FuncionariaController {
     public ResponseEntity<FuncionariaResponse> atualizar(
             @PathVariable UUID empresaId,
             @PathVariable UUID id,
+            @AuthenticationPrincipal Usuario usuario,
             @RequestBody @Valid FuncionariaRequest request) {
-        return ResponseEntity.ok(funcionariaService.atualizar(id, request));
+        acessoEmpresa.exigirEmpresa(empresaId, usuario);
+        return ResponseEntity.ok(funcionariaService.atualizar(empresaId, id, request));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> desativar(
             @PathVariable UUID empresaId,
-            @PathVariable UUID id) {
-        funcionariaService.desativar(id);
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Usuario usuario) {
+        acessoEmpresa.exigirEmpresa(empresaId, usuario);
+        funcionariaService.desativar(empresaId, id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/foto")
+    public ResponseEntity<FuncionariaResponse> definirFoto(
+            @PathVariable UUID empresaId,
+            @PathVariable UUID id,
+            @RequestParam("arquivo") MultipartFile arquivo,
+            @AuthenticationPrincipal Usuario usuario) {
+        acessoEmpresa.exigirEmpresa(empresaId, usuario);
+        return ResponseEntity.ok(funcionariaService.definirFoto(empresaId, id, arquivo));
+    }
+
+    @DeleteMapping("/{id}/foto")
+    public ResponseEntity<Void> removerFoto(
+            @PathVariable UUID empresaId,
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Usuario usuario) {
+        acessoEmpresa.exigirEmpresa(empresaId, usuario);
+        funcionariaService.removerFoto(empresaId, id);
         return ResponseEntity.noContent().build();
     }
 }

@@ -12,6 +12,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
 
+// O jjwt só aceita java.util.Date em issuedAt/expiration; o resto da classe usa java.time.
+@SuppressWarnings("java:S2143")
 @Component
 public class JwtTokenProvider {
 
@@ -41,6 +43,10 @@ public class JwtTokenProvider {
 
     public String extrairEmail(String token) {
         return extrairClaims(token).getSubject();
+    }
+
+    public Instant extrairExpiracao(String token) {
+        return extrairClaims(token).getExpiration().toInstant();
     }
 
     public boolean tokenValido(String token) {

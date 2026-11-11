@@ -2,7 +2,10 @@ package br.com.kira.kirabackend.service;
 
 import br.com.kira.kirabackend.domain.entity.Agendamento;
 import br.com.kira.kirabackend.domain.entity.DisponibilidadeEstudio;
+import br.com.kira.kirabackend.domain.entity.BloqueioHorario;
+import br.com.kira.kirabackend.domain.entity.Cliente;
 import br.com.kira.kirabackend.domain.entity.Empresa;
+import br.com.kira.kirabackend.domain.entity.Funcionaria;
 import br.com.kira.kirabackend.domain.entity.Servico;
 import br.com.kira.kirabackend.domain.enums.DiaSemana;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
@@ -10,9 +13,12 @@ import br.com.kira.kirabackend.dto.request.DisponibilidadeRequest;
 import br.com.kira.kirabackend.dto.response.DisponibilidadeResponse;
 import br.com.kira.kirabackend.dto.response.SlotDisponivel;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
+import br.com.kira.kirabackend.exception.AcessoNegadoException;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
+import br.com.kira.kirabackend.repository.BloqueioHorarioRepository;
 import br.com.kira.kirabackend.repository.DisponibilidadeEstudioRepository;
+import br.com.kira.kirabackend.repository.FuncionariaRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,7 +31,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -43,15 +48,19 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class DisponibilidadeServiceTest {
 
-    /** 19/10/2026 é uma segunda-feira. O serviço não valida datas passadas, então uma data fixa é segura. */
+    /** 19/10/2026 é uma segunda-feira. Os testes fixam o "agora" na véspera, então a data fixa é segura. */
     private static final LocalDate SEGUNDA = LocalDate.of(2026, 10, 19);
+    private static final LocalDateTime VESPERA = SEGUNDA.minusDays(1).atStartOfDay();
 
     @Mock
     private DisponibilidadeEstudioRepository disponibilidadeRepository;
@@ -65,7 +74,12 @@ class DisponibilidadeServiceTest {
     @Mock
     private UsuarioRepository usuarioRepository;
 
-    @InjectMocks
+    @Mock
+    private FuncionariaRepository funcionariaRepository;
+
+    @Mock
+    private BloqueioHorarioRepository bloqueioHorarioRepository;
+
     private DisponibilidadeService service;
 
     private Empresa empresa;
@@ -73,6 +87,9 @@ class DisponibilidadeServiceTest {
 
     @BeforeEach
     void setUp() {
+        service = new DisponibilidadeService(disponibilidadeRepository, servicoRepository, usuarioRepository,
+                new OcupacaoService(agendamentoRepository, funcionariaRepository, bloqueioHorarioRepository));
+
         empresa = new Empresa();
         empresa.setId(UUID.randomUUID());
 
@@ -80,6 +97,9 @@ class DisponibilidadeServiceTest {
         servico.setId(UUID.randomUUID());
         servico.setDuracaoMinutos(60);
         servico.setEmpresa(empresa);
+
+        // Nos testes, a empresa é ativa por padrão; os casos de empresa desativada sobrescrevem
+        lenient().when(usuarioRepository.existsEmpresaAtivaById(empresa.getId())).thenReturn(true);
     }
 
     // ---------- helpers ----------
@@ -116,7 +136,7 @@ class DisponibilidadeServiceTest {
     }
 
     private List<SlotDisponivel> calcular() {
-        return service.calcularSlotsDisponiveis(empresa.getId(), servico.getId(), SEGUNDA);
+        return service.calcularSlotsDisponiveis(empresa.getId(), servico.getId(), SEGUNDA, null, VESPERA);
     }
 
     private static List<LocalTime> horariosDeInicio(List<SlotDisponivel> slots) {
@@ -147,6 +167,31 @@ class DisponibilidadeServiceTest {
                     new SlotDisponivel(SEGUNDA.atTime(10, 0), SEGUNDA.atTime(11, 0)),
                     new SlotDisponivel(SEGUNDA.atTime(11, 0), SEGUNDA.atTime(12, 0))
             ), slots);
+        }
+
+        private List<SlotDisponivel> calcularAs(LocalDateTime agora) {
+            mockarServico(60);
+            mockarExpediente(DiaSemana.SEGUNDA, hora(9, 0), hora(12, 0));
+            mockarAgendamentos();
+            return service.calcularSlotsDisponiveis(empresa.getId(), servico.getId(), SEGUNDA, null, agora);
+        }
+
+        @Test
+        @DisplayName("No dia de hoje, os horários que já passaram não aparecem")
+        void hojeEscondeHorariosPassados() {
+            assertEquals(List.of(hora(11, 0)), horariosDeInicio(calcularAs(SEGUNDA.atTime(10, 30))));
+        }
+
+        @Test
+        @DisplayName("Horário que começa agora não aparece, como no agendamento")
+        void horarioQueComecaAgoraNaoAparece() {
+            assertEquals(List.of(hora(11, 0)), horariosDeInicio(calcularAs(SEGUNDA.atTime(10, 0))));
+        }
+
+        @Test
+        @DisplayName("Dia que já passou fica sem horários")
+        void diaPassadoFicaSemHorarios() {
+            assertEquals(List.of(), calcularAs(SEGUNDA.plusDays(1).atTime(8, 0)));
         }
 
         @Test
@@ -262,8 +307,11 @@ class DisponibilidadeServiceTest {
             when(disponibilidadeRepository.findByEmpresaIdAndDiaSemana(eq(empresa.getId()), any()))
                     .thenReturn(Optional.empty());
 
+            UUID empresaId = empresa.getId();
+            UUID servicoId = servico.getId();
+
             assertThrows(RegraDeNegocioException.class,
-                    () -> service.calcularSlotsDisponiveis(empresa.getId(), servico.getId(), data));
+                    () -> service.calcularSlotsDisponiveis(empresaId, servicoId, data, null));
 
             ArgumentCaptor<DiaSemana> dia = ArgumentCaptor.forClass(DiaSemana.class);
             verify(disponibilidadeRepository).findByEmpresaIdAndDiaSemana(eq(empresa.getId()), dia.capture());
@@ -292,13 +340,27 @@ class DisponibilidadeServiceTest {
     class Cadastrar {
 
         @Test
+        @DisplayName("Quem não é a empresa não altera o horário dela, e nada é consultado nem salvo")
+        void outroUsuarioNaoCadastra() {
+            UUID empresaId = empresa.getId();
+            UUID outroUsuario = UUID.randomUUID();
+            DisponibilidadeRequest req = new DisponibilidadeRequest(DiaSemana.SEGUNDA, hora(3, 0), hora(4, 0));
+
+            AcessoNegadoException ex = assertThrows(AcessoNegadoException.class,
+                    () -> service.cadastrar(empresaId, outroUsuario, req));
+
+            assertEquals("Você só pode alterar o horário do seu estabelecimento", ex.getMessage());
+            verifyNoInteractions(usuarioRepository, disponibilidadeRepository);
+        }
+
+        @Test
         @DisplayName("Cadastra o expediente com os dados enviados")
         void deveCadastrarExpediente() {
             when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
             when(disponibilidadeRepository.save(any(DisponibilidadeEstudio.class)))
                     .thenAnswer(invocation -> invocation.getArgument(0));
 
-            DisponibilidadeResponse response = service.cadastrar(empresa.getId(),
+            DisponibilidadeResponse response = service.cadastrar(empresa.getId(), empresa.getId(),
                     new DisponibilidadeRequest(DiaSemana.TERCA, hora(9, 0), hora(18, 0)));
 
             assertEquals(DiaSemana.TERCA, response.diaSemana());
@@ -319,10 +381,24 @@ class DisponibilidadeServiceTest {
         void fimAntesDoInicioDaErro(LocalTime inicio, LocalTime fim) {
             when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
 
+            UUID empresaId = empresa.getId();
+            DisponibilidadeRequest req = new DisponibilidadeRequest(DiaSemana.SEGUNDA, inicio, fim);
+
             RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
-                    () -> service.cadastrar(empresa.getId(),
-                            new DisponibilidadeRequest(DiaSemana.SEGUNDA, inicio, fim)));
+                    () -> service.cadastrar(empresaId, empresaId, req));
             assertEquals("Hora de fim deve ser após hora de início", ex.getMessage());
+            verify(disponibilidadeRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Conta que não é de empresa dá 404, mesmo usando o próprio id")
+        void contaDeClienteDa404() {
+            UUID clienteId = UUID.randomUUID();
+            when(usuarioRepository.findById(clienteId)).thenReturn(Optional.of(new Cliente()));
+            DisponibilidadeRequest req = new DisponibilidadeRequest(DiaSemana.SEGUNDA, hora(9, 0), hora(18, 0));
+
+            assertThrows(RecursoNaoEncontradoException.class,
+                    () -> service.cadastrar(clienteId, clienteId, req));
             verify(disponibilidadeRepository, never()).save(any());
         }
 
@@ -331,10 +407,212 @@ class DisponibilidadeServiceTest {
         void empresaInexistenteDa404() {
             when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.empty());
 
+            UUID empresaId = empresa.getId();
+            DisponibilidadeRequest req = new DisponibilidadeRequest(DiaSemana.SEGUNDA, hora(9, 0), hora(18, 0));
+
             assertThrows(RecursoNaoEncontradoException.class,
-                    () -> service.cadastrar(empresa.getId(),
-                            new DisponibilidadeRequest(DiaSemana.SEGUNDA, hora(9, 0), hora(18, 0))));
+                    () -> service.cadastrar(empresaId, empresaId, req));
             verify(disponibilidadeRepository, never()).save(any());
         }
+
+        @Test
+        @DisplayName("Dia que já tem expediente é atualizado, sem criar outro registro")
+        void diaExistenteEhAtualizado() {
+            DisponibilidadeEstudio existente = new DisponibilidadeEstudio();
+            existente.setId(UUID.randomUUID());
+            existente.setEmpresa(empresa);
+            existente.setDiaSemana(DiaSemana.TERCA);
+            existente.setHoraInicio(hora(8, 0));
+            existente.setHoraFim(hora(12, 0));
+            when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+            when(disponibilidadeRepository.findByEmpresaIdAndDiaSemana(empresa.getId(), DiaSemana.TERCA))
+                    .thenReturn(Optional.of(existente));
+            when(disponibilidadeRepository.save(existente)).thenReturn(existente);
+
+            DisponibilidadeResponse response = service.cadastrar(empresa.getId(), empresa.getId(),
+                    new DisponibilidadeRequest(DiaSemana.TERCA, hora(9, 0), hora(18, 0)));
+
+            assertEquals(existente.getId(), response.id());
+            assertEquals(hora(9, 0), response.horaInicio());
+            assertEquals(hora(18, 0), response.horaFim());
+        }
+    }
+
+    // ---------- substituirSemana ----------
+
+    @Nested
+    @DisplayName("substituirSemana")
+    class SubstituirSemana {
+
+        private List<DisponibilidadeResponse> substituir(DisponibilidadeRequest... dias) {
+            return service.substituirSemana(empresa.getId(), empresa.getId(), List.of(dias));
+        }
+
+        @Test
+        @DisplayName("Apaga a semana antiga e grava os dias enviados, em ordem de dia")
+        void deveTrocarASemana() {
+            DisponibilidadeEstudio antiga = new DisponibilidadeEstudio();
+            when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+            when(disponibilidadeRepository.findByEmpresaId(empresa.getId())).thenReturn(List.of(antiga));
+            when(disponibilidadeRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+            List<DisponibilidadeResponse> semana = substituir(
+                    new DisponibilidadeRequest(DiaSemana.SEXTA, hora(9, 0), hora(18, 0)),
+                    new DisponibilidadeRequest(DiaSemana.SEGUNDA, hora(10, 0), hora(16, 0)));
+
+            assertEquals(List.of(DiaSemana.SEGUNDA, DiaSemana.SEXTA),
+                    semana.stream().map(DisponibilidadeResponse::diaSemana).toList());
+            var ordem = inOrder(disponibilidadeRepository);
+            ordem.verify(disponibilidadeRepository).deleteAll(List.of(antiga));
+            ordem.verify(disponibilidadeRepository).flush();
+            ordem.verify(disponibilidadeRepository).saveAll(any());
+        }
+
+        @Test
+        @DisplayName("Lista vazia fecha todos os dias")
+        void listaVaziaFechaTudo() {
+            when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+            when(disponibilidadeRepository.findByEmpresaId(empresa.getId())).thenReturn(List.of());
+            when(disponibilidadeRepository.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+            assertTrue(substituir().isEmpty());
+            verify(disponibilidadeRepository).deleteAll(List.of());
+        }
+
+        @Test
+        @DisplayName("Outro usuário não pode alterar o horário da empresa")
+        void outroUsuarioNaoPodeAlterar() {
+            UUID outroUsuario = UUID.randomUUID();
+            List<DisponibilidadeRequest> dias = List.of();
+            UUID empresaId = empresa.getId();
+
+            AcessoNegadoException ex = assertThrows(AcessoNegadoException.class,
+                    () -> service.substituirSemana(empresaId, outroUsuario, dias));
+            assertEquals("Você só pode alterar o horário do seu estabelecimento", ex.getMessage());
+            verify(disponibilidadeRepository, never()).saveAll(any());
+        }
+
+        @Test
+        @DisplayName("Dia repetido dá erro e não apaga nada")
+        void diaRepetidoDaErro() {
+            when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+            var segunda = new DisponibilidadeRequest(DiaSemana.SEGUNDA, hora(9, 0), hora(12, 0));
+            var segundaTarde = new DisponibilidadeRequest(DiaSemana.SEGUNDA, hora(14, 0), hora(18, 0));
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> substituir(segunda, segundaTarde));
+            assertEquals("Dia da semana repetido: SEGUNDA", ex.getMessage());
+            verify(disponibilidadeRepository, never()).deleteAll(any());
+        }
+
+        @Test
+        @DisplayName("Fim antes do início dá erro e não apaga nada")
+        void fimAntesDoInicioDaErro() {
+            when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+            var invertido = new DisponibilidadeRequest(DiaSemana.SEGUNDA, hora(18, 0), hora(9, 0));
+
+            assertThrows(RegraDeNegocioException.class, () -> substituir(invertido));
+            verify(disponibilidadeRepository, never()).deleteAll(any());
+        }
+    }
+
+    // ---------- horários por funcionária ----------
+
+    @Nested
+    @DisplayName("calcularSlotsDisponiveis com funcionárias")
+    class SlotsPorFuncionaria {
+
+        private Funcionaria ana;
+        private Funcionaria bia;
+
+        @BeforeEach
+        void setUp() {
+            ana = funcionaria("Ana");
+            bia = funcionaria("Bia");
+            when(funcionariaRepository.findByEmpresaIdAndAtivoTrue(empresa.getId())).thenReturn(List.of(ana, bia));
+            mockarServico(60);
+            mockarExpediente(DiaSemana.SEGUNDA, hora(9, 0), hora(11, 0));
+        }
+
+        private Funcionaria funcionaria(String nome) {
+            Funcionaria f = new Funcionaria();
+            f.setId(UUID.randomUUID());
+            f.setNome(nome);
+            f.setEmpresa(empresa);
+            return f;
+        }
+
+        private Agendamento agendamentoDe(Funcionaria f, LocalTime inicio, LocalTime fim) {
+            Agendamento a = agendamento(inicio, fim);
+            a.setFuncionaria(f);
+            return a;
+        }
+
+        private void semBloqueios() {
+            when(bloqueioHorarioRepository.findByFuncionaria_Empresa_IdAndDataHoraInicioBeforeAndDataHoraFimAfter(
+                    eq(empresa.getId()), any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(List.of());
+        }
+
+        @Test
+        @DisplayName("Sem escolha, o horário continua livre enquanto houver uma funcionária livre")
+        void livreComUmaFuncionariaOcupada() {
+            mockarAgendamentos(agendamentoDe(ana, hora(9, 0), hora(10, 0)));
+            semBloqueios();
+
+            assertEquals(List.of(hora(9, 0), hora(10, 0)), horariosDeInicio(calcular()));
+        }
+
+        @Test
+        @DisplayName("Com a funcionária escolhida, some o horário em que ela está ocupada")
+        void escolhidaOcupada() {
+            mockarAgendamentos(agendamentoDe(ana, hora(9, 0), hora(10, 0)));
+            semBloqueios();
+
+            List<SlotDisponivel> slots = service.calcularSlotsDisponiveis(
+                    empresa.getId(), servico.getId(), SEGUNDA, ana.getId(), VESPERA);
+
+            assertEquals(List.of(hora(10, 0)), horariosDeInicio(slots));
+        }
+
+        @Test
+        @DisplayName("Horário some quando todas as funcionárias estão ocupadas ou bloqueadas")
+        void todasOcupadas() {
+            mockarAgendamentos(agendamentoDe(ana, hora(9, 0), hora(10, 0)));
+            BloqueioHorario almoco = new BloqueioHorario();
+            almoco.setFuncionaria(bia);
+            almoco.setDataHoraInicio(LocalDateTime.of(SEGUNDA, hora(9, 0)));
+            almoco.setDataHoraFim(LocalDateTime.of(SEGUNDA, hora(10, 0)));
+            when(bloqueioHorarioRepository.findByFuncionaria_Empresa_IdAndDataHoraInicioBeforeAndDataHoraFimAfter(
+                    eq(empresa.getId()), any(LocalDateTime.class), any(LocalDateTime.class))).thenReturn(List.of(almoco));
+
+            assertEquals(List.of(hora(10, 0)), horariosDeInicio(calcular()));
+        }
+
+        @Test
+        @DisplayName("Funcionária que não é deste estúdio dá erro")
+        void funcionariaDeOutroEstudio() {
+            mockarAgendamentos();
+            semBloqueios();
+            UUID empresaId = empresa.getId();
+            UUID servicoId = servico.getId();
+            UUID outra = UUID.randomUUID();
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> service.calcularSlotsDisponiveis(empresaId, servicoId, SEGUNDA, outra, VESPERA));
+            assertEquals("Funcionária não atende neste estabelecimento", ex.getMessage());
+        }
+    }
+
+    @Test
+    @DisplayName("Expediente e horários livres de empresa desativada dão 404")
+    void empresaDesativadaDa404() {
+        UUID empresaId = empresa.getId();
+        UUID servicoId = servico.getId();
+        when(usuarioRepository.existsEmpresaAtivaById(empresaId)).thenReturn(false);
+
+        assertThrows(RecursoNaoEncontradoException.class, () -> service.listarPorEmpresa(empresaId));
+        assertThrows(RecursoNaoEncontradoException.class,
+                () -> service.calcularSlotsDisponiveis(empresaId, servicoId, SEGUNDA, null, VESPERA));
+        verifyNoInteractions(disponibilidadeRepository, servicoRepository, agendamentoRepository);
     }
 }

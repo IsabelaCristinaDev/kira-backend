@@ -3,8 +3,10 @@ package br.com.kira.kirabackend.service;
 import br.com.kira.kirabackend.domain.entity.Cliente;
 import br.com.kira.kirabackend.domain.entity.Empresa;
 import br.com.kira.kirabackend.domain.entity.Endereco;
+import br.com.kira.kirabackend.domain.entity.Funcionaria;
 import br.com.kira.kirabackend.domain.enums.TipoEstabelecimento;
 import br.com.kira.kirabackend.dto.response.EstudioResponse;
+import br.com.kira.kirabackend.dto.response.FuncionariaPublicaResponse;
 import br.com.kira.kirabackend.exception.RecursoNaoEncontradoException;
 import br.com.kira.kirabackend.repository.AvaliacaoRepository;
 import br.com.kira.kirabackend.repository.FuncionariaRepository;
@@ -20,6 +22,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class EstudioServiceTest {
@@ -46,6 +51,9 @@ class EstudioServiceTest {
 
     @Mock
     private ServicoRepository servicoRepository;
+
+    @Mock
+    private ExigenciaVerificacao exigenciaVerificacao;
 
     @InjectMocks
     private EstudioService service;
@@ -68,6 +76,8 @@ class EstudioServiceTest {
         lenient().when(usuarioRepository.findAll())
                 .thenReturn(List.of(studioBelaVista, cliente, espacoCilios, semEndereco));
         lenient().when(avaliacaoRepository.calcularMediaAvaliacaoEmpresa(any())).thenReturn(null);
+        // Como com VERIFICACAO_OBRIGATORIA=false: todos aparecem
+        lenient().when(exigenciaVerificacao.naVitrine()).thenReturn(id -> true);
     }
 
     private static Empresa empresa(String nome, TipoEstabelecimento tipo, Endereco endereco) {
@@ -145,6 +155,20 @@ class EstudioServiceTest {
         assertEquals("Bela Unhas", response.nome());
         assertNull(response.endereco());
         assertEquals(4.5, response.mediaAvaliacoes());
+        assertNull(response.latitude());
+    }
+
+    @Test
+    @DisplayName("Buscar estúdio por ID devolve as coordenadas do cadastro")
+    void buscarPorIdDevolveCoordenadas() {
+        studioBelaVista.setLatitude(-23.5505);
+        studioBelaVista.setLongitude(-46.6333);
+        when(usuarioRepository.findById(studioBelaVista.getId())).thenReturn(Optional.of(studioBelaVista));
+
+        EstudioResponse response = service.buscarPorId(studioBelaVista.getId());
+
+        assertEquals(-23.5505, response.latitude());
+        assertEquals(-46.6333, response.longitude());
     }
 
     @Test
@@ -152,8 +176,10 @@ class EstudioServiceTest {
     void buscarClienteComoEstudioDa404() {
         when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
 
+        UUID clienteId = cliente.getId();
+
         RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
-                () -> service.buscarPorId(cliente.getId()));
+                () -> service.buscarPorId(clienteId));
         assertEquals("Estúdio não encontrado", ex.getMessage());
     }
 
@@ -167,9 +193,85 @@ class EstudioServiceTest {
     }
 
     @Test
+    @DisplayName("Empresa desativada some da listagem, da busca por nome, por tipo e por cidade")
+    void empresaDesativadaSomeDaVitrine() {
+        espacoCilios.setAtivo(false);
+
+        assertEquals(List.of("Studio Bela Vista", "Bela Unhas"), nomes(service.listarTodos()));
+        assertTrue(service.buscarPorNome("cílios").isEmpty());
+        assertEquals(List.of("Bela Unhas"), nomes(service.buscarPorTipo(TipoEstabelecimento.AUTONOMA)));
+        assertTrue(service.buscarPorCidade("campinas").isEmpty());
+    }
+
+    @Test
+    @DisplayName("Buscar o ID de uma empresa desativada dá 404")
+    void buscarEmpresaDesativadaDa404() {
+        espacoCilios.setAtivo(false);
+        when(usuarioRepository.findById(espacoCilios.getId())).thenReturn(Optional.of(espacoCilios));
+
+        UUID empresaId = espacoCilios.getId();
+
+        RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
+                () -> service.buscarPorId(empresaId));
+        assertEquals("Estúdio não encontrado", ex.getMessage());
+    }
+
+    @Test
     @DisplayName("Busca sem resultado devolve lista vazia")
     void buscaSemResultado() {
         assertTrue(service.buscarPorNome("inexistente").isEmpty());
         assertTrue(service.buscarPorCidade("Recife").isEmpty());
+    }
+
+    @Test
+    @DisplayName("Funcionárias e serviços de empresa desativada dão 404")
+    void funcionariasEServicosDeEmpresaDesativadaDao404() {
+        UUID empresaId = espacoCilios.getId();
+        when(usuarioRepository.existsEmpresaAtivaById(empresaId)).thenReturn(false);
+
+        assertThrows(RecursoNaoEncontradoException.class, () -> service.listarFuncionarias(empresaId));
+        assertThrows(RecursoNaoEncontradoException.class, () -> service.listarServicos(empresaId));
+        verifyNoInteractions(funcionariaRepository, servicoRepository);
+    }
+
+    @Test
+    @DisplayName("Funcionárias e serviços de empresa ativa são listados")
+    void funcionariasEServicosDeEmpresaAtiva() {
+        UUID empresaId = espacoCilios.getId();
+        when(usuarioRepository.existsEmpresaAtivaById(empresaId)).thenReturn(true);
+        when(funcionariaRepository.findByEmpresaIdAndAtivoTrue(empresaId)).thenReturn(List.of());
+        when(servicoRepository.findByEmpresaIdAndAtivoTrue(empresaId)).thenReturn(List.of());
+
+        assertTrue(service.listarFuncionarias(empresaId).isEmpty());
+        assertTrue(service.listarServicos(empresaId).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Funcionárias da vitrine trazem só o que a cliente precisa para escolher, sem a comissão")
+    void funcionariasDaVitrineSemDadosInternos() {
+        UUID empresaId = espacoCilios.getId();
+        Funcionaria bia = new Funcionaria(UUID.randomUUID(), "Bia", "/api/arquivos/bia.jpg", "Corte",
+                true, new BigDecimal("35.00"), null);
+        when(usuarioRepository.existsEmpresaAtivaById(empresaId)).thenReturn(true);
+        when(funcionariaRepository.findByEmpresaIdAndAtivoTrue(empresaId)).thenReturn(List.of(bia));
+
+        List<FuncionariaPublicaResponse> lista = service.listarFuncionarias(empresaId);
+
+        assertEquals(List.of(new FuncionariaPublicaResponse(bia.getId(), "Bia", "/api/arquivos/bia.jpg", "Corte")),
+                lista);
+        assertEquals(List.of("id", "nome", "fotoUrl", "especialidades"),
+                Arrays.stream(FuncionariaPublicaResponse.class.getRecordComponents()).map(c -> c.getName()).toList());
+    }
+
+    @Test
+    @DisplayName("Com a verificação obrigatória, a vitrine e as buscas mostram só os estúdios verificados")
+    void vitrineSoComVerificados() {
+        UUID verificado = studioBelaVista.getId();
+        when(exigenciaVerificacao.naVitrine()).thenReturn(verificado::equals);
+
+        assertEquals(List.of("Studio Bela Vista"), nomes(service.listarTodos()));
+        assertEquals(List.of("Studio Bela Vista"), nomes(service.buscarPorNome("bela")));
+        assertEquals(List.of("Studio Bela Vista"), nomes(service.buscarPorCidade("são")));
+        assertEquals(List.of("Studio Bela Vista"), nomes(service.buscarPorTipo(TipoEstabelecimento.ESTABELECIMENTO)));
     }
 }

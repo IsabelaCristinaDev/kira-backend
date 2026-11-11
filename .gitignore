@@ -46,3 +46,14 @@ backup_dados.sql
 # Dumps de banco (nunca versionar)
 *.sql
 *.dump
+*.dump~
+erros.txt
+
+# Configuracao local do Claude Code
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+
+### Arquivos enviados ###
+/uploads/
+doc/kira-seed/
