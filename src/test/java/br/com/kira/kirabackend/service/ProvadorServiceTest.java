@@ -14,16 +14,21 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -335,5 +340,115 @@ class ProvadorServiceTest {
                 () -> service.gerar(usuarioId, foto("cliente", "texto".getBytes()), foto("referencia", JPEG)));
 
         verify(uso, never()).reservar(any(), any(), anyInt());
+    }
+
+    @Test
+    @DisplayName("Revogar de novo mantém a data da primeira revogação")
+    void revogarJaRevogadoMantemAData() {
+        // Arrange
+        LocalDateTime primeiraRevogacao = LocalDateTime.of(2026, 1, 10, 9, 30);
+        ConsentimentoProvador revogado = consentimento(VERSAO, primeiraRevogacao);
+        when(repository.findByUsuarioId(usuarioId)).thenReturn(Optional.of(revogado));
+        when(repository.save(any(ConsentimentoProvador.class))).thenAnswer(i -> i.getArgument(0));
+
+        // Act
+        ConsentimentoProvadorResponse resposta = service.revogarConsentimento(usuarioId);
+
+        // Assert
+        assertEquals(primeiraRevogacao, revogado.getRevogadoEm());
+        assertFalse(resposta.ativo());
+    }
+
+    @Test
+    @DisplayName("Foto que não pode ser lida vira erro de regra de negócio, sem contar tentativa")
+    void fotoIlegivel() throws IOException {
+        // Arrange
+        when(repository.findByUsuarioId(usuarioId)).thenReturn(Optional.of(consentimento(VERSAO, null)));
+        MockMultipartFile ilegivel = new MockMultipartFile("cliente", "cliente.jpg", "image/jpeg", JPEG) {
+            @Override
+            public byte[] getBytes() throws IOException {
+                throw new IOException("conexão caiu no meio do envio");
+            }
+        };
+        MockMultipartFile referencia = foto("referencia", JPEG);
+
+        // Act
+        RegraDeNegocioException erro = assertThrows(RegraDeNegocioException.class,
+                () -> service.gerar(usuarioId, ilegivel, referencia));
+
+        // Assert
+        assertEquals("Não foi possível ler a foto enviada", erro.getMessage());
+        verify(uso, never()).reservar(any(), any(), anyInt());
+        verify(gerador, never()).gerar(any(), any());
+    }
+
+    @Test
+    @DisplayName("A foto de referência também tem o formato conferido")
+    void referenciaComFormatoInvalido() {
+        // Arrange
+        when(repository.findByUsuarioId(usuarioId)).thenReturn(Optional.of(consentimento(VERSAO, null)));
+        MockMultipartFile cliente = foto("cliente", JPEG);
+        MockMultipartFile referencia = foto("referencia", "isto nao e uma imagem".getBytes());
+
+        // Act
+        RegraDeNegocioException erro = assertThrows(RegraDeNegocioException.class,
+                () -> service.gerar(usuarioId, cliente, referencia));
+
+        // Assert
+        assertTrue(erro.getMessage().contains("JPG ou PNG"));
+        verify(gerador, never()).gerar(any(), any());
+    }
+
+    @Test
+    @DisplayName("Foto só com a assinatura de JPEG, de 4 bytes, é aceita (limite mínimo)")
+    void jpegNoTamanhoMinimo() {
+        // Arrange
+        byte[] jpegMinimo = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0};
+        when(repository.findByUsuarioId(usuarioId)).thenReturn(Optional.of(consentimento(VERSAO, null)));
+        comVagaNoDia();
+        when(gerador.gerar(jpegMinimo, JPEG)).thenReturn(JPEG);
+
+        // Act
+        GeracaoProvadorResponse resposta =
+                service.gerar(usuarioId, foto("cliente", jpegMinimo), foto("referencia", JPEG));
+
+        // Assert
+        assertTrue(resposta.imagemUri().startsWith("data:image/jpeg;base64,"));
+    }
+
+    static Stream<Arguments> arquivosQueNaoSaoJpegNemPng() {
+        return Stream.of(
+                Arguments.of("JPEG com só 3 bytes", new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF}),
+                Arguments.of("1º byte de JPEG errado", new byte[]{0x00, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0}),
+                Arguments.of("2º byte de JPEG errado", new byte[]{(byte) 0xFF, 0x00, (byte) 0xFF, (byte) 0xE0}),
+                Arguments.of("3º byte de JPEG errado", new byte[]{(byte) 0xFF, (byte) 0xD8, 0x00, (byte) 0xE0}),
+                Arguments.of("PNG cortado: só a assinatura de 8 bytes", new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A}),
+                Arguments.of("1º byte de PNG errado", new byte[]{0x00, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0}),
+                Arguments.of("2º byte de PNG errado", new byte[]{(byte) 0x89, 'X', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0}),
+                Arguments.of("3º byte de PNG errado", new byte[]{(byte) 0x89, 'P', 'X', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0}),
+                Arguments.of("4º byte de PNG errado", new byte[]{(byte) 0x89, 'P', 'N', 'X', 0x0D, 0x0A, 0x1A, 0x0A, 0}),
+                Arguments.of("5º byte de PNG errado", new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x00, 0x0A, 0x1A, 0x0A, 0}),
+                Arguments.of("6º byte de PNG errado", new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x00, 0x1A, 0x0A, 0}),
+                Arguments.of("7º byte de PNG errado", new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x00, 0x0A, 0}),
+                Arguments.of("8º byte de PNG errado", new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x00, 0}));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("arquivosQueNaoSaoJpegNemPng")
+    @DisplayName("Arquivo parecido com JPG ou PNG, mas fora do formato, é recusado sem contar tentativa")
+    void quaseImagemERecusada(String caso, byte[] bytes) {
+        // Arrange
+        when(repository.findByUsuarioId(usuarioId)).thenReturn(Optional.of(consentimento(VERSAO, null)));
+        MockMultipartFile cliente = foto("cliente", bytes);
+        MockMultipartFile referencia = foto("referencia", JPEG);
+
+        // Act
+        RegraDeNegocioException erro = assertThrows(RegraDeNegocioException.class,
+                () -> service.gerar(usuarioId, cliente, referencia));
+
+        // Assert
+        assertTrue(erro.getMessage().contains("JPG ou PNG"), caso);
+        verify(uso, never()).reservar(any(), any(), anyInt());
+        verify(gerador, never()).gerar(any(), any());
     }
 }
