@@ -3,6 +3,7 @@ package br.com.kira.kirabackend.service;
 import br.com.kira.kirabackend.domain.entity.Admin;
 import br.com.kira.kirabackend.domain.entity.Cliente;
 import br.com.kira.kirabackend.domain.entity.Empresa;
+import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.domain.entity.VerificacaoIdentidade;
 import br.com.kira.kirabackend.domain.enums.DecisaoVerificacaoIa;
 import br.com.kira.kirabackend.domain.enums.StatusVerificacao;
@@ -20,8 +21,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -30,12 +33,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -479,5 +484,95 @@ class VerificacaoServiceTest {
 
         assertTrue(obrigatoria.consultar(cliente.getId()).obrigatoria());
         assertFalse(service.consultar(cliente.getId()).obrigatoria());
+    }
+
+    @Test
+    @DisplayName("Conta de administrador recebe a mensagem própria de que admin não faz verificação")
+    void mensagemDoAdmin() {
+        // Arrange
+        Admin admin = new Admin();
+        admin.setId(UUID.randomUUID());
+        MockMultipartFile documento = foto("document", JPEG);
+        MockMultipartFile selfie = foto("selfie", JPEG);
+
+        // Act
+        RegraDeNegocioException erro = assertThrows(RegraDeNegocioException.class,
+                () -> service.enviar(admin, documento, null, selfie, "CNH", true));
+
+        // Assert
+        assertEquals("Contas de administrador não fazem verificação de identidade", erro.getMessage());
+    }
+
+    @Test
+    @DisplayName("Conta que não é cliente, estúdio nem admin é recusada com a mensagem genérica")
+    void outroTipoDeConta() {
+        // Arrange: um tipo de conta que o sistema não conhece
+        Usuario desconhecido = new Usuario() { };
+        desconhecido.setId(UUID.randomUUID());
+        MockMultipartFile documento = foto("document", JPEG);
+        MockMultipartFile selfie = foto("selfie", JPEG);
+
+        // Act
+        RegraDeNegocioException erro = assertThrows(RegraDeNegocioException.class,
+                () -> service.enviar(desconhecido, documento, null, selfie, "CNH", true));
+
+        // Assert
+        assertEquals("Este tipo de conta não faz verificação de identidade", erro.getMessage());
+        verifyNoInteractions(repository, verificador);
+    }
+
+    @Test
+    @DisplayName("Foto do documento que não pode ser lida vira erro de regra de negócio e não gasta tentativa")
+    void fotoIlegivel() {
+        // Arrange
+        MockMultipartFile ilegivel = new MockMultipartFile("document", "document.jpg", "image/jpeg", JPEG) {
+            @Override
+            public byte[] getBytes() throws IOException {
+                throw new IOException("conexão caiu no meio do envio");
+            }
+        };
+        MockMultipartFile selfie = foto("selfie", JPEG);
+
+        // Act
+        RegraDeNegocioException erro = assertThrows(RegraDeNegocioException.class,
+                () -> service.enviar(cliente, ilegivel, null, selfie, "CNH", true));
+
+        // Assert
+        assertEquals("Não foi possível ler a foto enviada", erro.getMessage());
+        verifyNoInteractions(repository, verificador);
+    }
+
+    static Stream<Arguments> arquivosQueNaoSaoJpegNemPng() {
+        return Stream.of(
+                Arguments.of("JPEG com só 3 bytes", new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF}),
+                Arguments.of("1º byte de JPEG errado", new byte[]{0x00, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0}),
+                Arguments.of("2º byte de JPEG errado", new byte[]{(byte) 0xFF, 0x00, (byte) 0xFF, (byte) 0xE0}),
+                Arguments.of("3º byte de JPEG errado", new byte[]{(byte) 0xFF, (byte) 0xD8, 0x00, (byte) 0xE0}),
+                Arguments.of("PNG cortado: só a assinatura de 8 bytes", new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A}),
+                Arguments.of("1º byte de PNG errado", new byte[]{0x00, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0}),
+                Arguments.of("2º byte de PNG errado", new byte[]{(byte) 0x89, 'X', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0}),
+                Arguments.of("3º byte de PNG errado", new byte[]{(byte) 0x89, 'P', 'X', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0}),
+                Arguments.of("4º byte de PNG errado", new byte[]{(byte) 0x89, 'P', 'N', 'X', 0x0D, 0x0A, 0x1A, 0x0A, 0}),
+                Arguments.of("5º byte de PNG errado", new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x00, 0x0A, 0x1A, 0x0A, 0}),
+                Arguments.of("6º byte de PNG errado", new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x00, 0x1A, 0x0A, 0}),
+                Arguments.of("7º byte de PNG errado", new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x00, 0x0A, 0}),
+                Arguments.of("8º byte de PNG errado", new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x00, 0}));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("arquivosQueNaoSaoJpegNemPng")
+    @DisplayName("Foto do documento parecida com JPG ou PNG, mas fora do formato, é recusada sem gastar tentativa")
+    void quaseImagemERecusada(String caso, byte[] bytes) {
+        // Arrange
+        MockMultipartFile documento = foto("document", bytes);
+        MockMultipartFile selfie = foto("selfie", JPEG);
+
+        // Act
+        RegraDeNegocioException erro = assertThrows(RegraDeNegocioException.class,
+                () -> service.enviar(cliente, documento, null, selfie, "CNH", true));
+
+        // Assert
+        assertEquals("Formato de foto não suportado. Use JPG ou PNG", erro.getMessage(), caso);
+        verifyNoInteractions(repository, verificador);
     }
 }
