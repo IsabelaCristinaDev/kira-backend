@@ -141,7 +141,7 @@ O banco guarda só o nome de cada foto; o arquivo fica num armazenamento de obje
   2. em *Manage API tokens*, crie um token com **Object Read & Write** só nesse bucket;
   3. no servidor, defina `KIRA_ARQUIVOS_TIPO=s3`, `KIRA_S3_ENDPOINT=https://<ID da conta>.r2.cloudflarestorage.com`, `KIRA_S3_REGIAO=auto` e as chaves do token em `KIRA_S3_ACCESS_KEY`/`KIRA_S3_SECRET_KEY`.
 
-Sem `KIRA_ARQUIVOS_TIPO`, as fotos ficam na pasta `KIRA_ARQUIVOS_PASTA` (padrão `./uploads`). Para levar as fotos dessa pasta para o MinIO, use uma vez `scripts/copiar-fotos-para-minio.sh`.
+Sem `KIRA_ARQUIVOS_TIPO`, as fotos ficam na pasta `KIRA_ARQUIVOS_PASTA` (padrão `./uploads`).
 
 #### Backup das fotos
 
