@@ -15,6 +15,7 @@
         <java.version>17</java.version>
         <!-- A versão do Spring Boot 3.3 não fala com o Docker 29 -->
         <testcontainers.version>1.21.4</testcontainers.version>
+        <aws-sdk.version>2.57.0</aws-sdk.version>
         <!--  SonarCloud  -->
         <sonar.organization>isabelacristinadev</sonar.organization>
         <sonar.projectKey>kira-backend</sonar.projectKey>
@@ -103,6 +104,29 @@
             <version>0.12.3</version>
             <scope>runtime</scope>
         </dependency>
+        <!-- Armazenamento das fotos no MinIO (ou outro serviço compatível com S3), com KIRA_ARQUIVOS_TIPO=s3 -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <exclusions>
+                <!-- Só o cliente síncrono é usado -->
+                <exclusion>
+                    <groupId>software.amazon.awssdk</groupId>
+                    <artifactId>netty-nio-client</artifactId>
+                </exclusion>
+                <!-- Traz o httpclient5: o Spring Boot 3.3 o rebaixa para uma versão que o SDK não aceita, e a
+                     presença dele troca o cliente HTTP dos RestClient (ClientesHttpConfig) -->
+                <exclusion>
+                    <groupId>software.amazon.awssdk</groupId>
+                    <artifactId>apache5-client</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!-- Cliente HTTP do próprio Java para o SDK, sem dependências -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>url-connection-client</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -124,6 +148,17 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${aws-sdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
     <build>
         <plugins>
             <plugin>
