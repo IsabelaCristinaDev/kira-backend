@@ -363,6 +363,10 @@ public class AgendamentoService {
      */
     private Funcionaria reservarHorario(UUID empresaId, Funcionaria escolhida, LocalDateTime inicio,
                                         LocalDateTime fim, UUID agendamentoIgnorado) {
+        // Pedidos simultâneos para a mesma empresa esperam aqui, um de cada vez, até a transação
+        // anterior terminar. Sem isso, todos conferem o horário antes de qualquer um gravar e todos são aceitos.
+        usuarioRepository.travarEmpresaParaAgendar(empresaId);
+
         // Carrega o dia inteiro para contar quantos atendimentos cada funcionária já tem
         QuadroDeHorarios quadro = ocupacaoService.carregar(empresaId, inicio.toLocalDate().atStartOfDay(),
                 fim.toLocalDate().plusDays(1).atStartOfDay(), agendamentoIgnorado);

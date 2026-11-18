@@ -16,12 +16,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -122,5 +124,62 @@ class ContatoEmergenciaServiceTest {
         assertThrows(RegraDeNegocioException.class, () -> service.remover(empresa, id));
         assertThrows(RegraDeNegocioException.class, () -> service.atualizar(empresa, id, request));
         verifyNoInteractions(contatoRepository);
+    }
+
+    @Test
+    @DisplayName("Lista os contatos da própria cliente na ordem em que foram cadastrados")
+    void lista() {
+        ContatoEmergencia primeiro = contato("Rosa", "Mãe");
+        ContatoEmergencia segundo = contato("João", null);
+        when(contatoRepository.findByClienteIdOrderByDataCriacaoAsc(cliente.getId()))
+                .thenReturn(List.of(primeiro, segundo));
+
+        List<ContatoEmergenciaResponse> contatos = service.listar(cliente);
+
+        assertEquals(List.of(primeiro.getId(), segundo.getId()),
+                contatos.stream().map(ContatoEmergenciaResponse::id).toList());
+        assertEquals("Rosa", contatos.get(0).nome());
+        assertEquals("Mãe", contatos.get(0).parentesco());
+        assertNull(contatos.get(1).parentesco());
+    }
+
+    @Test
+    @DisplayName("Cliente sem contatos recebe lista vazia")
+    void listaVazia() {
+        when(contatoRepository.findByClienteIdOrderByDataCriacaoAsc(cliente.getId())).thenReturn(List.of());
+
+        assertTrue(service.listar(cliente).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Remove o contato da própria cliente")
+    void remove() {
+        ContatoEmergencia contato = contato("Rosa", "Mãe");
+        when(contatoRepository.findByIdAndClienteId(contato.getId(), cliente.getId())).thenReturn(Optional.of(contato));
+
+        service.remover(cliente, contato.getId());
+
+        verify(contatoRepository).delete(contato);
+    }
+
+    @Test
+    @DisplayName("Parentesco preenchido é guardado sem os espaços das pontas")
+    void parentescoPreenchido() {
+        when(contatoRepository.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+
+        ContatoEmergenciaResponse resposta = service.cadastrar(
+                cliente, new ContatoEmergenciaRequest("Rosa", "62988887777", "  Mãe  "));
+
+        assertEquals("Mãe", resposta.parentesco());
+    }
+
+    private ContatoEmergencia contato(String nome, String parentesco) {
+        ContatoEmergencia contato = new ContatoEmergencia();
+        contato.setId(UUID.randomUUID());
+        contato.setCliente(cliente);
+        contato.setNome(nome);
+        contato.setTelefone("62988887777");
+        contato.setParentesco(parentesco);
+        return contato;
     }
 }
