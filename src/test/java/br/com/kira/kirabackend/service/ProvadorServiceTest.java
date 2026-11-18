@@ -43,7 +43,7 @@ class ProvadorServiceTest {
 
     private static final String VERSAO = "v1";
     private static final long LIMITE = 1024;
-    private static final int LIMITE_DIARIO = 5;
+    private static final int LIMITE_DIARIO = 2;
 
     private static final byte[] JPEG = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0, 16, 'J', 'F', 'I', 'F'};
     private static final byte[] PNG = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13};
@@ -281,7 +281,7 @@ class ProvadorServiceTest {
         LimiteProvadorException erro = assertThrows(LimiteProvadorException.class,
                 () -> service.gerar(usuarioId, foto("cliente", JPEG), foto("referencia", JPEG)));
 
-        assertTrue(erro.getMessage().contains("5 prévias"));
+        assertTrue(erro.getMessage().contains(LIMITE_DIARIO + " prévias"));
         verify(gerador, never()).gerar(any(), any());
         verify(uso, never()).devolver(any(), any());
     }
