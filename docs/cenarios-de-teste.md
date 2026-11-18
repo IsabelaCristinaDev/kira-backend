@@ -60,6 +60,35 @@ O front deve tratar esse caso, por exemplo exibindo o preço atual do serviço o
 
 ---
 
+## Agendamentos simultâneos no mesmo horário
+
+Quando várias clientes pedem o mesmo horário ao mesmo tempo, só um pedido pode ser aceito. Antes de
+conferir o horário, o sistema trava o registro do estúdio no banco: os pedidos daquele estúdio são
+processados um de cada vez, e cada um confere a agenda já com o agendamento anterior gravado.
+O teste automatizado `AgendamentosSimultaneosComBancoRealTest` faz esta disputa com 8 clientes.
+
+Pré-condição: estúdio sem funcionárias, com o serviço "Corte" (60 min) e agenda aberta; clientes Ana e Bia cadastradas.
+
+| ID | Cenário | Request | Esperado | Resultado |
+|---|---|---|---|---|
+| SIM-01 | Duas clientes pedem o mesmo horário ao mesmo tempo | Os dois `POST /api/agendamentos/cliente/{id}` do bloco abaixo, disparados juntos | Um 201 e um 400 com `"mensagem": "Já existe um agendamento neste horário para este estabelecimento"` | Pendente |
+| SIM-02 | Só um agendamento gravado | `GET /api/agendamentos/empresa/{empresaId}` com o token do estúdio | 200; um único agendamento às 09:00 do dia escolhido | Pendente |
+| SIM-03 | Horário sobreposto em sequência | `POST /api/agendamentos/cliente/{bia.id}` 30 min depois do horário do SIM-01 | 400 com a mesma mensagem | Pendente |
+| SIM-04 | Horário encostado no anterior | `POST /api/agendamentos/cliente/{bia.id}` 60 min depois do horário do SIM-01 | 201 | Pendente |
+
+Disparo simultâneo do SIM-01 (o `&` manda os dois pedidos ao mesmo tempo):
+
+```bash
+BODY='{"empresaId":"<empresaId>","servicoId":"<servicoId>","dataHoraInicio":"2026-11-16T09:00:00","formaPagamento":"PIX"}'
+curl -s -w ' -> %{http_code}\n' -X POST http://localhost:8081/api/agendamentos/cliente/<anaId> \
+  -H "Authorization: Bearer <tokenAna>" -H "Content-Type: application/json" -d "$BODY" &
+curl -s -w ' -> %{http_code}\n' -X POST http://localhost:8081/api/agendamentos/cliente/<biaId> \
+  -H "Authorization: Bearer <tokenBia>" -H "Content-Type: application/json" -d "$BODY" &
+wait
+```
+
+---
+
 ## Limite de tentativas de login
 
 O login conta as senhas erradas por IP e por conta (`kira.security.rate-limit.login` no `application.yml`).

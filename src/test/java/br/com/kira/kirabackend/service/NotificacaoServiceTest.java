@@ -157,6 +157,27 @@ class NotificacaoServiceTest {
         verifyNoInteractions(dispositivoRepository);
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = {0, 15, 17, 32})
+    @DisplayName("Segredo em Base64 válido, mas com tamanho diferente de 16 bytes, é recusado")
+    void segredoComTamanhoErrado(int bytes) {
+        String segredo = Base64.getUrlEncoder().withoutPadding().encodeToString(new byte[bytes]);
+        DispositivoWebRequest req = new DispositivoWebRequest(ENDERECO, chaveValida, segredo);
+
+        RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                () -> service.registrar(usuarioId, req));
+        assertEquals("Chaves de notificação inválidas", ex.getMessage());
+        verifyNoInteractions(dispositivoRepository);
+    }
+
+    @Test
+    @DisplayName("A chave pública entregue ao app é a configurada no envio")
+    void chavePublica() {
+        when(webPush.chavePublica()).thenReturn("BChavePublicaDeTeste");
+
+        assertEquals("BChavePublicaDeTeste", service.chavePublica());
+    }
+
     @Test
     @DisplayName("Remover vale só para o navegador da própria pessoa")
     void remover() {
