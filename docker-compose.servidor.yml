@@ -1,8 +1,13 @@
-# API + banco para rodar num servidor. O docker-compose.yml continua sendo o do dia a dia (só o Postgres).
+# API, banco e MinIO para rodar num servidor. O docker-compose.yml continua sendo o do dia a dia.
 #
 #   docker compose -f docker-compose.servidor.yml up -d --build
 #
 # Os valores vêm do .env do servidor. Faltando um obrigatório, o compose para e diz qual é.
+
+# Nome próprio: rodando este arquivo na mesma máquina do ambiente local (ensaio), os containers e os
+# volumes não se misturam com os do docker-compose.yml
+name: kira-servidor
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -20,10 +25,30 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # Fotos enviadas (perfil e portfólio). Mesma imagem do ambiente local
+  minio:
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
+    command: server /data --console-address ":9001"
+    environment:
+      # O mesmo par que a API usa para entrar. A senha precisa de pelo menos 8 caracteres
+      MINIO_ROOT_USER: ${KIRA_S3_ACCESS_KEY:?Defina KIRA_S3_ACCESS_KEY no .env}
+      MINIO_ROOT_PASSWORD: ${KIRA_S3_SECRET_KEY:?Defina KIRA_S3_SECRET_KEY no .env}
+    # Sem "ports", como o banco: só a API enxerga o MinIO. As fotos saem para o app pela API
+    volumes:
+      - kira_minio_dados:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   api:
     build: .
     depends_on:
       postgres:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     # Demais variáveis (e-mail, VAPID, Cloudflare, lembrete etc.). As de "environment" abaixo têm prioridade
     env_file:
@@ -37,16 +62,19 @@ services:
       JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION:?Defina JWT_REFRESH_EXPIRATION no .env}
       KIRA_CORS_ORIGENS: ${KIRA_CORS_ORIGENS:?Defina KIRA_CORS_ORIGENS com o endereço do app web}
       FRONTEND_URL: ${FRONTEND_URL:?Defina FRONTEND_URL com o endereço do app web}
-      # Fixos: a imagem escuta na 8081 e grava as fotos no volume abaixo
+      # Fixos: a imagem escuta na 8081 e as fotos vão para o MinIO daqui (e não o localhost:9000 do local).
+      # O bucket é criado na primeira subida da API. Para ir ao Cloudflare R2, ver "Fotos enviadas" no README
       SERVER_PORT: "8081"
-      KIRA_ARQUIVOS_PASTA: /app/uploads
+      KIRA_ARQUIVOS_TIPO: s3
+      KIRA_S3_ENDPOINT: http://minio:9000
+      KIRA_S3_REGIAO: us-east-1
+      KIRA_S3_BUCKET: ${KIRA_S3_BUCKET:-kira-arquivos}
+      KIRA_S3_ACCESS_KEY: ${KIRA_S3_ACCESS_KEY}
+      KIRA_S3_SECRET_KEY: ${KIRA_S3_SECRET_KEY}
     ports:
       # Por padrão, só o próprio servidor acessa a API: quem fica exposto é o proxy com HTTPS na frente dela.
       # Para testar sem proxy, use API_ENDERECO=0.0.0.0:8081 no .env
       - "${API_ENDERECO:-127.0.0.1:8081}:8081"
-    volumes:
-      # Fotos enviadas: sobrevivem a cada novo deploy
-      - kira_uploads:/app/uploads
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q UP"]
       interval: 15s
@@ -58,4 +86,4 @@ services:
 
 volumes:
   kira_db_dados:
-  kira_uploads:
+  kira_minio_dados:
