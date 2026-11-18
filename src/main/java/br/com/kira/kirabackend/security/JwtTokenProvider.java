@@ -45,6 +45,11 @@ public class JwtTokenProvider {
         return extrairClaims(token).getSubject();
     }
 
+    /** Quando o token foi emitido ("iat"), em segundos inteiros. */
+    public Instant extrairEmissao(String token) {
+        return extrairClaims(token).getIssuedAt().toInstant();
+    }
+
     public Instant extrairExpiracao(String token) {
         return extrairClaims(token).getExpiration().toInstant();
     }

@@ -3,6 +3,7 @@ package br.com.kira.kirabackend.security;
 import br.com.kira.kirabackend.domain.entity.Cliente;
 import br.com.kira.kirabackend.exception.AcessoNegadoException;
 import br.com.kira.kirabackend.service.MensagemService;
+import br.com.kira.kirabackend.util.KiraTimeZone;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -122,6 +124,22 @@ class WebSocketAutenticacaoInterceptorTest {
 
         assertThrows(MessageDeliveryException.class, () -> interceptor.preSend(mensagem, canal));
         verifyNoInteractions(userDetailsService);
+    }
+
+    @Test
+    @DisplayName("CONNECT com token emitido antes da troca de senha é recusado")
+    void connectComTokenAnteriorATrocaDeSenha() {
+        LocalDateTime troca = LocalDateTime.of(2026, 11, 7, 10, 0, 0);
+        cliente.setSenhaAlteradaEm(troca);
+        when(jwtTokenProvider.tokenValido("abc")).thenReturn(true);
+        when(jwtTokenProvider.extrairEmail("abc")).thenReturn(cliente.getEmail());
+        when(jwtTokenProvider.extrairEmissao("abc"))
+                .thenReturn(troca.atZone(KiraTimeZone.DEFAULT).toInstant().minusSeconds(60));
+        when(userDetailsService.loadUserByUsername(cliente.getEmail())).thenReturn(cliente);
+        Message<byte[]> mensagem = connect("Bearer abc");
+
+        assertThrows(MessageDeliveryException.class, () -> interceptor.preSend(mensagem, canal));
+        verifyNoInteractions(conexoesAoVivo);
     }
 
     @Test

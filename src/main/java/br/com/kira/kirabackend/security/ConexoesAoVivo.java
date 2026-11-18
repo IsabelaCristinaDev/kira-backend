@@ -1,5 +1,6 @@
 package br.com.kira.kirabackend.security;
 
+import br.com.kira.kirabackend.observer.SenhaRedefinidaEvent;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
@@ -10,6 +11,8 @@ import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 import java.time.Instant;
@@ -29,6 +32,7 @@ public class ConexoesAoVivo {
     // O app renova o token e reconecta quando a recusa começa com "Token"; as outras recusas são definitivas
     static final String TOKEN_EXPIRADO = "Token expirado";
     static final String CONTA_DESATIVADA = "Conta desativada";
+    static final String SENHA_TROCADA = "Senha trocada";
 
     private record Conexao(UUID usuarioId, Instant expira) {
     }
@@ -52,6 +56,20 @@ public class ConexoesAoVivo {
     @EventListener
     public void aoDesconectar(SessionDisconnectEvent evento) {
         conexoes.remove(evento.getSessionId());
+    }
+
+    /**
+     * Senha redefinida: o chat aberto do usuário é fechado na hora, sem esperar o token vencer.
+     * AFTER_COMMIT: só depois que a troca foi gravada. Se ela falhar, ninguém é desconectado.
+     * Síncrono, como os outros listeners do projeto. Vale para as conexões desta instância da API.
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void aoRedefinirSenha(SenhaRedefinidaEvent evento) {
+        conexoes.forEach((sessaoId, conexao) -> {
+            if (conexao.usuarioId().equals(evento.getUsuarioId())) {
+                encerrar(sessaoId, SENHA_TROCADA);
+            }
+        });
     }
 
     @Scheduled(fixedDelayString = "${kira.websocket.verificacao-ms:30000}")

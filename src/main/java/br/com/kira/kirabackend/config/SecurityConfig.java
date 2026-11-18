@@ -1,12 +1,15 @@
 package br.com.kira.kirabackend.config;
 
+import br.com.kira.kirabackend.security.CustomUserDetailsService;
 import br.com.kira.kirabackend.security.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.AccountStatusUserDetailsChecker;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -138,8 +141,29 @@ public class SecurityConfig {
         return config.getAuthenticationManager();
     }
 
+    /**
+     * Confere e-mail e senha no login. Duas proteções contra descobrir quem tem conta pelo tempo de resposta:
+     * <ul>
+     *   <li>E-mail sem conta: o Spring compara a senha com um hash fixo, então o BCrypt roda do mesmo jeito.</li>
+     *   <li>Conta inativa: o padrão do Spring recusaria ANTES de conferir a senha (resposta mais rápida).
+     *       Aqui a situação da conta só é conferida DEPOIS da senha.</li>
+     * </ul>
+     */
+    @Bean
+    public DaoAuthenticationProvider authenticationProvider(
+            CustomUserDetailsService usuarios, PasswordEncoder passwordEncoder) {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(passwordEncoder);
+        provider.setUserDetailsService(usuarios);
+        provider.setPreAuthenticationChecks(usuario -> {
+            // Nada antes da senha: ver o comentário acima
+        });
+        provider.setPostAuthenticationChecks(new AccountStatusUserDetailsChecker());
+        return provider;
+    }
+
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        // Custo 10 escrito por extenso (é o padrão): cada senha leva cerca de 0,1 s para ser conferida
+        return new BCryptPasswordEncoder(10);
     }
 }

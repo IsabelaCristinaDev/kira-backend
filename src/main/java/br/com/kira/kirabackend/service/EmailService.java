@@ -2,6 +2,7 @@ package br.com.kira.kirabackend.service;
 
 import jakarta.annotation.PostConstruct;
 import br.com.kira.kirabackend.domain.entity.Agendamento;
+import br.com.kira.kirabackend.util.MascaraEmail;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -61,14 +62,15 @@ public class EmailService {
                         link + "\n\n" +
                         "Se o link não abrir, use este código na tela de nova senha:\n\n" +
                         token + "\n\n" +
-                        "O link e o código expiram em 30 minutos.\n\n" +
+                        "O link e o código expiram em 15 minutos e só podem ser usados uma vez.\n\n" +
                         "Se você não solicitou a recuperação de senha, ignore este email.\n\n" +
                         "Equipe KIRA"
         );
         try {
             mailSender.send(message);
         } catch (MailException e) {
-            log.warn("Falha ao enviar e-mail de recuperação de senha para {}: {}", destinatario, e.getMessage());
+            log.warn("Falha ao enviar e-mail de recuperação de senha para {}: {}",
+                    MascaraEmail.mascarar(destinatario), MascaraEmail.mascararNoTexto(e.getMessage()));
         }
     }
 
@@ -97,6 +99,28 @@ public class EmailService {
 
     }
 
+    // Avisa o dono quando a conta acumula falhas de login. Não traz IP nem horários do ataque:
+    // só orienta a trocar a senha. Assíncrono e tolerante a falha, como os outros.
+    @Async
+    public void enviarAvisoTentativasSuspeitas(String destinatario, String nome) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(destinatario);
+        message.setSubject("KIRA — Tentativas de acesso à sua conta");
+        message.setText(
+                "Olá, " + nome + "!\n\n" +
+                        "Percebemos várias tentativas de entrar na sua conta KIRA com a senha errada.\n\n" +
+                        "Se foi você, está tudo bem: basta entrar com a senha certa.\n" +
+                        "Se não foi, recomendamos trocar a senha. Abra o app e use \"Esqueci minha senha\":\n\n" +
+                        StringUtils.trimTrailingCharacter(frontendUrl, '/') + "\n\n" +
+                        "Equipe KIRA"
+        );
+        try {
+            mailSender.send(message);
+        } catch (MailException e) {
+            log.warn("Falha ao enviar aviso de tentativas de acesso: {}", MascaraEmail.mascararNoTexto(e.getMessage()));
+        }
+    }
+
     // Assíncrono e tolerante a falha: o cadastro não deve travar nem falhar
     // por indisponibilidade do servidor SMTP.
     @Async
@@ -117,7 +141,8 @@ public class EmailService {
         try {
             mailSender.send(message);
         } catch (MailException e) {
-            log.warn("Falha ao enviar e-mail de boas-vindas para {}: {}", destinatario, e.getMessage());
+            log.warn("Falha ao enviar e-mail de boas-vindas para {}: {}",
+                    MascaraEmail.mascarar(destinatario), MascaraEmail.mascararNoTexto(e.getMessage()));
         }
     }
 }

@@ -11,6 +11,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -45,6 +46,18 @@ public abstract class Usuario implements UserDetails {
     private Boolean ativo = true;
     @Column(name = "data_criacao", nullable = false, updatable = false)
     private LocalDateTime dataCriacao;
+    // Quando a senha foi redefinida, em segundos inteiros (como o "iat" do JWT). Nula se nunca mudou
+    @Column(name = "senha_alterada_em")
+    private LocalDateTime senhaAlteradaEm;
+
+    /**
+     * Token emitido antes da última troca de senha: a sessão dele foi encerrada.
+     * Um token emitido no mesmo segundo da troca continua valendo (o JWT não guarda frações de segundo).
+     */
+    public boolean tokenAnteriorATrocaDeSenha(Instant emitidoEm) {
+        return senhaAlteradaEm != null
+                && emitidoEm.isBefore(senhaAlteradaEm.atZone(KiraTimeZone.DEFAULT).toInstant());
+    }
     @PrePersist
     protected void aoPersistir() {
         this.dataCriacao = LocalDateTime.now(KiraTimeZone.DEFAULT);

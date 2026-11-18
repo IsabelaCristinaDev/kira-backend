@@ -1,5 +1,6 @@
 package br.com.kira.kirabackend.security;
 
+import br.com.kira.kirabackend.observer.SenhaRedefinidaEvent;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,7 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
@@ -47,6 +49,44 @@ class ConexoesAoVivoTest {
         ArgumentCaptor<Message<?>> mensagem = ArgumentCaptor.captor();
         verify(saida).send(mensagem.capture());
         return StompHeaderAccessor.wrap(mensagem.getValue());
+    }
+
+    @Test
+    @DisplayName("Troca de senha encerra na hora todas as conexões daquele usuário, e só as dele")
+    void trocaDeSenhaEncerraConexoesDoUsuario() {
+        UUID bia = UUID.randomUUID();
+        conexoes.registrar("ana-celular", ana, depois);
+        conexoes.registrar("ana-computador", ana, depois);
+        conexoes.registrar("bia-celular", bia, depois);
+
+        conexoes.aoRedefinirSenha(new SenhaRedefinidaEvent(this, ana));
+
+        ArgumentCaptor<Message<?>> mensagens = ArgumentCaptor.captor();
+        verify(saida, times(2)).send(mensagens.capture());
+        Set<String> encerradas = new HashSet<>();
+        for (Message<?> mensagem : mensagens.getAllValues()) {
+            StompHeaderAccessor erro = StompHeaderAccessor.wrap(mensagem);
+            assertEquals(StompCommand.ERROR, erro.getCommand());
+            // Não começa com "Token": o app não tenta renovar e reconectar
+            assertEquals("Senha trocada", erro.getMessage());
+            encerradas.add(erro.getSessionId());
+        }
+        assertEquals(Set.of("ana-celular", "ana-computador"), encerradas);
+    }
+
+    @Test
+    @DisplayName("Depois da troca de senha, a conexão de quem continua não é encerrada pela verificação")
+    void trocaDeSenhaMantemOsOutros() {
+        UUID bia = UUID.randomUUID();
+        conexoes.registrar("ana-celular", ana, depois);
+        conexoes.registrar("bia-celular", bia, depois);
+        conexoes.aoRedefinirSenha(new SenhaRedefinidaEvent(this, ana));
+        when(usuarioRepository.findIdsAtivos(Set.of(bia))).thenReturn(Set.of(bia));
+
+        conexoes.verificar();
+
+        // Só o frame da troca de senha foi enviado: a da Bia segue aberta e a da Ana já não é acompanhada
+        verify(saida, times(1)).send(any());
     }
 
     @Test

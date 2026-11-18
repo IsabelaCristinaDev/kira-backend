@@ -5,62 +5,61 @@ import br.com.kira.kirabackend.domain.entity.Usuario;
 import br.com.kira.kirabackend.dto.request.RecuperacaoSenhaRequest;
 import br.com.kira.kirabackend.dto.request.RedefinicaoSenhaRequest;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
+import br.com.kira.kirabackend.exception.TentativasExcedidasException;
+import br.com.kira.kirabackend.observer.SenhaRedefinidaEvent;
+import br.com.kira.kirabackend.repository.RefreshTokenRepository;
 import br.com.kira.kirabackend.repository.TokenRecuperacaoSenhaRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
+import br.com.kira.kirabackend.security.LimiteDeTentativas;
 import br.com.kira.kirabackend.util.KiraTimeZone;
+import br.com.kira.kirabackend.util.MascaraEmail;
 import lombok.RequiredArgsConstructor;
-
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
-import java.util.HexFormat;
-import java.util.UUID;
+import java.time.temporal.ChronoUnit;
 
-/**
- * O código de redefinição vai só no e-mail. O banco guarda o SHA-256 dele, como faz com a senha:
- * um resumo simples basta porque o código é aleatório, e permite achar o registro pela busca direta.
- */
+@Slf4j
 @RequiredArgsConstructor
 @Service
-@Transactional
 public class RecuperacaoSenhaService {
 
     private final UsuarioRepository usuarioRepository;
     private final TokenRecuperacaoSenhaRepository tokenRepository;
-    private final EmailService emailService;
+    private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
+    private final LimiteDeTentativas limite;
+    private final EnvioRecuperacaoSenha envio;
+    private final ApplicationEventPublisher eventos;
 
-    public void solicitarRecuperacao(RecuperacaoSenhaRequest request) {
-        var usuario = usuarioRepository.findByEmailIgnoreCase(request.email())
-                .orElse(null);
-
-        if (usuario == null) {
-            return;
-        }
-
-        tokenRepository.deleteByUsuarioId(usuario.getId());
-
-        String token = UUID.randomUUID().toString();
-
-        TokenRecuperacaoSenha tokenRecuperacao = new TokenRecuperacaoSenha();
-        tokenRecuperacao.setToken(resumo(token));
-        tokenRecuperacao.setUsuario(usuario);
-        tokenRecuperacao.setDataExpiracao(LocalDateTime.now(KiraTimeZone.DEFAULT).plusMinutes(30));
-        tokenRecuperacao.setUsado(false);
-
-        tokenRepository.save(tokenRecuperacao);
-
-        emailService.enviarEmailRecuperacaoSenha(usuario.getEmail(), token);
+    /**
+     * Confere o limite agora (pode responder 429) e deixa o resto para o segundo plano. Daqui não se consulta
+     * o banco: a resposta é a mesma, no mesmo tempo, exista a conta ou não. O limite também conta
+     * e-mails sem conta, então o 429 não revela nada.
+     */
+    public void solicitarRecuperacao(RecuperacaoSenhaRequest request, String ip) {
+        String email = LimiteDeTentativas.normalizar(request.email());
+        limite.registrarPedidoDeRecuperacao(ip, email).ifPresent(espera -> {
+            log.warn("Recuperação de senha bloqueada por excesso de pedidos: ip={} email={}",
+                    ip, MascaraEmail.mascarar(email));
+            throw new TentativasExcedidasException(espera);
+        });
+        envio.gerarEEnviar(email);
     }
 
-    public void redefinirSenha(RedefinicaoSenhaRequest request) {
+    @Transactional
+    public void redefinirSenha(RedefinicaoSenhaRequest request, String ip) {
+        limite.registrarValidacaoDeToken(ip).ifPresent(espera -> {
+            log.warn("Redefinição de senha bloqueada por excesso de tentativas: ip={}", ip);
+            throw new TentativasExcedidasException(espera);
+        });
+
         TokenRecuperacaoSenha tokenRecuperacao = tokenRepository
-                .findByToken(resumo(request.token()))
+                .findByTokenHash(TokenRecuperacaoSenha.hashDoToken(request.token()))
                 .orElseThrow(() -> new RegraDeNegocioException("Token inválido"));
 
         if (tokenRecuperacao.isExpirado()) {
@@ -73,19 +72,17 @@ public class RecuperacaoSenhaService {
 
         Usuario usuario = tokenRecuperacao.getUsuario();
         usuario.setSenhaHash(passwordEncoder.encode(request.novaSenha()));
+        // Encerra todas as sessões: o JWT emitido antes deste momento deixa de valer,
+        // e sem refresh token ninguém consegue um JWT novo sem a senha nova
+        usuario.setSenhaAlteradaEm(LocalDateTime.now(KiraTimeZone.DEFAULT).truncatedTo(ChronoUnit.SECONDS));
         usuarioRepository.save(usuario);
+        refreshTokenRepository.deleteByUsuarioId(usuario.getId());
+        // O chat aberto também cai: o ConexoesAoVivo fecha as conexões depois do commit
+        eventos.publishEvent(new SenhaRedefinidaEvent(this, usuario.getId()));
 
+        // Uso único: este fica marcado, os outros links pendentes são apagados
         tokenRecuperacao.setUsado(true);
         tokenRepository.save(tokenRecuperacao);
-    }
-
-    static String resumo(String codigo) {
-        try {
-            byte[] bytes = MessageDigest.getInstance("SHA-256").digest(codigo.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(bytes);
-        } catch (NoSuchAlgorithmException e) {
-            // Toda JVM traz o SHA-256: só chega aqui com o ambiente quebrado
-            throw new IllegalStateException("SHA-256 indisponível", e);
-        }
+        tokenRepository.deleteByUsuarioIdAndIdNot(usuario.getId(), tokenRecuperacao.getId());
     }
 }
