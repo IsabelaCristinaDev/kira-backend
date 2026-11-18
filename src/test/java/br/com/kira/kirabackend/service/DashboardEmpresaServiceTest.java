@@ -15,11 +15,13 @@ import br.com.kira.kirabackend.dto.response.ServicoRankingResponse;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.repository.AvaliacaoRepository;
+import br.com.kira.kirabackend.util.KiraTimeZone;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -39,6 +41,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -318,5 +322,95 @@ class DashboardEmpresaServiceTest {
         var gerar = DashboardEmpresaService.class.getMethod("gerar", UUID.class, LocalDate.class, LocalDate.class);
 
         assertTrue(gerar.isAnnotationPresent(org.springframework.transaction.annotation.Transactional.class));
+    }
+
+    @Test
+    @DisplayName("Com só cancelamentos no período, a taxa de conclusão é 0% e os cancelados aparecem")
+    void soCancelamentos() {
+        // Arrange
+        mockarPeriodo();
+        mockarCancelados(2);
+
+        // Act
+        DashboardEmpresaResponse r = gerar();
+
+        // Assert
+        assertEquals(0, r.totalAtendimentos());
+        assertEquals(2, r.totalCancelados());
+        assertEquals(0.0, r.taxaConclusao());
+    }
+
+    @Nested
+    @DisplayName("Período padrão quando as datas não são informadas")
+    class PeriodoPadrao {
+
+        @BeforeEach
+        void periodoQualquerSemAtendimentos() {
+            when(agendamentoRepository.findByEmpresaIdAndStatusAndDataHoraInicioBetween(
+                    eq(empresaId), eq(StatusAgendamento.CONCLUIDO), any(LocalDateTime.class), any(LocalDateTime.class)))
+                    .thenReturn(List.of());
+            mockarCancelados(0);
+        }
+
+        /** Período atual consultado pelo painel: a 1ª das duas buscas (a 2ª é a do período anterior). */
+        private LocalDateTime[] periodoConsultado() {
+            ArgumentCaptor<LocalDateTime> de = ArgumentCaptor.forClass(LocalDateTime.class);
+            ArgumentCaptor<LocalDateTime> ate = ArgumentCaptor.forClass(LocalDateTime.class);
+            verify(agendamentoRepository, times(2)).findByEmpresaIdAndStatusAndDataHoraInicioBetween(
+                    eq(empresaId), eq(StatusAgendamento.CONCLUIDO), de.capture(), ate.capture());
+            return new LocalDateTime[]{de.getAllValues().get(0), ate.getAllValues().get(0)};
+        }
+
+        @Test
+        @DisplayName("Sem nenhuma data, mostra do dia 1º do mês atual até hoje, no horário de Brasília")
+        void semDatasUsaOMesAtual() {
+            // Arrange
+            LocalDate hojeAntes = LocalDate.now(KiraTimeZone.DEFAULT);
+
+            // Act
+            service.gerar(empresaId, null, null);
+
+            // Assert
+            LocalDate hojeDepois = LocalDate.now(KiraTimeZone.DEFAULT);
+            LocalDateTime[] periodo = periodoConsultado();
+            LocalDate fim = periodo[1].toLocalDate();
+            assertTrue(fim.equals(hojeAntes) || fim.equals(hojeDepois), "o fim deve ser hoje");
+            assertEquals(LocalTime.MAX, periodo[1].toLocalTime());
+            assertEquals(fim.withDayOfMonth(1).atStartOfDay(), periodo[0]);
+        }
+
+        @Test
+        @DisplayName("Só com a data de início, o painel vai dessa data até hoje")
+        void soComInicio() {
+            // Arrange
+            LocalDate hojeAntes = LocalDate.now(KiraTimeZone.DEFAULT);
+            LocalDate inicio = hojeAntes.minusDays(10);
+
+            // Act
+            service.gerar(empresaId, inicio, null);
+
+            // Assert
+            LocalDate hojeDepois = LocalDate.now(KiraTimeZone.DEFAULT);
+            LocalDateTime[] periodo = periodoConsultado();
+            assertEquals(inicio.atStartOfDay(), periodo[0]);
+            LocalDate fim = periodo[1].toLocalDate();
+            assertTrue(fim.equals(hojeAntes) || fim.equals(hojeDepois), "o fim deve ser hoje");
+            assertEquals(LocalTime.MAX, periodo[1].toLocalTime());
+        }
+
+        @Test
+        @DisplayName("Só com a data de fim, o painel começa no dia 1º do mês atual")
+        void soComFim() {
+            // Arrange
+            LocalDate hoje = LocalDate.now(KiraTimeZone.DEFAULT);
+
+            // Act
+            service.gerar(empresaId, null, hoje);
+
+            // Assert
+            LocalDateTime[] periodo = periodoConsultado();
+            assertEquals(hoje.withDayOfMonth(1).atStartOfDay(), periodo[0]);
+            assertEquals(hoje.atTime(LocalTime.MAX), periodo[1]);
+        }
     }
 }

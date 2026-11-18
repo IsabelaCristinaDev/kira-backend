@@ -108,6 +108,9 @@ class AgendaFuncionariaServiceTest {
             assertEquals(cliente.getNome(), primeiro.nomeCliente());
             assertEquals(servico.getNome(), primeiro.nomeServico());
             assertEquals(dia.atTime(9, 0), primeiro.dataHoraInicio());
+            assertEquals("Ana", primeiro.nomeFuncionaria());
+            assertEquals(dia.atTime(10, 0), primeiro.dataHoraFim());
+            assertEquals(StatusAgendamento.CONFIRMADO, primeiro.status());
         }
 
         @Test

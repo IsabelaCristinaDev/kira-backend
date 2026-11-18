@@ -19,6 +19,7 @@ import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 import java.time.Instant;
@@ -231,5 +232,96 @@ class WebSocketAutenticacaoInterceptorTest {
         Message<byte[]> mensagem = frame(StompCommand.SEND, topico(), autenticacao());
 
         assertThrows(MessageDeliveryException.class, () -> interceptor.preSend(mensagem, canal));
+    }
+
+    @Test
+    @DisplayName("CONNECT com Authorization sem o prefixo Bearer é recusado sem nem olhar o token")
+    void connectSemPrefixoBearer() {
+        // Arrange
+        Message<byte[]> mensagem = connect("Basic YW5hOnNlbmhh");
+
+        // Act
+        MessageDeliveryException erro = assertThrows(MessageDeliveryException.class,
+                () -> interceptor.preSend(mensagem, canal));
+
+        // Assert
+        assertEquals("Token ausente", erro.getMessage());
+        verifyNoInteractions(jwtTokenProvider, userDetailsService, conexoesAoVivo);
+    }
+
+    @Test
+    @DisplayName("CONNECT cujo usuário carregado não é uma conta do sistema é recusado e não registra a conexão")
+    void connectDeUsuarioQueNaoEConta() {
+        // Arrange: o token é válido, mas o que volta não é um Usuario do KIRA
+        when(jwtTokenProvider.tokenValido("abc")).thenReturn(true);
+        when(jwtTokenProvider.extrairEmail("abc")).thenReturn("externo@example.com");
+        when(userDetailsService.loadUserByUsername("externo@example.com"))
+                .thenReturn(User.withUsername("externo@example.com").password("x").roles("CLIENTE").build());
+        Message<byte[]> mensagem = connect("Bearer abc");
+
+        // Act
+        MessageDeliveryException erro = assertThrows(MessageDeliveryException.class,
+                () -> interceptor.preSend(mensagem, canal));
+
+        // Assert
+        assertEquals("Conexão sem autenticação", erro.getMessage());
+        verifyNoInteractions(conexoesAoVivo);
+    }
+
+    @Test
+    @DisplayName("SUBSCRIBE com autenticação que não traz uma conta do sistema é recusado")
+    void assinaturaComAutenticacaoSemConta() {
+        // Arrange: autenticado, mas o principal não é um Usuario do KIRA
+        Authentication semConta = new UsernamePasswordAuthenticationToken("ana@example.com", null, List.of());
+        Message<byte[]> mensagem = frame(StompCommand.SUBSCRIBE, topico(), semConta);
+
+        // Act
+        MessageDeliveryException erro = assertThrows(MessageDeliveryException.class,
+                () -> interceptor.preSend(mensagem, canal));
+
+        // Assert
+        assertEquals("Conexão sem autenticação", erro.getMessage());
+        verifyNoInteractions(mensagemService);
+    }
+
+    @Test
+    @DisplayName("SUBSCRIBE autenticado mas sem destino é recusado")
+    void assinaturaSemDestino() {
+        // Arrange
+        Message<byte[]> mensagem = frame(StompCommand.SUBSCRIBE, null, autenticacao());
+
+        // Act + Assert
+        assertThrows(MessageDeliveryException.class, () -> interceptor.preSend(mensagem, canal));
+        verifyNoInteractions(mensagemService);
+    }
+
+    @Test
+    @DisplayName("Mensagem que não é STOMP passa direto, sem autenticar nem validar nada")
+    void mensagemQueNaoEStomp() {
+        // Arrange
+        Message<byte[]> mensagem = MessageBuilder.withPayload(new byte[0]).build();
+
+        // Act
+        Message<?> resultado = interceptor.preSend(mensagem, canal);
+
+        // Assert
+        assertSame(mensagem, resultado);
+        verifyNoInteractions(jwtTokenProvider, userDetailsService, mensagemService, conexoesAoVivo);
+    }
+
+    @Test
+    @DisplayName("Heartbeat (frame STOMP sem comando) passa direto, sem autenticar nem validar nada")
+    void heartbeatPassaDireto() {
+        // Arrange
+        StompHeaderAccessor heartbeat = StompHeaderAccessor.createForHeartbeat();
+        heartbeat.setLeaveMutable(true);
+        Message<byte[]> mensagem = MessageBuilder.createMessage(new byte[0], heartbeat.getMessageHeaders());
+
+        // Act
+        Message<?> resultado = interceptor.preSend(mensagem, canal);
+
+        // Assert
+        assertSame(mensagem, resultado);
+        verifyNoInteractions(jwtTokenProvider, userDetailsService, mensagemService, conexoesAoVivo);
     }
 }

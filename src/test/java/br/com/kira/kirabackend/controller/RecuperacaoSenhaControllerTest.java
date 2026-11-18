@@ -26,6 +26,9 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -132,5 +135,34 @@ class RecuperacaoSenhaControllerTest {
 
         redefinir("10.4.1.1", "chute-10").andExpect(status().isTooManyRequests());
         redefinir("10.4.1.2", "chute-11").andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("Redefinir sem token e com senha curta responde 400 com o erro de cada campo, sem procurar o token")
+    void redefinirComCorpoInvalido() throws Exception {
+        mockMvc.perform(post("/api/auth/redefinir-senha")
+                        .with(requisicao -> {
+                            requisicao.setRemoteAddr("10.5.1.1");
+                            return requisicao;
+                        })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"\",\"novaSenha\":\"curta\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.erro").value("VALIDACAO"))
+                .andExpect(jsonPath("$.erros.token").value("Token é obrigatório"))
+                .andExpect(jsonPath("$.erros.novaSenha").value("Senha deve ter no mínimo 8 caracteres"));
+
+        verify(tokenRepository, never()).findByTokenHash(any());
+    }
+
+    @Test
+    @DisplayName("Pedir a recuperação com e-mail inválido responde 400 sem procurar a conta nem enviar e-mail")
+    void recuperarComEmailInvalido() throws Exception {
+        pedirRecuperacao("10.6.1.1", "nao-e-email")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.erros.email").value("Email inválido"));
+
+        verify(usuarioRepository, never()).findByEmailIgnoreCase(any());
+        verifyNoInteractions(envio);
     }
 }

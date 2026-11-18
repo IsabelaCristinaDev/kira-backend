@@ -523,20 +523,24 @@ class AgendamentoServiceTest {
         }
 
         @Test
-        @DisplayName("Deve dar erro quando o serviço não tem empresa cadastrada")
+        @DisplayName("Deve dar erro quando o serviço não está ligado a nenhuma empresa")
         void deveFalharServicoSemEmpresa() {
+            // Arrange
             servico.setEmpresa(null);
             when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
             when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
             when(servicoRepository.findById(servico.getId())).thenReturn(Optional.of(servico));
-
             UUID clienteId = cliente.getId();
             AgendamentoRequest req = request(inicioValido);
 
+            // Act
             RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
                     () -> service.criar(clienteId, clienteId, req));
+
+            // Assert
             assertEquals("Serviço não pertence a este estabelecimento", ex.getMessage());
             verify(agendamentoRepository, never()).save(any());
+            verifyNoInteractions(eventPublisher);
         }
 
         @Test
@@ -656,6 +660,24 @@ class AgendamentoServiceTest {
                     () -> service.confirmar(agendamento.getId(), UUID.randomUUID()));
 
             assertEquals(StatusAgendamento.PENDENTE, agendamento.getStatus());
+            verify(agendamentoRepository, never()).save(any());
+            verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        @DisplayName("Confirmar um agendamento inexistente dá 404")
+        void confirmarInexistente() {
+            // Arrange
+            UUID id = UUID.randomUUID();
+            when(agendamentoRepository.findById(id)).thenReturn(Optional.empty());
+            UUID empresaId = empresa.getId();
+
+            // Act
+            RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
+                    () -> service.confirmar(id, empresaId));
+
+            // Assert
+            assertEquals("Agendamento não encontrado", ex.getMessage());
             verify(agendamentoRepository, never()).save(any());
             verifyNoInteractions(eventPublisher);
         }
@@ -1117,6 +1139,69 @@ class AgendamentoServiceTest {
             verifyNoInteractions(eventPublisher);
         }
 
+        @Test
+        @DisplayName("Cliente cancelando um agendamento inexistente recebe 404")
+        void clienteCancelaInexistente() {
+            // Arrange
+            UUID id = UUID.randomUUID();
+            when(agendamentoRepository.findById(id)).thenReturn(Optional.empty());
+            UUID clienteId = cliente.getId();
+
+            // Act
+            RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
+                    () -> service.cancelarPeloCliente(id, clienteId));
+
+            // Assert
+            assertEquals("Agendamento não encontrado", ex.getMessage());
+            verify(cancelamentoClienteStrategy, never()).validarCancelamento(any());
+            verify(agendamentoRepository, never()).save(any());
+            verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        @DisplayName("Estúdio cancelando um agendamento inexistente recebe 404")
+        void estudioCancelaInexistente() {
+            // Arrange
+            UUID id = UUID.randomUUID();
+            when(agendamentoRepository.findById(id)).thenReturn(Optional.empty());
+            UUID empresaId = empresa.getId();
+
+            // Act
+            RecursoNaoEncontradoException ex = assertThrows(RecursoNaoEncontradoException.class,
+                    () -> service.cancelarPelaEmpresa(id, empresaId));
+
+            // Assert
+            assertEquals("Agendamento não encontrado", ex.getMessage());
+            verify(cancelamentoEmpresaStrategy, never()).validarCancelamento(any());
+            verify(agendamentoRepository, never()).save(any());
+            verifyNoInteractions(eventPublisher);
+        }
+
+        @Test
+        @DisplayName("Sem a estratégia de cancelamento do perfil registrada, falha e nada é cancelado")
+        void semEstrategiaDoPerfil() {
+            // Arrange: só a estratégia do cliente está registrada
+            AgendamentoService semEstrategiaDaEmpresa = new AgendamentoService(
+                    agendamentoRepository, usuarioRepository, servicoRepository, funcionariaRepository,
+                    disponibilidadeRepository, List.of(cancelamentoClienteStrategy), eventPublisher,
+                    new OcupacaoService(agendamentoRepository, funcionariaRepository, bloqueioHorarioRepository),
+                    exigenciaVerificacao);
+            Agendamento agendamento = agendamentoExistente(StatusAgendamento.PENDENTE);
+            when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+            UUID agendamentoId = agendamento.getId();
+            UUID empresaId = empresa.getId();
+
+            // Act
+            IllegalStateException ex = assertThrows(IllegalStateException.class,
+                    () -> semEstrategiaDaEmpresa.cancelarPelaEmpresa(agendamentoId, empresaId));
+
+            // Assert
+            assertEquals("Nenhuma estratégia de cancelamento encontrada para o tipo: EMPRESA", ex.getMessage());
+            assertEquals(StatusAgendamento.PENDENTE, agendamento.getStatus());
+            verify(agendamentoRepository, never()).save(any());
+            verifyNoInteractions(eventPublisher);
+        }
+
         private void assertCanceladoComEvento(Agendamento agendamento) {
             assertEquals(StatusAgendamento.CANCELADO, agendamento.getStatus());
             verify(agendamentoRepository).save(agendamento);
@@ -1396,10 +1481,34 @@ class AgendamentoServiceTest {
             AgendamentoRequest semPreferencia = new AgendamentoRequest(empresa.getId(), null, servico.getId(),
                     inicioValido, null, null);
 
+            // Act
             RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
                     () -> service.criar(clienteId, clienteId, semPreferencia));
+
+            // Assert
             assertEquals("Já existe um agendamento neste horário para este estabelecimento", ex.getMessage());
             verify(agendamentoRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Reagendar com a funcionária desativada passa o horário para outra que esteja livre")
+        void reagendarComFuncionariaDesativada() {
+            // Arrange: a Ana saiu do estúdio, então só a Bia continua ativa
+            funcionaria.setAtivo(false);
+            when(funcionariaRepository.findByEmpresaIdAndAtivoTrue(empresa.getId())).thenReturn(List.of(bia));
+            Agendamento agendamento = daAna();
+            when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
+            mockarAgendamentosNoIntervalo(List.of());
+            mockarSaveDevolvendoArgumento();
+            ReagendamentoRequest req = new ReagendamentoRequest(inicioValido.plusHours(3), null);
+
+            // Act
+            AgendamentoResponse resposta = service.reagendarPelaEmpresa(agendamento.getId(), empresa.getId(), req);
+
+            // Assert
+            assertSame(bia, agendamento.getFuncionaria());
+            assertEquals(bia.getId(), resposta.funcionariaId());
+            assertEquals(StatusAgendamento.REAGENDADO, resposta.status());
         }
     }
 

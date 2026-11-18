@@ -46,7 +46,7 @@ import static org.mockito.Mockito.when;
 @Testcontainers(disabledWithoutDocker = true)
 class LimiteProvadorComBancoRealTest {
 
-    private static final int LIMITE = 5;
+    private static final int LIMITE = 2;
     private static final byte[] JPEG = {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0, 16, 'J', 'F', 'I', 'F'};
     private static final String LIMITE_ATINGIDO = "PROVADOR_LIMITE_DIARIO";
 
@@ -146,8 +146,8 @@ class LimiteProvadorComBancoRealTest {
     }
 
     @Test
-    @DisplayName("A sexta prévia do dia é recusada sem chamar o gerador, e a outra conta continua livre")
-    void sextaRecusada() throws Exception {
+    @DisplayName("A terceira prévia do dia é recusada sem chamar o gerador, e a outra conta continua livre")
+    void terceiraRecusada() throws Exception {
         String token = entrar("seis", "52998224725").get("token").asText();
         gerarAteOLimite(token);
 

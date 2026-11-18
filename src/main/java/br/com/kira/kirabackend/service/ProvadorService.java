@@ -49,7 +49,7 @@ public class ProvadorService {
             GeradorDeImagem geradorDeImagem,
             @Value("${kira.provador.versao-consentimento:v1}") String versaoAtual,
             @Value("${kira.provador.tamanho-maximo-bytes:5242880}") long tamanhoMaximoBytes,
-            @Value("${kira.provador.limite-diario:5}") int limiteDiario) {
+            @Value("${kira.provador.limite-diario:2}") int limiteDiario) {
         this.consentimentoRepository = consentimentoRepository;
         this.usoRepository = usoRepository;
         this.geradorDeImagem = geradorDeImagem;

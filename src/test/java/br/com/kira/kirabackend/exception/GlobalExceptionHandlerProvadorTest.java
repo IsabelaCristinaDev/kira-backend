@@ -41,11 +41,11 @@ class GlobalExceptionHandlerProvadorTest {
     @DisplayName("Limite do dia responde 429 com a mensagem para a pessoa")
     void limiteDoDia() {
         ResponseEntity<GlobalExceptionHandler.ErroResponse> resposta =
-                handler.handleLimiteProvador(new LimiteProvadorException(5), request);
+                handler.handleLimiteProvador(new LimiteProvadorException(2), request);
 
         assertEquals(HttpStatus.TOO_MANY_REQUESTS, resposta.getStatusCode());
         assertEquals("PROVADOR_LIMITE_DIARIO", resposta.getBody().erro());
-        assertEquals("Você chegou ao limite de 5 prévias por dia. Tente novamente amanhã", resposta.getBody().mensagem());
+        assertEquals("Você chegou ao limite de 2 prévias por dia. Tente novamente amanhã", resposta.getBody().mensagem());
     }
 
     @Test
