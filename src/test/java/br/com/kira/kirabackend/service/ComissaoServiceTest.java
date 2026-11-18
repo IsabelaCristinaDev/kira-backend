@@ -74,6 +74,33 @@ class ComissaoServiceTest {
         assertSame(agendamento.getFuncionaria(), comissao.getFuncionaria());
     }
 
+    @Test
+    @DisplayName("Usa o valor guardado no agendamento, e não o preço atual do serviço")
+    void deveUsarValorDoAgendamento() {
+        // Agendado a R$ 80; o estúdio subiu o preço para R$ 120 antes de concluir
+        Agendamento agendamento = agendamento("120.00", "50");
+        agendamento.setValor(new BigDecimal("80.00"));
+
+        service.calcularERegistrarComissao(agendamento);
+
+        ComissaoAgendamento comissao = comissaoSalva();
+        assertEquals(new BigDecimal("40.00"), comissao.getValorComissao());
+        assertEquals(new BigDecimal("80.00"), comissao.getValorServico());
+    }
+
+    @Test
+    @DisplayName("Agendamento antigo, sem valor guardado, usa o preço atual do serviço")
+    void semValorUsaPrecoDoServico() {
+        Agendamento agendamento = agendamento("120.00", "50");
+        agendamento.setValor(null);
+
+        service.calcularERegistrarComissao(agendamento);
+
+        ComissaoAgendamento comissao = comissaoSalva();
+        assertEquals(new BigDecimal("60.00"), comissao.getValorComissao());
+        assertEquals(new BigDecimal("120.00"), comissao.getValorServico());
+    }
+
     @ParameterizedTest(name = "R$ {0} com {1}% = R$ {2}")
     @CsvSource({
             "33.33, 15, 5.00",   // 4,9995 -> 5,00
