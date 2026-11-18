@@ -1,5 +1,7 @@
 package br.com.kira.kirabackend.integracao;
 
+import br.com.kira.kirabackend.domain.entity.TokenRecuperacaoSenha;
+import br.com.kira.kirabackend.util.KiraTimeZone;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -28,6 +30,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -132,6 +135,24 @@ class ConexaoAoVivoComBancoRealTest {
         Conexao conexao = conectar(login.get("token").asText());
 
         assertEquals("Token expirado", conexao.recusa().get(15, TimeUnit.SECONDS));
+        esperarFechar(conexao.sessao());
+    }
+
+    @Test
+    @DisplayName("Redefinir a senha fecha na hora o chat aberto, sem esperar o token vencer")
+    void senhaRedefinida() throws Exception {
+        JsonNode login = entrarComNovaConta("cris", "39053344705");
+        Conexao conexao = conectar(login.get("token").asText());
+        // Link de recuperação com valor conhecido: o banco guarda só o hash, como os de verdade
+        jdbc.update("insert into token_recuperacao_senha (id, token, usuario_id, data_expiracao, usado) "
+                        + "values (gen_random_uuid(), ?, ?, ?, false)",
+                TokenRecuperacaoSenha.hashDoToken("link-do-teste"), UUID.fromString(login.get("id").asText()),
+                LocalDateTime.now(KiraTimeZone.DEFAULT).plusMinutes(15));
+
+        postar("/api/auth/redefinir-senha", Map.of("token", "link-do-teste", "novaSenha", "SenhaNova1234"), 200);
+
+        // Bem antes dos 6 s do token: quem fechou foi a troca de senha
+        assertEquals("Senha trocada", conexao.recusa().get(3, TimeUnit.SECONDS));
         esperarFechar(conexao.sessao());
     }
 

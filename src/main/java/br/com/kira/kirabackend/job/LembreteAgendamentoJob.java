@@ -5,6 +5,7 @@ import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import br.com.kira.kirabackend.service.EmailService;
 import br.com.kira.kirabackend.util.KiraTimeZone;
+import br.com.kira.kirabackend.util.MascaraEmail;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -59,7 +60,8 @@ public class LembreteAgendamentoJob {
                 agendamentoRepository.save(agendamento);
             } catch (Exception e) {
                 log.error("Falha ao enviar lembrete do agendamento {}: {}",
-                        agendamento.getId(), e.getMessage());
+                        // A mensagem do servidor de e-mail costuma trazer o endereço
+                        agendamento.getId(), MascaraEmail.mascararNoTexto(e.getMessage()));
             }
         }
     }

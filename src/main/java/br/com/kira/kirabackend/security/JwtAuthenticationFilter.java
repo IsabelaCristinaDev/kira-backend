@@ -1,5 +1,6 @@
 package br.com.kira.kirabackend.security;
 
+import br.com.kira.kirabackend.domain.entity.Usuario;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -40,6 +41,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             UserDetails userDetails = buscarConta(email);
             // Conta desativada ou excluída depois do login: o token ainda é válido, mas não pode autenticar
             if (userDetails == null || !userDetails.isEnabled()) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+            // Senha redefinida depois que este token foi emitido: a sessão foi encerrada
+            if (userDetails instanceof Usuario usuario
+                    && usuario.tokenAnteriorATrocaDeSenha(jwtTokenProvider.extrairEmissao(token))) {
                 filterChain.doFilter(request, response);
                 return;
             }

@@ -10,9 +10,9 @@ import br.com.kira.kirabackend.dto.response.AgendamentoResponse;
 import br.com.kira.kirabackend.repository.AgendamentoRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -24,16 +24,20 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AgendaFuncionariaServiceTest {
 
+    /** Último instante do dia: 23:59:59.999999999. */
+    private static final LocalTime FIM_DO_DIA = LocalTime.MAX;
+
     @Mock
     private AgendamentoRepository agendamentoRepository;
 
-    @InjectMocks
     private AgendaFuncionariaService service;
 
     private Funcionaria funcionaria;
@@ -43,9 +47,16 @@ class AgendaFuncionariaServiceTest {
 
     @BeforeEach
     void setUp() {
+        service = new AgendaFuncionariaService(agendamentoRepository);
+
         empresa = new Empresa();
         empresa.setId(UUID.randomUUID());
         empresa.setNome("Estúdio");
+
+        funcionaria = new Funcionaria();
+        funcionaria.setId(UUID.randomUUID());
+        funcionaria.setNome("Ana");
+        funcionaria.setEmpresa(empresa);
 
         cliente = new Cliente();
         cliente.setId(UUID.randomUUID());
@@ -56,120 +67,130 @@ class AgendaFuncionariaServiceTest {
         servico.setNome("Design de sobrancelha");
         servico.setDuracaoMinutos(60);
         servico.setEmpresa(empresa);
-
-        funcionaria = new Funcionaria();
-        funcionaria.setId(UUID.randomUUID());
-        funcionaria.setNome("Ana");
-        funcionaria.setEmpresa(empresa);
     }
 
-    private Agendamento agendamentoEm(LocalDateTime inicio) {
-        Agendamento a = new Agendamento();
-        a.setId(UUID.randomUUID());
-        a.setCliente(cliente);
-        a.setEmpresa(empresa);
-        a.setServico(servico);
-        a.setFuncionaria(funcionaria);
-        a.setDataHoraInicio(inicio);
-        a.setDataHoraFim(inicio.plusMinutes(60));
-        a.setStatus(StatusAgendamento.CONFIRMADO);
-        return a;
+    private Agendamento agendamento(LocalDateTime inicio) {
+        Agendamento agendamento = new Agendamento();
+        agendamento.setId(UUID.randomUUID());
+        agendamento.setCliente(cliente);
+        agendamento.setEmpresa(empresa);
+        agendamento.setFuncionaria(funcionaria);
+        agendamento.setServico(servico);
+        agendamento.setDataHoraInicio(inicio);
+        agendamento.setDataHoraFim(inicio.plusMinutes(60));
+        agendamento.setStatus(StatusAgendamento.CONFIRMADO);
+        return agendamento;
     }
 
-    @Test
-    @DisplayName("Agenda do dia busca da meia-noite até o último instante do dia, sem perder o atendimento das 23h")
-    void diaVaiDaMeiaNoiteAoFimDoDia() {
-        // Arrange
-        LocalDate dia = LocalDate.of(2026, 11, 16);
-        LocalDateTime inicioDoDia = LocalDateTime.of(2026, 11, 16, 0, 0);
-        LocalDateTime fimDoDia = LocalDateTime.of(dia, LocalTime.MAX);
-        Agendamento cedo = agendamentoEm(dia.atTime(9, 0));
-        Agendamento tarde = agendamentoEm(dia.atTime(23, 0));
+    private void mockarIntervalo(LocalDateTime inicio, LocalDateTime fim, List<Agendamento> agendamentos) {
         when(agendamentoRepository.findByFuncionariaIdAndDataHoraInicioBetweenOrderByDataHoraInicio(
-                funcionaria.getId(), inicioDoDia, fimDoDia)).thenReturn(List.of(cedo, tarde));
-
-        // Act
-        List<AgendamentoResponse> agenda = service.listarPorDia(funcionaria.getId(), dia);
-
-        // Assert
-        verify(agendamentoRepository).findByFuncionariaIdAndDataHoraInicioBetweenOrderByDataHoraInicio(
-                funcionaria.getId(), inicioDoDia, fimDoDia);
-        assertEquals(List.of(cedo.getId(), tarde.getId()), agenda.stream().map(AgendamentoResponse::id).toList());
+                funcionaria.getId(), inicio, fim)).thenReturn(agendamentos);
     }
 
-    @Test
-    @DisplayName("Agenda da semana cobre 7 dias: do início do dia escolhido até o fim do sexto dia depois")
-    void semanaCobreSeteDias() {
-        // Arrange
-        LocalDate segunda = LocalDate.of(2026, 11, 16);
-        LocalDateTime inicio = LocalDateTime.of(2026, 11, 16, 0, 0);
-        LocalDateTime fim = LocalDateTime.of(LocalDate.of(2026, 11, 22), LocalTime.MAX);
-        Agendamento domingoANoite = agendamentoEm(LocalDateTime.of(2026, 11, 22, 23, 0));
-        when(agendamentoRepository.findByFuncionariaIdAndDataHoraInicioBetweenOrderByDataHoraInicio(
-                funcionaria.getId(), inicio, fim)).thenReturn(List.of(domingoANoite));
+    @Nested
+    @DisplayName("listarPorDia")
+    class ListarPorDia {
 
-        // Act
-        List<AgendamentoResponse> agenda = service.listarPorSemana(funcionaria.getId(), segunda);
+        @Test
+        @DisplayName("Busca do primeiro ao último instante do dia e devolve os agendamentos convertidos, na ordem do banco")
+        void deveListarODiaInteiro() {
+            LocalDate dia = LocalDate.of(2026, 11, 16);
+            Agendamento manha = agendamento(dia.atTime(9, 0));
+            Agendamento noite = agendamento(dia.atTime(19, 30));
+            mockarIntervalo(dia.atStartOfDay(), dia.atTime(FIM_DO_DIA), List.of(manha, noite));
 
-        // Assert
-        verify(agendamentoRepository).findByFuncionariaIdAndDataHoraInicioBetweenOrderByDataHoraInicio(
-                funcionaria.getId(), inicio, fim);
-        assertEquals(1, agenda.size());
-        assertEquals(domingoANoite.getId(), agenda.get(0).id());
+            List<AgendamentoResponse> agenda = service.listarPorDia(funcionaria.getId(), dia);
+
+            assertEquals(List.of(manha.getId(), noite.getId()),
+                    agenda.stream().map(AgendamentoResponse::id).toList());
+            AgendamentoResponse primeiro = agenda.get(0);
+            assertEquals(funcionaria.getId(), primeiro.funcionariaId());
+            assertEquals(cliente.getNome(), primeiro.nomeCliente());
+            assertEquals(servico.getNome(), primeiro.nomeServico());
+            assertEquals(dia.atTime(9, 0), primeiro.dataHoraInicio());
+            assertEquals("Ana", primeiro.nomeFuncionaria());
+            assertEquals(dia.atTime(10, 0), primeiro.dataHoraFim());
+            assertEquals(StatusAgendamento.CONFIRMADO, primeiro.status());
+        }
+
+        @Test
+        @DisplayName("O intervalo do dia vai de 00:00 até 23:59:59.999999999, sem invadir o dia seguinte")
+        void intervaloNaoInvadeODiaSeguinte() {
+            LocalDate dia = LocalDate.of(2026, 11, 16);
+
+            service.listarPorDia(funcionaria.getId(), dia);
+
+            verify(agendamentoRepository).findByFuncionariaIdAndDataHoraInicioBetweenOrderByDataHoraInicio(
+                    funcionaria.getId(),
+                    LocalDateTime.of(2026, 11, 16, 0, 0),
+                    LocalDateTime.of(2026, 11, 16, 23, 59, 59, 999_999_999));
+        }
+
+        @Test
+        @DisplayName("Dia sem atendimentos devolve lista vazia")
+        void diaSemAtendimentos() {
+            LocalDate dia = LocalDate.of(2026, 11, 16);
+            mockarIntervalo(dia.atStartOfDay(), dia.atTime(FIM_DO_DIA), List.of());
+
+            assertTrue(service.listarPorDia(funcionaria.getId(), dia).isEmpty());
+        }
     }
 
-    @Test
-    @DisplayName("Semana que atravessa a virada do mês termina no dia certo do mês seguinte")
-    void semanaNaViradaDoMes() {
-        // Arrange
-        LocalDate sabado = LocalDate.of(2026, 11, 28);
-        LocalDateTime inicio = LocalDateTime.of(2026, 11, 28, 0, 0);
-        LocalDateTime fim = LocalDateTime.of(LocalDate.of(2026, 12, 4), LocalTime.MAX);
-        when(agendamentoRepository.findByFuncionariaIdAndDataHoraInicioBetweenOrderByDataHoraInicio(
-                funcionaria.getId(), inicio, fim)).thenReturn(List.of());
+    @Nested
+    @DisplayName("listarPorSemana")
+    class ListarPorSemana {
 
-        // Act
-        service.listarPorSemana(funcionaria.getId(), sabado);
+        @Test
+        @DisplayName("A semana tem 7 dias: do início do primeiro dia até o fim do sexto dia seguinte")
+        void semanaTemSeteDias() {
+            LocalDate inicio = LocalDate.of(2026, 11, 16);
 
-        // Assert
-        verify(agendamentoRepository).findByFuncionariaIdAndDataHoraInicioBetweenOrderByDataHoraInicio(
-                funcionaria.getId(), inicio, fim);
-    }
+            service.listarPorSemana(funcionaria.getId(), inicio);
 
-    @Test
-    @DisplayName("Dia sem atendimentos devolve a agenda vazia, sem erro")
-    void diaSemAtendimentos() {
-        // Arrange
-        LocalDate dia = LocalDate.of(2026, 11, 17);
-        when(agendamentoRepository.findByFuncionariaIdAndDataHoraInicioBetweenOrderByDataHoraInicio(
-                funcionaria.getId(), dia.atStartOfDay(), dia.atTime(LocalTime.MAX))).thenReturn(List.of());
+            // Fim no dia 22, não no 23: senão a semana teria 8 dias
+            verify(agendamentoRepository).findByFuncionariaIdAndDataHoraInicioBetweenOrderByDataHoraInicio(
+                    funcionaria.getId(),
+                    LocalDateTime.of(2026, 11, 16, 0, 0),
+                    LocalDateTime.of(2026, 11, 22, 23, 59, 59, 999_999_999));
+        }
 
-        // Act
-        List<AgendamentoResponse> agenda = service.listarPorDia(funcionaria.getId(), dia);
+        @Test
+        @DisplayName("Devolve os agendamentos da semana convertidos, na ordem do banco")
+        void deveListarASemana() {
+            LocalDate inicio = LocalDate.of(2026, 11, 16);
+            Agendamento primeiroDia = agendamento(inicio.atTime(10, 0));
+            Agendamento ultimoDia = agendamento(inicio.plusDays(6).atTime(17, 0));
+            mockarIntervalo(inicio.atStartOfDay(), inicio.plusDays(6).atTime(FIM_DO_DIA),
+                    List.of(primeiroDia, ultimoDia));
 
-        // Assert
-        assertTrue(agenda.isEmpty());
-    }
+            List<AgendamentoResponse> agenda = service.listarPorSemana(funcionaria.getId(), inicio);
 
-    @Test
-    @DisplayName("Cada item da agenda traz cliente, serviço, funcionária e horários do atendimento")
-    void itemDaAgendaTrazOsDados() {
-        // Arrange
-        LocalDate dia = LocalDate.of(2026, 11, 16);
-        Agendamento atendimento = agendamentoEm(dia.atTime(14, 0));
-        when(agendamentoRepository.findByFuncionariaIdAndDataHoraInicioBetweenOrderByDataHoraInicio(
-                funcionaria.getId(), dia.atStartOfDay(), dia.atTime(LocalTime.MAX))).thenReturn(List.of(atendimento));
+            assertEquals(List.of(primeiroDia.getId(), ultimoDia.getId()),
+                    agenda.stream().map(AgendamentoResponse::id).toList());
+            assertEquals(inicio.plusDays(6).atTime(17, 0), agenda.get(1).dataHoraInicio());
+        }
 
-        // Act
-        AgendamentoResponse item = service.listarPorDia(funcionaria.getId(), dia).get(0);
+        @Test
+        @DisplayName("Semana que atravessa a virada do ano termina no dia certo do ano seguinte")
+        void semanaNaViradaDoAno() {
+            LocalDate inicio = LocalDate.of(2026, 12, 28);
 
-        // Assert
-        assertEquals("Cliente", item.nomeCliente());
-        assertEquals("Design de sobrancelha", item.nomeServico());
-        assertEquals(funcionaria.getId(), item.funcionariaId());
-        assertEquals("Ana", item.nomeFuncionaria());
-        assertEquals(dia.atTime(14, 0), item.dataHoraInicio());
-        assertEquals(dia.atTime(15, 0), item.dataHoraFim());
-        assertEquals(StatusAgendamento.CONFIRMADO, item.status());
+            service.listarPorSemana(funcionaria.getId(), inicio);
+
+            verify(agendamentoRepository).findByFuncionariaIdAndDataHoraInicioBetweenOrderByDataHoraInicio(
+                    eq(funcionaria.getId()),
+                    eq(LocalDateTime.of(2026, 12, 28, 0, 0)),
+                    eq(LocalDateTime.of(2027, 1, 3, 23, 59, 59, 999_999_999)));
+        }
+
+        @Test
+        @DisplayName("Semana sem atendimentos devolve lista vazia")
+        void semanaSemAtendimentos() {
+            when(agendamentoRepository.findByFuncionariaIdAndDataHoraInicioBetweenOrderByDataHoraInicio(
+                    eq(funcionaria.getId()), any(LocalDateTime.class), any(LocalDateTime.class)))
+                    .thenReturn(List.of());
+
+            assertTrue(service.listarPorSemana(funcionaria.getId(), LocalDate.of(2026, 11, 16)).isEmpty());
+        }
     }
 }

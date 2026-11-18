@@ -615,4 +615,39 @@ class DisponibilidadeServiceTest {
                 () -> service.calcularSlotsDisponiveis(empresaId, servicoId, SEGUNDA, null, VESPERA));
         verifyNoInteractions(disponibilidadeRepository, servicoRepository, agendamentoRepository);
     }
+
+    @Test
+    @DisplayName("Lista o expediente da empresa ativa em ordem de dia da semana, mesmo que o banco devolva fora de ordem")
+    void listaExpedienteEmOrdemDeDia() {
+        DisponibilidadeEstudio sexta = expediente(DiaSemana.SEXTA, hora(10, 0), hora(16, 0));
+        DisponibilidadeEstudio domingo = expediente(DiaSemana.DOMINGO, hora(8, 0), hora(12, 0));
+        DisponibilidadeEstudio segunda = expediente(DiaSemana.SEGUNDA, hora(9, 0), hora(18, 0));
+        when(disponibilidadeRepository.findByEmpresaId(empresa.getId())).thenReturn(List.of(sexta, domingo, segunda));
+
+        List<DisponibilidadeResponse> semana = service.listarPorEmpresa(empresa.getId());
+
+        assertEquals(List.of(DiaSemana.DOMINGO, DiaSemana.SEGUNDA, DiaSemana.SEXTA),
+                semana.stream().map(DisponibilidadeResponse::diaSemana).toList());
+        assertEquals(segunda.getId(), semana.get(1).id());
+        assertEquals(hora(9, 0), semana.get(1).horaInicio());
+        assertEquals(hora(18, 0), semana.get(1).horaFim());
+    }
+
+    @Test
+    @DisplayName("Empresa ativa sem expediente cadastrado recebe lista vazia")
+    void listaExpedienteVazio() {
+        when(disponibilidadeRepository.findByEmpresaId(empresa.getId())).thenReturn(List.of());
+
+        assertTrue(service.listarPorEmpresa(empresa.getId()).isEmpty());
+    }
+
+    private DisponibilidadeEstudio expediente(DiaSemana dia, LocalTime abertura, LocalTime fechamento) {
+        DisponibilidadeEstudio disponibilidade = new DisponibilidadeEstudio();
+        disponibilidade.setId(UUID.randomUUID());
+        disponibilidade.setEmpresa(empresa);
+        disponibilidade.setDiaSemana(dia);
+        disponibilidade.setHoraInicio(abertura);
+        disponibilidade.setHoraFim(fechamento);
+        return disponibilidade;
+    }
 }

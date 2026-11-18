@@ -7,7 +7,10 @@ import br.com.kira.kirabackend.dto.request.LoginRequest;
 import br.com.kira.kirabackend.dto.request.RefreshTokenRequest;
 import br.com.kira.kirabackend.dto.request.TrocaSenhaRequest;
 import br.com.kira.kirabackend.dto.response.LoginResponse;
+import br.com.kira.kirabackend.security.IpDoCliente;
+import br.com.kira.kirabackend.security.ProtecaoLogin;
 import br.com.kira.kirabackend.service.AuthService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,10 +24,13 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final ProtecaoLogin protecaoLogin;
+    private final IpDoCliente ipDoCliente;
 
+    // A proteção envolve o login (como um filtro): limite de tentativas, atraso e aviso ficam no ProtecaoLogin
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody @Valid LoginRequest data) {
-        var loginResponse = authService.login(data);
+    public ResponseEntity<LoginResponse> login(@RequestBody @Valid LoginRequest data, HttpServletRequest request) {
+        var loginResponse = protecaoLogin.proteger(ipDoCliente.de(request), data.email(), () -> authService.login(data));
         return ResponseEntity.ok(loginResponse);
     }
 

@@ -12,12 +12,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.mail.MailSendException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -29,7 +33,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class LembreteAgendamentoJobTest {
 
     @Mock
@@ -88,6 +92,22 @@ class LembreteAgendamentoJobTest {
 
         verifyNoInteractions(emailService);
         verify(agendamentoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("O log da falha de envio mascara o e-mail que vem na mensagem do SMTP")
+    void logDaFalhaMascaraEmail(CapturedOutput saida) {
+        Agendamento comFalha = novoAgendamento("falha.lembrete@teste.com");
+        when(agendamentoRepository.findByStatusNotInAndLembreteEnviadoFalseAndDataHoraInicioBetween(
+                anyList(), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(List.of(comFalha));
+        doThrow(new MailSendException("550 <falha.lembrete@teste.com> recipient rejected"))
+                .when(emailService).enviarLembreteAgendamento(eq("falha.lembrete@teste.com"), any());
+
+        job.enviarLembretes();
+
+        assertTrue(saida.getOut().contains("fa***@teste.com"), saida.getOut());
+        assertFalse(saida.getOut().contains("falha.lembrete@teste.com"), saida.getOut());
     }
 
     @Test

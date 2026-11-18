@@ -2,6 +2,7 @@ package br.com.kira.kirabackend.exception;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -14,6 +15,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 class GlobalExceptionHandlerTest {
@@ -80,57 +82,91 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    @DisplayName("E-mail já cadastrado responde 409 com o código EMAIL_JA_CADASTRADO")
+    @DisplayName("Recurso não encontrado responde 404 com a mensagem da exceção")
+    void recursoNaoEncontrado() {
+        ResponseEntity<GlobalExceptionHandler.ErroResponse> resposta = handler.handleRecursoNaoEncontrado(
+                new RecursoNaoEncontradoException("Agendamento não encontrado"), request);
+
+        assertEquals(HttpStatus.NOT_FOUND, resposta.getStatusCode());
+        GlobalExceptionHandler.ErroResponse corpo = resposta.getBody();
+        assertEquals(404, corpo.status());
+        assertEquals("RECURSO_NAO_ENCONTRADO", corpo.erro());
+        assertEquals("Agendamento não encontrado", corpo.mensagem());
+        assertEquals("/api/teste", corpo.path());
+        assertNotNull(corpo.timestamp());
+        assertNull(corpo.erros());
+    }
+
+    @Test
+    @DisplayName("E-mail já cadastrado responde 409 com código próprio")
     void emailJaCadastrado() {
-        // Act
         ResponseEntity<GlobalExceptionHandler.ErroResponse> resposta =
                 handler.handleEmailJaCadastrado(new EmailJaCadastradoException(), request);
 
-        // Assert
         assertEquals(HttpStatus.CONFLICT, resposta.getStatusCode());
-        assertEquals(409, resposta.getBody().status());
-        assertEquals("EMAIL_JA_CADASTRADO", resposta.getBody().erro());
-        assertEquals("Email já cadastrado", resposta.getBody().mensagem());
-        assertEquals("/api/teste", resposta.getBody().path());
-        assertNull(resposta.getBody().erros());
+        GlobalExceptionHandler.ErroResponse corpo = resposta.getBody();
+        assertEquals(409, corpo.status());
+        assertEquals("EMAIL_JA_CADASTRADO", corpo.erro());
+        assertEquals("Email já cadastrado", corpo.mensagem());
+        assertEquals("/api/teste", corpo.path());
+        assertNull(corpo.erros());
     }
 
     @Test
-    @DisplayName("CPF ou CNPJ já cadastrado responde 409 com o código DOCUMENTO_JA_CADASTRADO e a mensagem da exceção")
+    @DisplayName("CPF ou CNPJ já cadastrado responde 409 com código diferente do de e-mail")
     void documentoJaCadastrado() {
-        // Act
         ResponseEntity<GlobalExceptionHandler.ErroResponse> resposta = handler.handleDocumentoJaCadastrado(
-                new DocumentoJaCadastradoException("CPF já cadastrado"), request);
+                new DocumentoJaCadastradoException("CNPJ já cadastrado"), request);
 
-        // Assert
         assertEquals(HttpStatus.CONFLICT, resposta.getStatusCode());
-        assertEquals(409, resposta.getBody().status());
-        assertEquals("DOCUMENTO_JA_CADASTRADO", resposta.getBody().erro());
-        assertEquals("CPF já cadastrado", resposta.getBody().mensagem());
-        assertEquals("/api/teste", resposta.getBody().path());
-        assertNull(resposta.getBody().erros());
+        GlobalExceptionHandler.ErroResponse corpo = resposta.getBody();
+        assertEquals(409, corpo.status());
+        assertEquals("DOCUMENTO_JA_CADASTRADO", corpo.erro());
+        assertEquals("CNPJ já cadastrado", corpo.mensagem());
+        assertEquals("/api/teste", corpo.path());
+        assertNull(corpo.erros());
     }
 
     @Test
-    @DisplayName("Validação responde 400 e junta com '; ' os erros do mesmo campo, na ordem em que vieram")
-    void validacaoJuntaErrosDoMesmoCampo() {
-        // Arrange
-        BeanPropertyBindingResult resultado = new BeanPropertyBindingResult(new Object(), "cadastroRequest");
-        resultado.addError(new FieldError("cadastroRequest", "senha", "A senha deve ter no mínimo 8 caracteres"));
-        resultado.addError(new FieldError("cadastroRequest", "email", "E-mail inválido"));
-        resultado.addError(new FieldError("cadastroRequest", "senha", "A senha deve ter letras e números"));
-        MethodArgumentNotValidException erro = new MethodArgumentNotValidException(null, resultado);
+    @DisplayName("Validação responde 400 com mensagem fixa e o erro de cada campo, na ordem em que vieram")
+    void validacaoListaOsCampos() throws NoSuchMethodException {
+        MethodArgumentNotValidException erro = erroDeValidacao(
+                new FieldError("request", "email", "E-mail inválido"),
+                new FieldError("request", "senha", "A senha precisa ter pelo menos 8 caracteres"));
 
-        // Act
         ResponseEntity<GlobalExceptionHandler.ErroResponse> resposta = handler.handleValidacao(erro, request);
 
-        // Assert
         assertEquals(HttpStatus.BAD_REQUEST, resposta.getStatusCode());
-        assertEquals("VALIDACAO", resposta.getBody().erro());
-        assertEquals("Erro de validação nos campos informados", resposta.getBody().mensagem());
-        Map<String, String> erros = resposta.getBody().erros();
-        assertEquals(List.of("senha", "email"), List.copyOf(erros.keySet()));
-        assertEquals("A senha deve ter no mínimo 8 caracteres; A senha deve ter letras e números", erros.get("senha"));
-        assertEquals("E-mail inválido", erros.get("email"));
+        GlobalExceptionHandler.ErroResponse corpo = resposta.getBody();
+        assertEquals(400, corpo.status());
+        assertEquals("VALIDACAO", corpo.erro());
+        assertEquals("Erro de validação nos campos informados", corpo.mensagem());
+        assertEquals("/api/teste", corpo.path());
+        assertEquals(List.of("email", "senha"), List.copyOf(corpo.erros().keySet()));
+        assertEquals("E-mail inválido", corpo.erros().get("email"));
+        assertEquals("A senha precisa ter pelo menos 8 caracteres", corpo.erros().get("senha"));
+    }
+
+    @Test
+    @DisplayName("Dois erros no mesmo campo aparecem juntos, separados por ponto e vírgula, sem perder nenhum")
+    void validacaoJuntaErrosDoMesmoCampo() throws NoSuchMethodException {
+        MethodArgumentNotValidException erro = erroDeValidacao(
+                new FieldError("request", "senha", "A senha é obrigatória"),
+                new FieldError("request", "senha", "A senha precisa ter pelo menos 8 caracteres"));
+
+        Map<String, String> erros = handler.handleValidacao(erro, request).getBody().erros();
+
+        assertEquals(1, erros.size());
+        assertEquals("A senha é obrigatória; A senha precisa ter pelo menos 8 caracteres", erros.get("senha"));
+    }
+
+    private static MethodArgumentNotValidException erroDeValidacao(FieldError... erros)
+            throws NoSuchMethodException {
+        BeanPropertyBindingResult resultado = new BeanPropertyBindingResult(new Object(), "request");
+        for (FieldError erro : erros) {
+            resultado.addError(erro);
+        }
+        MethodParameter parametro = new MethodParameter(Object.class.getMethod("equals", Object.class), 0);
+        return new MethodArgumentNotValidException(parametro, resultado);
     }
 }

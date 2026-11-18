@@ -52,6 +52,17 @@ class JwtTokenProviderTest {
     }
 
     @Test
+    @DisplayName("O momento de emissão (iat) do token sai em segundos inteiros, igual ao do JWT")
+    void extraiEmissao() {
+        Instant antes = Instant.now().minusSeconds(1);
+
+        Instant emissao = provider.extrairEmissao(provider.gerarToken(usuario, "CLIENTE"));
+
+        assertEquals(0, emissao.getNano());
+        assertTrue(emissao.isAfter(antes) && !emissao.isAfter(Instant.now()), emissao.toString());
+    }
+
+    @Test
     @DisplayName("Token gerado é válido e devolve o e-mail certo")
     void tokenGeradoEhValido() {
         String token = provider.gerarToken(usuario, "CLIENTE");
@@ -78,6 +89,20 @@ class JwtTokenProviderTest {
         long segundosAteExpirar = claims.getExpiration().toInstant().getEpochSecond() - antes.getEpochSecond();
         assertTrue(segundosAteExpirar >= 3599 && segundosAteExpirar <= 3601,
                 "expiração deveria ser ~1h, foi " + segundosAteExpirar + "s");
+    }
+
+    @Test
+    @DisplayName("A expiração lida do token é a gravada nele, uma hora depois da emissão")
+    void extraiExpiracao() {
+        String token = provider.gerarToken(usuario, "CLIENTE");
+
+        Instant expiracao = provider.extrairExpiracao(token);
+
+        assertEquals(lerClaims(token).getExpiration().toInstant(), expiracao);
+        long segundosDepoisDaEmissao = expiracao.getEpochSecond() - provider.extrairEmissao(token).getEpochSecond();
+        // Emissão e expiração são lidas do relógio em momentos separados: pode virar um segundo entre elas
+        assertTrue(segundosDepoisDaEmissao >= 3600 && segundosDepoisDaEmissao <= 3601,
+                "expiração deveria ser 1h após a emissão, foi " + segundosDepoisDaEmissao + "s");
     }
 
     @Test

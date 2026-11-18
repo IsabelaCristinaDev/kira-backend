@@ -19,6 +19,7 @@ public class CustomUserDetailsService implements UserDetailsService {
             throws UsernameNotFoundException {
         return usuarioRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new UsernameNotFoundException(
-                        "Usuário não encontrado: " + email));
+                        // Sem o e-mail: esta mensagem pode acabar num log
+                        "Usuário não encontrado"));
     }
 }

@@ -1,11 +1,15 @@
 package br.com.kira.kirabackend.controller;
 
+import br.com.kira.kirabackend.config.LimiteTentativasConfig;
 import br.com.kira.kirabackend.config.SecurityConfig;
-import br.com.kira.kirabackend.dto.request.RecuperacaoSenhaRequest;
-import br.com.kira.kirabackend.dto.request.RedefinicaoSenhaRequest;
-import br.com.kira.kirabackend.exception.RegraDeNegocioException;
+import br.com.kira.kirabackend.domain.entity.Cliente;
+import br.com.kira.kirabackend.repository.RefreshTokenRepository;
+import br.com.kira.kirabackend.repository.TokenRecuperacaoSenhaRepository;
+import br.com.kira.kirabackend.repository.UsuarioRepository;
 import br.com.kira.kirabackend.security.CustomUserDetailsService;
+import br.com.kira.kirabackend.security.IpDoCliente;
 import br.com.kira.kirabackend.security.JwtTokenProvider;
+import br.com.kira.kirabackend.service.EnvioRecuperacaoSenha;
 import br.com.kira.kirabackend.service.RecuperacaoSenhaService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,54 +19,132 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
 
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-// Controller de verdade com o SecurityConfig de verdade: confere que as rotas são públicas,
-// que o @Valid recusa o corpo inválido e que o erro do service chega como 400.
+// Service e limite de verdade; o envio (em segundo plano) e o banco ficam simulados.
+// Cada teste usa e-mails e IPs próprios, porque o contador é o mesmo durante toda a classe.
 @WebMvcTest(controllers = RecuperacaoSenhaController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, LimiteTentativasConfig.class, IpDoCliente.class, RecuperacaoSenhaService.class})
 class RecuperacaoSenhaControllerTest {
 
-    private static final String REDEFINIR = "/api/auth/redefinir-senha";
-    private static final String RECUPERAR = "/api/auth/recuperar-senha";
+    private static final String MENSAGEM = "Se o e-mail estiver cadastrado, enviaremos as instruções.";
 
     @Autowired
     private MockMvc mockMvc;
 
     @MockBean
-    private RecuperacaoSenhaService recuperacaoSenhaService;
+    private EnvioRecuperacaoSenha envio;
 
-    // Dependências do JwtAuthenticationFilter. Sem header Authorization o filtro não as usa.
+    @MockBean
+    private UsuarioRepository usuarioRepository;
+
+    @MockBean
+    private TokenRecuperacaoSenhaRepository tokenRepository;
+
+    @MockBean
+    private RefreshTokenRepository refreshTokenRepository;
+
+    // Dependências do JwtAuthenticationFilter e do SecurityConfig
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
 
     @MockBean
     private CustomUserDetailsService customUserDetailsService;
 
-    @Test
-    @DisplayName("Redefinir a senha com token e senha válidos, sem estar logada, responde 200 e chama o service")
-    void redefinirComDadosValidos() throws Exception {
-        // Act + Assert
-        mockMvc.perform(post(REDEFINIR)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"token\":\"abc-123\",\"novaSenha\":\"NovaSenha1\"}"))
-                .andExpect(status().isOk());
+    private ResultActions pedirRecuperacao(String ip, String email) throws Exception {
+        return mockMvc.perform(post("/api/auth/recuperar-senha")
+                .with(requisicao -> {
+                    requisicao.setRemoteAddr(ip);
+                    return requisicao;
+                })
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"" + email + "\"}"));
+    }
 
-        verify(recuperacaoSenhaService).redefinirSenha(new RedefinicaoSenhaRequest("abc-123", "NovaSenha1"));
+    private ResultActions redefinir(String ip, String token) throws Exception {
+        return mockMvc.perform(post("/api/auth/redefinir-senha")
+                .with(requisicao -> {
+                    requisicao.setRemoteAddr(ip);
+                    return requisicao;
+                })
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"token\":\"" + token + "\",\"novaSenha\":\"novaSenha123\"}"));
     }
 
     @Test
-    @DisplayName("Redefinir sem token e com senha curta responde 400 com o erro de cada campo, sem chamar o service")
+    @DisplayName("E-mail cadastrado e e-mail sem conta recebem exatamente a mesma resposta")
+    void respostaIdentica() throws Exception {
+        Cliente ana = new Cliente();
+        ana.setEmail("cadastrada@teste.com");
+        when(usuarioRepository.findByEmailIgnoreCase("cadastrada@teste.com")).thenReturn(Optional.of(ana));
+        when(usuarioRepository.findByEmailIgnoreCase("sem-conta@teste.com")).thenReturn(Optional.empty());
+
+        MvcResult comConta = pedirRecuperacao("10.1.1.1", "cadastrada@teste.com").andReturn();
+        MvcResult semConta = pedirRecuperacao("10.1.1.2", "sem-conta@teste.com").andReturn();
+
+        assertEquals(200, comConta.getResponse().getStatus());
+        assertEquals(comConta.getResponse().getStatus(), semConta.getResponse().getStatus());
+        assertEquals(comConta.getResponse().getContentAsString(), semConta.getResponse().getContentAsString());
+        pedirRecuperacao("10.1.1.3", "outra@teste.com").andExpect(jsonPath("$.mensagem").value(MENSAGEM));
+    }
+
+    @Test
+    @DisplayName("O 4º pedido de recuperação do mesmo e-mail na hora recebe 429 com Retry-After")
+    void quartoPedidoDoEmail429() throws Exception {
+        for (int i = 0; i < 3; i++) {
+            pedirRecuperacao("10.2.1." + i, "limite@teste.com").andExpect(status().isOk());
+        }
+
+        pedirRecuperacao("10.2.1.9", "limite@teste.com")
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "3600"))
+                .andExpect(jsonPath("$.erro").value("TENTATIVAS_EXCEDIDAS"));
+    }
+
+    @Test
+    @DisplayName("Token inválido na redefinição é rejeitado com 400")
+    void tokenInvalido400() throws Exception {
+        when(tokenRepository.findByTokenHash(any())).thenReturn(Optional.empty());
+
+        redefinir("10.3.1.1", "token-inventado")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem").value("Token inválido"));
+    }
+
+    @Test
+    @DisplayName("A 11ª tentativa de validar token do mesmo IP recebe 429")
+    void validacaoDeTokenLimitada() throws Exception {
+        when(tokenRepository.findByTokenHash(any())).thenReturn(Optional.empty());
+        for (int i = 0; i < 10; i++) {
+            redefinir("10.4.1.1", "chute-" + i).andExpect(status().isBadRequest());
+        }
+
+        redefinir("10.4.1.1", "chute-10").andExpect(status().isTooManyRequests());
+        redefinir("10.4.1.2", "chute-11").andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("Redefinir sem token e com senha curta responde 400 com o erro de cada campo, sem procurar o token")
     void redefinirComCorpoInvalido() throws Exception {
-        // Act + Assert
-        mockMvc.perform(post(REDEFINIR)
+        mockMvc.perform(post("/api/auth/redefinir-senha")
+                        .with(requisicao -> {
+                            requisicao.setRemoteAddr("10.5.1.1");
+                            return requisicao;
+                        })
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"token\":\"\",\"novaSenha\":\"curta\"}"))
                 .andExpect(status().isBadRequest())
@@ -70,46 +152,17 @@ class RecuperacaoSenhaControllerTest {
                 .andExpect(jsonPath("$.erros.token").value("Token é obrigatório"))
                 .andExpect(jsonPath("$.erros.novaSenha").value("Senha deve ter no mínimo 8 caracteres"));
 
-        verify(recuperacaoSenhaService, never()).redefinirSenha(any());
+        verify(tokenRepository, never()).findByTokenHash(any());
     }
 
     @Test
-    @DisplayName("Token inválido, expirado ou já usado vira 400 com a mensagem do service")
-    void redefinirComTokenRecusado() throws Exception {
-        // Arrange
-        doThrow(new RegraDeNegocioException("Token expirado"))
-                .when(recuperacaoSenhaService).redefinirSenha(any());
-
-        // Act + Assert
-        mockMvc.perform(post(REDEFINIR)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"token\":\"velho\",\"novaSenha\":\"NovaSenha1\"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.mensagem").value("Token expirado"));
-    }
-
-    @Test
-    @DisplayName("Pedir a recuperação com e-mail válido, sem estar logada, responde 200 e chama o service")
-    void recuperarComEmailValido() throws Exception {
-        // Act + Assert
-        mockMvc.perform(post(RECUPERAR)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"ana@example.com\"}"))
-                .andExpect(status().isOk());
-
-        verify(recuperacaoSenhaService).solicitarRecuperacao(new RecuperacaoSenhaRequest("ana@example.com"));
-    }
-
-    @Test
-    @DisplayName("Pedir a recuperação com e-mail inválido responde 400 sem chamar o service")
+    @DisplayName("Pedir a recuperação com e-mail inválido responde 400 sem procurar a conta nem enviar e-mail")
     void recuperarComEmailInvalido() throws Exception {
-        // Act + Assert
-        mockMvc.perform(post(RECUPERAR)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"email\":\"nao-e-email\"}"))
+        pedirRecuperacao("10.6.1.1", "nao-e-email")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.erros.email").value("Email inválido"));
 
-        verify(recuperacaoSenhaService, never()).solicitarRecuperacao(any());
+        verify(usuarioRepository, never()).findByEmailIgnoreCase(any());
+        verifyNoInteractions(envio);
     }
 }
