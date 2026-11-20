@@ -3,11 +3,15 @@ package br.com.kira.kirabackend.repository;
 import br.com.kira.kirabackend.domain.entity.Agendamento;
 import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import jakarta.persistence.LockModeType;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -16,6 +20,14 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID> 
     List<Agendamento> findByClienteIdAndStatusOrderByDataHoraInicioDesc(
             UUID clienteId,
             StatusAgendamento status);
+
+    /**
+     * Trava o agendamento até o fim da transação: dois pedidos ao mesmo tempo sobre o código de chegada
+     * (gerar duas vezes, validar duas vezes) passam um de cada vez.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from Agendamento a where a.id = :id")
+    Optional<Agendamento> travarParaChegada(UUID id);
 
     List<Agendamento> findByClienteId(UUID clienteId);
 

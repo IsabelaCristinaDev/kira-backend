@@ -74,6 +74,14 @@ public class GlobalExceptionHandler {
                         null));
     }
 
+    // 400 com o motivo no "erro" (TOKEN_INVALIDO, TOKEN_EXPIRADO, TOKEN_JA_UTILIZADO): o app mostra a mensagem de cada um
+    @ExceptionHandler(CodigoChegadaException.class)
+    public ResponseEntity<ErroResponse> handleCodigoChegada(
+            CodigoChegadaException ex,
+            HttpServletRequest request) {
+        return resposta(HttpStatus.BAD_REQUEST, ex.getMotivo().name(), ex.getMessage(), request);
+    }
+
     // 403: a conta logada não é dona do recurso. O código é outro que o da verificação obrigatória, que também é 403
     @ExceptionHandler(AcessoNegadoException.class)
     public ResponseEntity<ErroResponse> handleAcessoNegado(

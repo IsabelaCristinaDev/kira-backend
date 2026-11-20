@@ -149,3 +149,36 @@ Rotas públicas, sem `Authorization`:
 | REC-12 | 10 pedidos do mesmo IP em e-mails diferentes | 11 pedidos de `recuperar-senha`, cada um com um e-mail diferente | o 11º recebe 429 | Coberto por `LimiteDeTentativasTest`. Não rodado à mão: bloqueia a recuperação local por 1 h |
 
 Os cenários REC-07 a REC-11 dependem do código que chega por e-mail e são feitos à mão, com uma conta de e-mail real.
+
+---
+
+## Confirmação presencial (código de chegada)
+
+A cliente gera um código de 6 dígitos quando está a caminho ("Estou a caminho") e o mostra ao chegar; o
+estúdio digita o código e o agendamento passa para `CHEGADA_CONFIRMADA`. O código vale por 15 minutos e
+uma vez só, e só pode ser gerado com o agendamento confirmado, a partir de 2 horas antes do horário até o
+fim do atendimento. Depois de 5 tentativas erradas, o código deixa de valer e a cliente gera outro.
+O teste automatizado `ChegadaComBancoRealTest` percorre este fluxo com o banco real.
+
+Pré-condição: agendamento da Ana **confirmado** pelo estúdio, começando em menos de 2 horas (para testar
+na hora, criar o agendamento para mais tarde no mesmo dia).
+
+| ID | Cenário | Request | Esperado | Resultado |
+|---|---|---|---|---|
+| CHE-01 | Gerar sem token | `POST /api/agendamentos/{id}/token-chegada` sem `Authorization` | 401 | Pendente |
+| CHE-02 | Cliente gera o código | `POST /api/agendamentos/{id}/token-chegada` com o token da Ana | 200 com `codigo` (6 dígitos) e `expiraEm` | Pendente |
+| CHE-03 | Cliente vê o código de novo | `GET /api/agendamentos/{id}/token-chegada` com o token da Ana | 200 com o mesmo `codigo` | Pendente |
+| CHE-04 | Outra cliente não vê o código | `GET /api/agendamentos/{id}/token-chegada` com o token da Bia | 403 | Pendente |
+| CHE-05 | Estúdio erra o código | `POST /api/agendamentos/{id}/chegada/validar` com o token do estúdio e outro código | 400 com `"erro": "TOKEN_INVALIDO"` | Pendente |
+| CHE-06 | Cliente não valida o próprio código | `POST /api/agendamentos/{id}/chegada/validar` com o token da Ana | 403 | Pendente |
+| CHE-07 | Estúdio valida o código certo | `POST /api/agendamentos/{id}/chegada/validar` com o token do estúdio e o código do CHE-02 | 200 com `"status": "CHEGADA_CONFIRMADA"` | Pendente |
+| CHE-08 | Validar de novo | O mesmo pedido do CHE-07 | 400 com `"erro": "TOKEN_JA_UTILIZADO"` | Pendente |
+| CHE-09 | Cliente não cancela depois da chegada | `PATCH /api/agendamentos/{id}/cancelar` com o token da Ana | 400 | Pendente |
+| CHE-10 | Estúdio conclui o atendimento | `PATCH /api/agendamentos/{id}/concluir` com o token do estúdio | 200 com `"status": "CONCLUIDO"` | Pendente |
+| CHE-11 | Agendamento ainda pendente | `POST /api/agendamentos/{id}/token-chegada` num agendamento não confirmado | 400 | Pendente |
+
+Body do CHE-05 e do CHE-07:
+
+```json
+{ "codigo": "123456" }
+```
