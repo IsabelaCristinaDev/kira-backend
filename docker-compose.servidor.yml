@@ -2,6 +2,10 @@
 #
 #   docker compose -f docker-compose.servidor.yml up -d --build
 #
+# Com o kira-ai (verificação de identidade e ordem do Provador), que é opcional:
+#
+#   docker compose -f docker-compose.servidor.yml --profile ia up -d --build
+#
 # Os valores vêm do .env do servidor. Faltando um obrigatório, o compose para e diz qual é.
 
 # Nome próprio: rodando este arquivo na mesma máquina do ambiente local (ensaio), os containers e os
@@ -43,6 +47,17 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # IA da Wanessa (outro repositório): verificação de identidade e ordem do Provador. Só sobe com
+  # "--profile ia". Sem ela, a API continua no ar: o Provador usa a própria ordem e a verificação responde
+  # que está indisponível. A imagem tem cerca de 12 GB, e os modelos ficam na memória depois do primeiro uso
+  kira-ai:
+    profiles: ["ia"]
+    build: ${KIRA_AI_PASTA:-../kira-ai}
+    # Sem "ports", como o banco: só a API enxerga a IA
+    # Limite de memória: se a IA passar disso, só ela é reiniciada, e a API e o banco não ficam sem memória
+    mem_limit: ${KIRA_AI_MEMORIA:-3g}
+    restart: unless-stopped
+
   api:
     build: .
     depends_on:
@@ -71,6 +86,10 @@ services:
       KIRA_S3_BUCKET: ${KIRA_S3_BUCKET:-kira-arquivos}
       KIRA_S3_ACCESS_KEY: ${KIRA_S3_ACCESS_KEY}
       KIRA_S3_SECRET_KEY: ${KIRA_S3_SECRET_KEY}
+      # O kira-ai daqui (perfil "ia"), e não o localhost:8001 do local. Sem o perfil, o endereço não existe,
+      # e a API trata como serviço fora do ar
+      KIRA_AI_URL: http://kira-ai:8000
+      VERIFY_SERVICE_URL: http://kira-ai:8000
     ports:
       # Por padrão, só o próprio servidor acessa a API: quem fica exposto é o proxy com HTTPS na frente dela.
       # Para testar sem proxy, use API_ENDERECO=0.0.0.0:8081 no .env
