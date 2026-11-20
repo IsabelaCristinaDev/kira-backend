@@ -80,6 +80,20 @@ docker compose -f docker-compose.servidor.yml up -d --build
 - O projeto se chama `kira-servidor`: rodando este arquivo na mesma máquina do `docker-compose.yml` (para ensaiar antes de subir), os containers e os volumes dos dois não se misturam.
 - Além das variáveis obrigatórias da tabela abaixo, o servidor exige `KIRA_CORS_ORIGENS` e `FRONTEND_URL` com o endereço real do app web. As `SPRING_DATASOURCE_*` não são usadas: a API aponta sozinha para o banco do compose.
 
+#### Com o kira-ai (opcional)
+
+O kira-ai (verificação de identidade e ordem do Provador) fica em outro repositório e só sobe com o perfil `ia`. Ele é montado a partir da pasta do kira-ai, que por padrão fica ao lado desta (`../kira-ai`):
+
+```bash
+docker compose -f docker-compose.servidor.yml --profile ia up -d --build
+```
+
+- A API passa a usar o kira-ai do compose sozinha: `KIRA_AI_URL` e `VERIFY_SERVICE_URL` são ignorados no servidor.
+- Sem o perfil, a API continua no ar: o Provador usa a própria ordem e a verificação responde que está indisponível. Nesse caso, deixe `VERIFICACAO_OBRIGATORIA=false`.
+- Como o banco, o kira-ai não fica acessível de fora do servidor.
+- A imagem tem cerca de 12 GB, e a IA usa até 3 GB de memória (`KIRA_AI_MEMORIA`, padrão `3g`). Se passar disso, só ela é reiniciada. Com o kira-ai, o servidor precisa de pelo menos 8 GB de memória e 40 GB de disco; sem ele, 4 GB bastam.
+- Outra pasta para o kira-ai: `KIRA_AI_PASTA=/caminho/do/kira-ai`.
+
 ### Levar os dados locais para o servidor (primeira subida)
 
 O banco e as fotos andam juntos: o banco guarda só o nome de cada foto, e o arquivo fica no MinIO. Por isso o dump é gerado na hora, junto com as fotos daquele momento. Um dump antigo aponta para fotos que podem não existir mais.
