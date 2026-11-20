@@ -66,21 +66,23 @@ As tabelas são criadas e atualizadas automaticamente pelo Hibernate (`ddl-auto:
 
 ### Rodar num servidor
 
-O arquivo `docker-compose.servidor.yml` sobe a API e o banco juntos, cada um no seu container:
+O arquivo `docker-compose.servidor.yml` sobe a API, o banco e o MinIO (fotos) juntos, cada um no seu container:
 
 ```bash
 cp .env.example .env   # preencher com os valores do servidor
 docker compose -f docker-compose.servidor.yml up -d --build
 ```
 
-- O banco não fica acessível de fora do servidor: só a API o enxerga.
+- O banco e o MinIO não ficam acessíveis de fora do servidor: só a API os enxerga. As fotos saem para o app pela API.
 - A API fica em `127.0.0.1:8081`, para ser publicada por um proxy com HTTPS. Para testar sem proxy, use `API_ENDERECO=0.0.0.0:8081`.
-- O banco e as fotos enviadas ficam em volumes do Docker e continuam lá a cada novo deploy. Só `docker compose down -v` os apaga.
+- O banco e as fotos enviadas ficam em volumes do Docker (`kira-servidor_kira_db_dados` e `kira-servidor_kira_minio_dados`) e continuam lá a cada novo deploy. Só `docker compose down -v` os apaga.
+- As fotos vão sempre para o MinIO do compose, criado com as chaves `KIRA_S3_ACCESS_KEY` e `KIRA_S3_SECRET_KEY` do `.env`. O bucket é criado na primeira subida da API.
+- O projeto se chama `kira-servidor`: rodando este arquivo na mesma máquina do `docker-compose.yml` (para ensaiar antes de subir), os containers e os volumes dos dois não se misturam.
 - Além das variáveis obrigatórias da tabela abaixo, o servidor exige `KIRA_CORS_ORIGENS` e `FRONTEND_URL` com o endereço real do app web. As `SPRING_DATASOURCE_*` não são usadas: a API aponta sozinha para o banco do compose.
 
 ### Levar os dados locais para o servidor (primeira subida)
 
-O banco e as fotos andam juntos: o banco guarda só o nome de cada foto, e o arquivo fica na pasta `uploads/`. Por isso o dump é gerado na hora, junto com as fotos daquele momento. Um dump antigo aponta para fotos que podem não existir mais.
+O banco e as fotos andam juntos: o banco guarda só o nome de cada foto, e o arquivo fica no MinIO. Por isso o dump é gerado na hora, junto com as fotos daquele momento. Um dump antigo aponta para fotos que podem não existir mais.
 
 **1. Na máquina local**, gerar o dump do banco atual (fica fora do Git pelo `.gitignore`):
 
@@ -88,7 +90,15 @@ O banco e as fotos andam juntos: o banco guarda só o nome de cada foto, e o arq
 docker exec kira_postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > kira.dump
 ```
 
-Copiar para o servidor o `kira.dump` e a pasta `uploads/`, junto com o projeto.
+E exportar as fotos do MinIO local para a pasta `fotos-minio/` (também fora do Git):
+
+```bash
+docker exec kira_minio sh -c 'mc alias set origem http://localhost:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null && mc mirror --quiet origem/kira-arquivos /tmp/fotos-minio'
+docker cp kira_minio:/tmp/fotos-minio ./fotos-minio
+docker exec kira_minio rm -rf /tmp/fotos-minio
+```
+
+Copiar para o servidor o `kira.dump` e a pasta `fotos-minio/`, junto com o projeto.
 
 **2. No servidor**, com o `.env` preenchido. A ordem importa: o banco é restaurado **antes** de a API subir, senão o Hibernate cria tabelas vazias e a restauração falha.
 
@@ -105,12 +115,16 @@ $DC exec -T postgres sh -c 'pg_restore --no-owner --no-privileges --single-trans
 # Apaga as sessões do ambiente local: um refresh token antigo continuaria valendo no servidor
 $DC exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "TRUNCATE refresh_token, token_recuperacao_senha, dispositivo_notificacao"'
 
-# Sobe a API e copia as fotos para o volume
+# Sobe a API (ela cria o bucket) e copia as fotos para o MinIO
 $DC up -d --wait --build
-$DC cp uploads/. api:/app/uploads/
+$DC cp fotos-minio/. minio:/tmp/fotos-minio/
+$DC exec -T minio sh -c 'mc alias set destino http://localhost:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null && mc mirror --quiet /tmp/fotos-minio destino/kira-arquivos && rm -rf /tmp/fotos-minio'
+
+# Confere: a quantidade tem que ser igual à de arquivos em fotos-minio/ (find fotos-minio -type f | wc -l)
+$DC exec -T minio sh -c 'mc ls --recursive destino/kira-arquivos | wc -l'
 ```
 
-Se o banco do servidor já tiver dados, a restauração para no primeiro erro e não altera nada. Depois de conferir, apague o `kira.dump` do servidor: ele tem os dados de todos os usuários.
+Se o banco do servidor já tiver dados, a restauração para no primeiro erro e não altera nada. Depois de conferir, apague do servidor o `kira.dump` e a pasta `fotos-minio/`: eles têm os dados e as fotos de todos os usuários.
 
 ## Variáveis de ambiente
 
@@ -136,10 +150,13 @@ O arquivo `.env` é carregado automaticamente e nunca deve ir para o repositóri
 O banco guarda só o nome de cada foto; o arquivo fica num armazenamento de objetos compatível com S3, escolhido por `KIRA_ARQUIVOS_TIPO=s3`:
 
 - **Local:** o MinIO do `docker-compose.yml`, com as chaves `KIRA_S3_ACCESS_KEY` e `KIRA_S3_SECRET_KEY` do `.env`. Painel em <http://localhost:9001>.
-- **Servidor:** o Cloudflare R2. No painel da Cloudflare, em R2:
+- **Servidor:** o MinIO do `docker-compose.servidor.yml`, já configurado nele (ver "Rodar num servidor").
+- **Mais adiante, no servidor:** o Cloudflare R2, que guarda as próprias cópias e não cobra pela saída das fotos. A troca não muda código nem o banco, só onde os arquivos ficam. No painel da Cloudflare, em R2:
   1. crie o bucket `kira-arquivos`, sem acesso público (as fotos saem pela API);
   2. em *Manage API tokens*, crie um token com **Object Read & Write** só nesse bucket;
-  3. no servidor, defina `KIRA_ARQUIVOS_TIPO=s3`, `KIRA_S3_ENDPOINT=https://<ID da conta>.r2.cloudflarestorage.com`, `KIRA_S3_REGIAO=auto` e as chaves do token em `KIRA_S3_ACCESS_KEY`/`KIRA_S3_SECRET_KEY`.
+  3. copie as fotos do MinIO para o R2 (`mc mirror` ou `rclone sync`) e confira a quantidade;
+  4. no `docker-compose.servidor.yml`, tire o serviço `minio` (e o `depends_on` dele) e troque, na API, `KIRA_S3_ENDPOINT` por `https://<ID da conta>.r2.cloudflarestorage.com` e `KIRA_S3_REGIAO` por `auto`;
+  5. no `.env` do servidor, coloque as chaves do token em `KIRA_S3_ACCESS_KEY`/`KIRA_S3_SECRET_KEY`.
 
 Sem `KIRA_ARQUIVOS_TIPO`, as fotos ficam na pasta `KIRA_ARQUIVOS_PASTA` (padrão `./uploads`).
 
@@ -148,7 +165,7 @@ Sem `KIRA_ARQUIVOS_TIPO`, as fotos ficam na pasta `KIRA_ARQUIVOS_PASTA` (padrão
 Faça o backup das fotos junto com o do banco, no mesmo momento: um sem o outro deixa fotos sem registro ou registros sem foto.
 
 - **R2:** os dados ficam na Cloudflare, sem volume para copiar. Para ter uma cópia fora dela, use `mc mirror` ou `rclone sync` do bucket para uma pasta.
-- **MinIO local:** as fotos ficam no volume `kira-backend_kira_minio_data`. Com o MinIO parado, para a cópia ficar consistente:
+- **MinIO:** as fotos ficam no volume `kira-backend_kira_minio_data` (local) ou `kira-servidor_kira_minio_dados` (servidor, onde os comandos abaixo levam `-f docker-compose.servidor.yml`). Com o MinIO parado, para a cópia ficar consistente:
 
 ```bash
 docker compose stop minio

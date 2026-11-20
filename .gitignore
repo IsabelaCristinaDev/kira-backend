@@ -62,3 +62,4 @@ doc/kira-seed/
 
 # Backup das fotos do MinIO (nunca versionar)
 kira-minio.tar.gz
+/fotos-minio/
