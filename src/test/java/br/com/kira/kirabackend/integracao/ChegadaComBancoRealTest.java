@@ -111,8 +111,8 @@ class ChegadaComBancoRealTest {
     }
 
     @Test
-    @DisplayName("Fluxo completo: gerar, ver de novo, errar, acertar e concluir o atendimento")
-    void fluxoCompleto() throws Exception {
+    @DisplayName("Gerar e ver o código: o mesmo enquanto vale, e só para a cliente do agendamento")
+    void geracaoEAcesso() throws Exception {
         String agendamento = agendamentoConfirmadoDaquiA30Minutos();
 
         JsonNode gerado = esperar(200, "POST", caminho(agendamento, "token-chegada"), null, cliente.token());
@@ -132,6 +132,14 @@ class ChegadaComBancoRealTest {
         esperar(403, "POST", caminho(agendamento, "chegada/validar"), Map.of("codigo", codigo), outroEstudio.token());
         esperar(403, "POST", caminho(agendamento, "chegada/validar"), Map.of("codigo", codigo), cliente.token());
         esperar(401, "GET", caminho(agendamento, "token-chegada"), null, null);
+    }
+
+    @Test
+    @DisplayName("Validar: errar, acertar, não validar de novo e concluir o atendimento")
+    void validacaoEConclusao() throws Exception {
+        String agendamento = agendamentoConfirmadoDaquiA30Minutos();
+        String codigo = esperar(200, "POST", caminho(agendamento, "token-chegada"), null, cliente.token())
+                .get("codigo").asText();
 
         // Código errado: o erro chega ao app e a tentativa fica gravada (a transação não é desfeita)
         JsonNode errado = esperar(400, "POST", caminho(agendamento, "chegada/validar"),
@@ -144,16 +152,15 @@ class ChegadaComBancoRealTest {
                 Map.of("codigo", codigo), estudio.token());
         assertEquals("CHEGADA_CONFIRMADA", validado.get("status").asText());
 
-        // Segundo envio, código que não aparece mais, cliente sem cancelar nem remarcar
+        // Segundo envio, código que não aparece mais, cliente sem cancelar
         assertEquals("TOKEN_JA_UTILIZADO", esperar(400, "POST", caminho(agendamento, "chegada/validar"),
                 Map.of("codigo", codigo), estudio.token()).get("erro").asText());
         esperar(404, "GET", caminho(agendamento, "token-chegada"), null, cliente.token());
         esperar(400, "PATCH", "/api/agendamentos/" + agendamento + "/cancelar", null, cliente.token());
 
         // A chegada confirmada continua aparecendo na agenda e o estúdio conclui normalmente
-        assertEquals("CHEGADA_CONFIRMADA", esperar(200, "GET", "/api/agendamentos/empresa/" + estudio.id(), null,
-                estudio.token()).findValues("status").stream()
-                .map(JsonNode::asText).filter("CHEGADA_CONFIRMADA"::equals).findFirst().orElse(""));
+        assertTrue(esperar(200, "GET", "/api/agendamentos/empresa/" + estudio.id(), null, estudio.token())
+                .findValues("status").stream().map(JsonNode::asText).anyMatch("CHEGADA_CONFIRMADA"::equals));
         assertEquals("CONCLUIDO", esperar(200, "PATCH", "/api/agendamentos/" + agendamento + "/concluir", null,
                 estudio.token()).get("status").asText());
     }

@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * O Hibernate cria a coluna status com uma regra CHECK que aceita só os status que existiam na criação da
@@ -25,6 +24,16 @@ import java.util.stream.Collectors;
 public class AtualizacaoStatusAgendamento implements ApplicationRunner {
 
     static final String REGRA = "agendamento_status_check";
+
+    /**
+     * Texto fixo, e não montado a partir do enum: comando SQL montado em tempo de execução é um risco que a
+     * análise estática não consegue descartar. O teste confere que a lista tem todos os status do enum.
+     */
+    static final String STATUS_ACEITOS =
+            "'PENDENTE', 'CONFIRMADO', 'CHEGADA_CONFIRMADA', 'CANCELADO', 'CONCLUIDO', 'REAGENDADO'";
+    private static final String APAGAR_REGRA = "alter table agendamento drop constraint if exists " + REGRA;
+    private static final String CRIAR_REGRA =
+            "alter table agendamento add constraint " + REGRA + " check (status in (" + STATUS_ACEITOS + "))";
 
     private static final Logger log = LoggerFactory.getLogger(AtualizacaoStatusAgendamento.class);
 
@@ -40,13 +49,9 @@ public class AtualizacaoStatusAgendamento implements ApplicationRunner {
         if (!definicao.isEmpty() && aceitaTodos(definicao.get(0))) {
             return;
         }
-        // Os nomes vêm do enum, não de quem usa a API: montar o texto aqui não abre espaço para injeção
-        String status = Arrays.stream(StatusAgendamento.values())
-                .map(s -> "'" + s.name() + "'")
-                .collect(Collectors.joining(", "));
-        jdbc.execute("alter table agendamento drop constraint if exists " + REGRA);
-        jdbc.execute("alter table agendamento add constraint " + REGRA + " check (status in (" + status + "))");
-        log.info("Regra {} atualizada com os status {}", REGRA, status);
+        jdbc.execute(APAGAR_REGRA);
+        jdbc.execute(CRIAR_REGRA);
+        log.info("Regra {} atualizada com os status {}", REGRA, STATUS_ACEITOS);
     }
 
     private static boolean aceitaTodos(String definicao) {

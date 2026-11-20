@@ -1,5 +1,6 @@
 package br.com.kira.kirabackend.config;
 
+import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,6 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.DefaultApplicationArguments;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -53,6 +55,18 @@ class AtualizacaoStatusAgendamentoTest {
         String nova = comandos.getAllValues().get(1);
         assertTrue(nova.contains("'CHEGADA_CONFIRMADA'"), nova);
         assertTrue(nova.contains("'PENDENTE'") && nova.contains("'REAGENDADO'"), nova);
+    }
+
+    @Test
+    @DisplayName("A lista fixa da regra tem exatamente os status do enum (status novo precisa entrar nela)")
+    void listaFixaIgualAoEnum() {
+        List<String> daLista = Arrays.stream(AtualizacaoStatusAgendamento.STATUS_ACEITOS.split(","))
+                .map(s -> s.trim().replace("'", ""))
+                .sorted()
+                .toList();
+        List<String> doEnum = Arrays.stream(StatusAgendamento.values()).map(Enum::name).sorted().toList();
+
+        assertEquals(doEnum, daLista);
     }
 
     @Test
