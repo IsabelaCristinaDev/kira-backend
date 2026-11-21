@@ -51,4 +51,14 @@ class CancelamentoEmpresaStrategyTest {
         assertThrows(RegraDeNegocioException.class,
                 () -> strategy.validarCancelamento(agendamento));
     }
+
+    @Test
+    @DisplayName("O estúdio ainda pode cancelar depois que a chegada foi confirmada")
+    void deveCancelarComChegadaConfirmada() {
+        Agendamento agendamento = new Agendamento();
+        agendamento.setStatus(StatusAgendamento.CHEGADA_CONFIRMADA);
+        agendamento.setDataHoraInicio(LocalDateTime.now().minusMinutes(5));
+
+        assertDoesNotThrow(() -> strategy.validarCancelamento(agendamento));
+    }
 }

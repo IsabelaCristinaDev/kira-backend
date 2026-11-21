@@ -80,6 +80,13 @@ kira:
       chave-publica: ${VAPID_PUBLIC_KEY:}
       chave-privada: ${VAPID_PRIVATE_KEY:}
       assunto: ${VAPID_SUBJECT:}
+  chegada:
+    # Confirmação presencial (Kira Confirm): código de 6 dígitos que a cliente mostra ao chegar
+    validade-minutos: ${CHEGADA_VALIDADE_MINUTOS:15}
+    # A partir de quantas horas antes do horário marcado a cliente pode gerar o código
+    antecedencia-horas: ${CHEGADA_ANTECEDENCIA_HORAS:2}
+    # Tentativas erradas do estúdio até o código deixar de valer (a cliente gera outro)
+    tentativas-maximas: ${CHEGADA_TENTATIVAS_MAXIMAS:5}
   provador:
     # Muda quando o texto jurídico do consentimento muda: quem aceitou a versão antiga precisa aceitar de novo
     versao-consentimento: ${PROVADOR_VERSAO_CONSENTIMENTO:v1}

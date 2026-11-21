@@ -41,7 +41,8 @@ public class AgendamentoService {
     private static final String AGENDAMENTO_NAO_ENCONTRADO = "Agendamento não encontrado";
     private static final String SO_OS_SEUS_AGENDAMENTOS = "Você só pode ver os seus próprios agendamentos";
     private static final List<StatusAgendamento> AINDA_VAO_ACONTECER = List.of(
-            StatusAgendamento.PENDENTE, StatusAgendamento.CONFIRMADO, StatusAgendamento.REAGENDADO);
+            StatusAgendamento.PENDENTE, StatusAgendamento.CONFIRMADO, StatusAgendamento.CHEGADA_CONFIRMADA,
+            StatusAgendamento.REAGENDADO);
 
     private final AgendamentoRepository agendamentoRepository;
     private final UsuarioRepository usuarioRepository;
@@ -294,6 +295,10 @@ public class AgendamentoService {
         if (agendamento.getStatus() == StatusAgendamento.CANCELADO ||
                 agendamento.getStatus() == StatusAgendamento.CONCLUIDO) {
             throw new RegraDeNegocioException("Não é possível reagendar este agendamento");
+        }
+        // A cliente já está no estúdio: o atendimento segue para a conclusão ou o cancelamento
+        if (agendamento.getStatus() == StatusAgendamento.CHEGADA_CONFIRMADA) {
+            throw new RegraDeNegocioException("A chegada da cliente já foi confirmada: não é possível remarcar");
         }
 
         // Cancelar continua permitido: a cliente precisa conseguir desmarcar

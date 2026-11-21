@@ -65,4 +65,16 @@ class CancelamentoClienteStrategyTest {
         assertThrows(RegraDeNegocioException.class,
                 () -> strategy.validarCancelamento(agendamento));
     }
+
+    @Test
+    @DisplayName("Não deve cancelar depois que a chegada foi confirmada, mesmo com antecedência")
+    void naoDeveCancelarComChegadaConfirmada() {
+        Agendamento agendamento = new Agendamento();
+        agendamento.setStatus(StatusAgendamento.CHEGADA_CONFIRMADA);
+        agendamento.setDataHoraInicio(LocalDateTime.now(KiraTimeZone.DEFAULT).plusHours(5));
+
+        RegraDeNegocioException erro = assertThrows(RegraDeNegocioException.class,
+                () -> strategy.validarCancelamento(agendamento));
+        assertEquals("A chegada já foi confirmada: fale com o estúdio para cancelar", erro.getMessage());
+    }
 }

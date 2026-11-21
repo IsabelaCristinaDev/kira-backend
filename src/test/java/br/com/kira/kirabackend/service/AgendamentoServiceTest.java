@@ -1000,8 +1000,8 @@ class AgendamentoServiceTest {
         }
 
         @ParameterizedTest
-        @EnumSource(value = StatusAgendamento.class, names = {"CANCELADO", "CONCLUIDO"})
-        @DisplayName("Reagendar um agendamento cancelado ou concluído dá erro")
+        @EnumSource(value = StatusAgendamento.class, names = {"CANCELADO", "CONCLUIDO", "CHEGADA_CONFIRMADA"})
+        @DisplayName("Reagendar um agendamento cancelado, concluído ou com a chegada confirmada dá erro")
         void deveRejeitarReagendamentoInvalido(StatusAgendamento status) {
             Agendamento agendamento = agendamentoExistente(status);
             when(agendamentoRepository.findById(agendamento.getId())).thenReturn(Optional.of(agendamento));
@@ -1517,7 +1517,8 @@ class AgendamentoServiceTest {
     class CancelarFuturosDaContaExcluida {
 
         private static final List<StatusAgendamento> AINDA_VAO_ACONTECER = List.of(
-                StatusAgendamento.PENDENTE, StatusAgendamento.CONFIRMADO, StatusAgendamento.REAGENDADO);
+                StatusAgendamento.PENDENTE, StatusAgendamento.CONFIRMADO, StatusAgendamento.CHEGADA_CONFIRMADA,
+                StatusAgendamento.REAGENDADO);
 
         @Test
         @DisplayName("Cliente: cancela os futuros, mesmo em cima da hora, sem avisar a cliente que saiu")

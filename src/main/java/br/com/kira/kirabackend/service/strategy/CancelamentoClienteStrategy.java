@@ -1,6 +1,7 @@
 package br.com.kira.kirabackend.service.strategy;
 
 import br.com.kira.kirabackend.domain.entity.Agendamento;
+import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import br.com.kira.kirabackend.domain.enums.TipoUsuario;
 import br.com.kira.kirabackend.exception.RegraDeNegocioException;
 import br.com.kira.kirabackend.util.KiraTimeZone;
@@ -22,6 +23,9 @@ public class CancelamentoClienteStrategy implements CancelamentoStrategy {
     @Override
     public void validarCancelamento(Agendamento agendamento) {
         validarStatusCancelavel(agendamento);
+        if (agendamento.getStatus() == StatusAgendamento.CHEGADA_CONFIRMADA) {
+            throw new RegraDeNegocioException("A chegada já foi confirmada: fale com o estúdio para cancelar");
+        }
 
         if (agendamento.getDataHoraInicio().isBefore(
                 LocalDateTime.now(KiraTimeZone.DEFAULT).plusHours(ANTECEDENCIA_MINIMA_HORAS))) {
