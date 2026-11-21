@@ -71,10 +71,10 @@ Pré-condição: estúdio sem funcionárias, com o serviço "Corte" (60 min) e a
 
 | ID | Cenário | Request | Esperado | Resultado |
 |---|---|---|---|---|
-| SIM-01 | Duas clientes pedem o mesmo horário ao mesmo tempo | Os dois `POST /api/agendamentos/cliente/{id}` do bloco abaixo, disparados juntos | Um 201 e um 400 com `"mensagem": "Já existe um agendamento neste horário para este estabelecimento"` | Pendente |
-| SIM-02 | Só um agendamento gravado | `GET /api/agendamentos/empresa/{empresaId}` com o token do estúdio | 200; um único agendamento às 09:00 do dia escolhido | Pendente |
-| SIM-03 | Horário sobreposto em sequência | `POST /api/agendamentos/cliente/{bia.id}` 30 min depois do horário do SIM-01 | 400 com a mesma mensagem | Pendente |
-| SIM-04 | Horário encostado no anterior | `POST /api/agendamentos/cliente/{bia.id}` 60 min depois do horário do SIM-01 | 201 | Pendente |
+| SIM-01 | Duas clientes pedem o mesmo horário ao mesmo tempo | Os dois `POST /api/agendamentos/cliente/{id}` do bloco abaixo, disparados juntos | Um 201 e um 400 com `"mensagem": "Já existe um agendamento neste horário para este estabelecimento"` | 21/11/2026 ✅ |
+| SIM-02 | Só um agendamento gravado | `GET /api/agendamentos/empresa/{empresaId}` com o token do estúdio | 200; um único agendamento às 09:00 do dia escolhido | 21/11/2026 ✅ |
+| SIM-03 | Horário sobreposto em sequência | `POST /api/agendamentos/cliente/{bia.id}` 30 min depois do horário do SIM-01 | 400 com a mesma mensagem | 21/11/2026 ✅ |
+| SIM-04 | Horário encostado no anterior | `POST /api/agendamentos/cliente/{bia.id}` 60 min depois do horário do SIM-01 | 201 | 21/11/2026 ✅ |
 
 Disparo simultâneo do SIM-01 (o `&` manda os dois pedidos ao mesmo tempo):
 
