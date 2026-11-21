@@ -28,6 +28,9 @@ import org.springframework.test.web.servlet.ResultActions;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -42,7 +45,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // Atrasos em milissegundos, para o teste não esperar segundos de verdade
 @TestPropertySource(properties = {
         "kira.security.rate-limit.login.por-email.atraso-inicial=1ms",
-        "kira.security.rate-limit.login.por-email.atraso-maximo=8ms"})
+        "kira.security.rate-limit.login.por-email.atraso-maximo=8ms",
+        // O mesmo número do application.yml: src/test/resources/config o aumenta para os testes com banco
+        "kira.security.rate-limit.cadastro.por-ip.maximo=10"})
 class AuthControllerLimiteTentativasTest {
 
     @Autowired
@@ -140,5 +145,60 @@ class AuthControllerLimiteTentativasTest {
 
         logar("10.0.5.1", "nova-conta@teste.com", "certa").andExpect(status().isTooManyRequests());
         logar("10.0.5.2", "nova-conta@teste.com", "certa").andExpect(status().isOk());
+    }
+
+    // ---------- cadastro: cada pedido do IP conta, dando certo ou não ----------
+
+    private static final String CLIENTE = """
+            {"nome":"Ana","email":"ana@teste.com","senha":"Senha1234","telefone":"62999990000",
+             "cpf":"12345678901","dataNascimento":"1995-05-05","genero":"FEMININO"}""";
+
+    private static final String EMPRESA = """
+            {"nome":"Estúdio","email":"estudio@teste.com","senha":"Senha1234","telefone":"62999990000",
+             "tipoEstabelecimento":"ESTABELECIMENTO"}""";
+
+    private ResultActions cadastrar(String ip, String tipo, String corpo) throws Exception {
+        return mockMvc.perform(post("/api/auth/registro/" + tipo)
+                .with(requisicao -> {
+                    requisicao.setRemoteAddr(ip);
+                    return requisicao;
+                })
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(corpo));
+    }
+
+    @Test
+    @DisplayName("Cadastro: o 11º pedido do mesmo IP em 1 hora responde 429 com Retry-After e não cadastra")
+    void decimoPrimeiroCadastro429() throws Exception {
+        for (int i = 0; i < 10; i++) {
+            cadastrar("10.0.6.1", "cliente", CLIENTE).andExpect(status().isCreated());
+        }
+
+        cadastrar("10.0.6.1", "cliente", CLIENTE)
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"))
+                .andExpect(jsonPath("$.erro").value("TENTATIVAS_EXCEDIDAS"));
+        verify(authService, times(10)).registrarCliente(any());
+    }
+
+    @Test
+    @DisplayName("Cadastro: cliente e estúdio contam juntos no mesmo IP")
+    void clienteEEstudioContamJuntos() throws Exception {
+        for (int i = 0; i < 10; i++) {
+            cadastrar("10.0.7.1", "cliente", CLIENTE).andExpect(status().isCreated());
+        }
+
+        cadastrar("10.0.7.1", "empresa", EMPRESA).andExpect(status().isTooManyRequests());
+        verify(authService, never()).registrarEmpresa(any());
+    }
+
+    @Test
+    @DisplayName("Cadastro: IP no limite não impede outro IP de cadastrar")
+    void outroIpCadastra() throws Exception {
+        for (int i = 0; i < 11; i++) {
+            cadastrar("10.0.8.1", "empresa", EMPRESA);
+        }
+
+        cadastrar("10.0.8.2", "empresa", EMPRESA).andExpect(status().isCreated());
     }
 }

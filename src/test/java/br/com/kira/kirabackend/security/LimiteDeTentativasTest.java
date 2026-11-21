@@ -1,6 +1,7 @@
 package br.com.kira.kirabackend.security;
 
 import br.com.kira.kirabackend.config.LimiteTentativasPropriedades;
+import br.com.kira.kirabackend.config.LimiteTentativasPropriedades.Cadastro;
 import br.com.kira.kirabackend.config.LimiteTentativasPropriedades.Limite;
 import br.com.kira.kirabackend.config.LimiteTentativasPropriedades.Login;
 import br.com.kira.kirabackend.config.LimiteTentativasPropriedades.PorEmail;
@@ -34,7 +35,8 @@ class LimiteDeTentativasTest {
             new Recuperacao(
                     new Limite(3, Duration.ofHours(1)),
                     new Limite(10, Duration.ofHours(1)),
-                    new Limite(10, Duration.ofMinutes(15))));
+                    new Limite(10, Duration.ofMinutes(15))),
+            new Cadastro(new Limite(10, Duration.ofHours(1))));
 
     private final AtomicLong agoraNanos = new AtomicLong();
     private LimiteDeTentativas limite;
@@ -243,5 +245,28 @@ class LimiteDeTentativasTest {
 
         assertEquals(Optional.of(Duration.ofMinutes(15)), limite.registrarValidacaoDeToken(IP));
         assertTrue(limite.registrarValidacaoDeToken(OUTRO_IP).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Cadastro: 10 por IP a cada hora; o 11º recebe a espera e outro IP segue livre")
+    void cadastroPorIp() {
+        for (int i = 0; i < 10; i++) {
+            assertTrue(limite.registrarPedidoDeCadastro(IP).isEmpty());
+        }
+
+        assertEquals(Optional.of(Duration.ofHours(1)), limite.registrarPedidoDeCadastro(IP));
+        assertTrue(limite.registrarPedidoDeCadastro(OUTRO_IP).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Cadastro: depois de 1 hora, o IP volta a poder cadastrar")
+    void cadastroLiberaDepoisDeUmaHora() {
+        for (int i = 0; i < 11; i++) {
+            limite.registrarPedidoDeCadastro(IP);
+        }
+
+        avancar(Duration.ofHours(1));
+
+        assertTrue(limite.registrarPedidoDeCadastro(IP).isEmpty());
     }
 }

@@ -9,13 +9,17 @@ import java.time.Duration;
  * um record só: os números ficam juntos, com nome, e o Spring converte "15m" e "1h" em Duration.
  */
 @ConfigurationProperties(prefix = "kira.security.rate-limit")
-public record LimiteTentativasPropriedades(Login login, Recuperacao recuperacao) {
+public record LimiteTentativasPropriedades(Login login, Recuperacao recuperacao, Cadastro cadastro) {
 
     public record Login(Limite porIpEEmail, Limite porIp, PorEmail porEmail) {
     }
 
     /** Pedidos de e-mail de recuperação e tentativas de usar o token recebido. */
     public record Recuperacao(Limite porEmail, Limite porIp, Limite validacaoPorIp) {
+    }
+
+    /** Pedidos de cadastro (cliente e estúdio contam juntos), dando certo ou não. */
+    public record Cadastro(Limite porIp) {
     }
 
     /** Até {@code maximo} vezes dentro da janela; a seguinte recebe 429. */
