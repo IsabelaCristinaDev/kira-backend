@@ -165,17 +165,17 @@ na hora, criar o agendamento para mais tarde no mesmo dia).
 
 | ID | Cenário | Request | Esperado | Resultado |
 |---|---|---|---|---|
-| CHE-01 | Gerar sem token | `POST /api/agendamentos/{id}/token-chegada` sem `Authorization` | 401 | Pendente |
-| CHE-02 | Cliente gera o código | `POST /api/agendamentos/{id}/token-chegada` com o token da Ana | 200 com `codigo` (6 dígitos) e `expiraEm` | Pendente |
-| CHE-03 | Cliente vê o código de novo | `GET /api/agendamentos/{id}/token-chegada` com o token da Ana | 200 com o mesmo `codigo` | Pendente |
-| CHE-04 | Outra cliente não vê o código | `GET /api/agendamentos/{id}/token-chegada` com o token da Bia | 403 | Pendente |
-| CHE-05 | Estúdio erra o código | `POST /api/agendamentos/{id}/chegada/validar` com o token do estúdio e outro código | 400 com `"erro": "TOKEN_INVALIDO"` | Pendente |
-| CHE-06 | Cliente não valida o próprio código | `POST /api/agendamentos/{id}/chegada/validar` com o token da Ana | 403 | Pendente |
-| CHE-07 | Estúdio valida o código certo | `POST /api/agendamentos/{id}/chegada/validar` com o token do estúdio e o código do CHE-02 | 200 com `"status": "CHEGADA_CONFIRMADA"` | Pendente |
-| CHE-08 | Validar de novo | O mesmo pedido do CHE-07 | 400 com `"erro": "TOKEN_JA_UTILIZADO"` | Pendente |
-| CHE-09 | Cliente não cancela depois da chegada | `PATCH /api/agendamentos/{id}/cancelar` com o token da Ana | 400 | Pendente |
-| CHE-10 | Estúdio conclui o atendimento | `PATCH /api/agendamentos/{id}/concluir` com o token do estúdio | 200 com `"status": "CONCLUIDO"` | Pendente |
-| CHE-11 | Agendamento ainda pendente | `POST /api/agendamentos/{id}/token-chegada` num agendamento não confirmado | 400 | Pendente |
+| CHE-01 | Gerar sem token | `POST /api/agendamentos/{id}/token-chegada` sem `Authorization` | 401 | 21/11/2026 ✅ |
+| CHE-02 | Cliente gera o código | `POST /api/agendamentos/{id}/token-chegada` com o token da Ana | 200 com `codigo` (6 dígitos) e `expiraEm` | 21/11/2026 ✅ |
+| CHE-03 | Cliente vê o código de novo | `GET /api/agendamentos/{id}/token-chegada` com o token da Ana | 200 com o mesmo `codigo` | 21/11/2026 ✅ |
+| CHE-04 | Outra cliente não vê o código | `GET /api/agendamentos/{id}/token-chegada` com o token da Bia | 403 | 21/11/2026 ✅ |
+| CHE-05 | Estúdio erra o código | `POST /api/agendamentos/{id}/chegada/validar` com o token do estúdio e outro código | 400 com `"erro": "TOKEN_INVALIDO"` | 21/11/2026 ✅ |
+| CHE-06 | Cliente não valida o próprio código | `POST /api/agendamentos/{id}/chegada/validar` com o token da Ana | 403 | 21/11/2026 ✅ |
+| CHE-07 | Estúdio valida o código certo | `POST /api/agendamentos/{id}/chegada/validar` com o token do estúdio e o código do CHE-02 | 200 com `"status": "CHEGADA_CONFIRMADA"` | 21/11/2026 ✅ |
+| CHE-08 | Validar de novo | O mesmo pedido do CHE-07 | 400 com `"erro": "TOKEN_JA_UTILIZADO"` | 21/11/2026 ✅ |
+| CHE-09 | Cliente não cancela depois da chegada | `PATCH /api/agendamentos/{id}/cancelar` com o token da Ana | 400 | 21/11/2026 ✅ |
+| CHE-10 | Estúdio conclui o atendimento | `PATCH /api/agendamentos/{id}/concluir` com o token do estúdio | 200 com `"status": "CONCLUIDO"` | 21/11/2026 ✅ |
+| CHE-11 | Agendamento ainda pendente | `POST /api/agendamentos/{id}/token-chegada` num agendamento não confirmado | 400 | 21/11/2026 ✅ |
 
 Body do CHE-05 e do CHE-07:
 
