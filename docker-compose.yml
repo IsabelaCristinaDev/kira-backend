@@ -39,6 +39,20 @@ services:
       - kira_minio_data:/data
     restart: unless-stopped
 
+  # IA (verificação de identidade e ordem do Provador), de outro repositório. Só sobe com o perfil "ia"
+  kira-ai:
+    profiles: ["ia"]
+    build: ${KIRA_AI_PASTA:-../kira-ai}
+    # Nome fixo da imagem: a de 12 GB já montada é reaproveitada, sem montar de novo
+    image: kira-ai:local
+    container_name: kira-ai
+    ports:
+      # A API local procura a IA na 8001 (KIRA_AI_URL). Só a própria máquina acessa
+      - "127.0.0.1:8001:8000"
+    # Se a IA passar disso, só ela é reiniciada
+    mem_limit: ${KIRA_AI_MEMORIA:-3g}
+    restart: unless-stopped
+
 volumes:
   kira_postgres_data:
   kira_minio_data:

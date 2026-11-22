@@ -64,6 +64,16 @@ Com a API no ar:
 
 As tabelas são criadas e atualizadas automaticamente pelo Hibernate (`ddl-auto: update`).
 
+Para usar a verificação de identidade e a ordem do Provador, suba também o kira-ai (outro repositório, na pasta `../kira-ai`):
+
+```bash
+docker compose --profile ia up -d
+```
+
+- Ele fica em `http://localhost:8001`, o endereço padrão de `KIRA_AI_URL` e `VERIFY_SERVICE_URL`, e só a própria máquina acessa.
+- Na primeira vez, a imagem (cerca de 12 GB) é montada. Para montar de novo depois de atualizar o kira-ai, acrescente `--build`.
+- Sem o kira-ai, a API continua no ar: o Provador usa a própria ordem e a verificação responde que está indisponível.
+
 ### Rodar num servidor
 
 O arquivo `docker-compose.servidor.yml` sobe a API, o banco e o MinIO (fotos) juntos, cada um no seu container:
