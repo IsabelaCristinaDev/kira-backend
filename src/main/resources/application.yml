@@ -166,6 +166,11 @@ kira:
         validacao-por-ip:
           maximo: 10
           janela: 15m
+      cadastro:
+        # Cadastros de cliente e de estúdio vindos do mesmo IP, dando certo ou não
+        por-ip:
+          maximo: 10
+          janela: 1h
   diagnostico:
     # TODO(LGPD): remover depois do primeiro deploy no Render. Liga o log dos headers de IP do login
     registrar-headers-ip: ${REGISTRAR_HEADERS_IP:false}

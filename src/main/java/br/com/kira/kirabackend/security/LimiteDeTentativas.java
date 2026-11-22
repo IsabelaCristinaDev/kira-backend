@@ -29,6 +29,7 @@ public class LimiteDeTentativas {
 
     private final LimiteTentativasPropriedades.Login regras;
     private final LimiteTentativasPropriedades.Recuperacao regrasRecuperacao;
+    private final LimiteTentativasPropriedades.Cadastro regrasCadastro;
     private final TimeMeter relogioDosBaldes;
     private final Cache<String, Bucket> porIpEEmail;
     private final Cache<String, Bucket> porIp;
@@ -37,11 +38,13 @@ public class LimiteDeTentativas {
     private final Cache<String, Bucket> recuperacaoPorEmail;
     private final Cache<String, Bucket> recuperacaoPorIp;
     private final Cache<String, Bucket> validacaoDeTokenPorIp;
+    private final Cache<String, Bucket> cadastroPorIp;
 
     /** @param relogio fonte de tempo em nanossegundos; nos testes é um relógio falso */
     public LimiteDeTentativas(LimiteTentativasPropriedades propriedades, Ticker relogio) {
         this.regras = propriedades.login();
         this.regrasRecuperacao = propriedades.recuperacao();
+        this.regrasCadastro = propriedades.cadastro();
         this.relogioDosBaldes = new TimeMeter() {
             @Override
             public long currentTimeNanos() {
@@ -62,6 +65,7 @@ public class LimiteDeTentativas {
         this.recuperacaoPorEmail = cache(relogio).expireAfterAccess(regrasRecuperacao.porEmail().janela()).build();
         this.recuperacaoPorIp = cache(relogio).expireAfterAccess(regrasRecuperacao.porIp().janela()).build();
         this.validacaoDeTokenPorIp = cache(relogio).expireAfterAccess(regrasRecuperacao.validacaoPorIp().janela()).build();
+        this.cadastroPorIp = cache(relogio).expireAfterAccess(regrasCadastro.porIp().janela()).build();
     }
 
     private static Caffeine<Object, Object> cache(Ticker relogio) {
@@ -132,6 +136,14 @@ public class LimiteDeTentativas {
     /** Conta uma tentativa de usar um token de recuperação vinda deste IP. */
     public Optional<Duration> registrarValidacaoDeToken(String ip) {
         Bucket balde = validacaoDeTokenPorIp.get(ip, chave -> novoBalde(regrasRecuperacao.validacaoPorIp()));
+        return balde.tryConsume(1) ? Optional.empty() : esperaSeVazio(balde);
+    }
+
+    // ---------- cadastro: cada pedido conta, dando certo ou não ----------
+
+    /** Conta um pedido de cadastro (cliente ou estúdio) vindo deste IP. */
+    public Optional<Duration> registrarPedidoDeCadastro(String ip) {
+        Bucket balde = cadastroPorIp.get(ip, chave -> novoBalde(regrasCadastro.porIp()));
         return balde.tryConsume(1) ? Optional.empty() : esperaSeVazio(balde);
     }
 

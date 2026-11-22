@@ -7,7 +7,9 @@ import br.com.kira.kirabackend.dto.request.LoginRequest;
 import br.com.kira.kirabackend.dto.request.RefreshTokenRequest;
 import br.com.kira.kirabackend.dto.request.TrocaSenhaRequest;
 import br.com.kira.kirabackend.dto.response.LoginResponse;
+import br.com.kira.kirabackend.exception.TentativasExcedidasException;
 import br.com.kira.kirabackend.security.IpDoCliente;
+import br.com.kira.kirabackend.security.LimiteDeTentativas;
 import br.com.kira.kirabackend.security.ProtecaoLogin;
 import br.com.kira.kirabackend.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,6 +28,7 @@ public class AuthController {
     private final AuthService authService;
     private final ProtecaoLogin protecaoLogin;
     private final IpDoCliente ipDoCliente;
+    private final LimiteDeTentativas limiteDeTentativas;
 
     // A proteção envolve o login (como um filtro): limite de tentativas, atraso e aviso ficam no ProtecaoLogin
     @PostMapping("/login")
@@ -35,13 +38,15 @@ public class AuthController {
     }
 
     @PostMapping("/registro/cliente")
-    public ResponseEntity<Void> registrarCliente(@RequestBody @Valid ClienteRegistroRequest data) {
+    public ResponseEntity<Void> registrarCliente(@RequestBody @Valid ClienteRegistroRequest data, HttpServletRequest http) {
+        exigirLimiteDeCadastro(http);
         authService.registrarCliente(data);
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     @PostMapping("/registro/empresa")
-    public ResponseEntity<Void> registrarEmpresa(@RequestBody @Valid EmpresaRegistroRequest data) {
+    public ResponseEntity<Void> registrarEmpresa(@RequestBody @Valid EmpresaRegistroRequest data, HttpServletRequest http) {
+        exigirLimiteDeCadastro(http);
         authService.registrarEmpresa(data);
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
@@ -64,5 +69,12 @@ public class AuthController {
             @AuthenticationPrincipal Usuario usuario,
             @RequestBody @Valid TrocaSenhaRequest data) {
         return ResponseEntity.ok(authService.trocarSenha(usuario, data));
+    }
+
+    // Cada pedido de cadastro do IP conta, dando certo ou não: passando do limite, 429 sem chegar ao serviço
+    private void exigirLimiteDeCadastro(HttpServletRequest http) {
+        limiteDeTentativas.registrarPedidoDeCadastro(ipDoCliente.de(http)).ifPresent(espera -> {
+            throw new TentativasExcedidasException(espera);
+        });
     }
 }
