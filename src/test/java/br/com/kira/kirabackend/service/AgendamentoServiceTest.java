@@ -523,6 +523,24 @@ class AgendamentoServiceTest {
         }
 
         @Test
+        @DisplayName("Deve dar erro quando o serviço foi desativado")
+        void deveFalharServicoInativo() {
+            servico.setAtivo(false);
+
+            when(usuarioRepository.findById(cliente.getId())).thenReturn(Optional.of(cliente));
+            when(usuarioRepository.findById(empresa.getId())).thenReturn(Optional.of(empresa));
+            when(servicoRepository.findById(servico.getId())).thenReturn(Optional.of(servico));
+
+            UUID clienteId = cliente.getId();
+            AgendamentoRequest req = request(inicioValido);
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> service.criar(clienteId, clienteId, req));
+            assertEquals("Este serviço não está mais disponível", ex.getMessage());
+            verify(agendamentoRepository, never()).save(any());
+        }
+
+        @Test
         @DisplayName("Deve dar erro quando o serviço não está ligado a nenhuma empresa")
         void deveFalharServicoSemEmpresa() {
             // Arrange
