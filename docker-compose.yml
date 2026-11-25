@@ -3,7 +3,9 @@ name: kira-backend
 
 services:
   postgres:
-    image: postgres:16-alpine
+    # Postgres 16 Alpine com a extensão pgvector, usada pelo kira-ai (schema rag)
+    build: ./docker/postgres
+    image: kira-postgres:16-pgvector
     container_name: kira_postgres
     environment:
       POSTGRES_DB: ${DB_NAME}
