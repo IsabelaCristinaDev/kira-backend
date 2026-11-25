@@ -82,6 +82,10 @@ public class AgendamentoService {
         if (servico.getEmpresa() == null || !empresa.getId().equals(servico.getEmpresa().getId())) {
             throw new RegraDeNegocioException("Serviço não pertence a este estabelecimento");
         }
+        // A tela da cliente pode estar desatualizada: quem barra o serviço desativado é o backend
+        if (Boolean.FALSE.equals(servico.getAtivo())) {
+            throw new RegraDeNegocioException("Este serviço não está mais disponível");
+        }
 
         Funcionaria funcionaria = null;
         if (request.funcionariaId() != null) {
