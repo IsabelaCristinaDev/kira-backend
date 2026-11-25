@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 public class CancelamentoClienteStrategy implements CancelamentoStrategy {
 
     /** Prazo mínimo da cliente para cancelar ou remarcar (o remarcar usa a mesma regra). */
-    public static final long ANTECEDENCIA_MINIMA_HORAS = 2;
+    public static final long ANTECEDENCIA_MINIMA_HORAS = 24;
 
     @Override
     public TipoUsuario getTipo() {
@@ -30,7 +30,8 @@ public class CancelamentoClienteStrategy implements CancelamentoStrategy {
         if (agendamento.getDataHoraInicio().isBefore(
                 LocalDateTime.now(KiraTimeZone.DEFAULT).plusHours(ANTECEDENCIA_MINIMA_HORAS))) {
             throw new RegraDeNegocioException(
-                    "Cancelamento pelo cliente deve ser feito com no mínimo 2 horas de antecedência");
+                    "Cancelamento pelo cliente deve ser feito com no mínimo " + ANTECEDENCIA_MINIMA_HORAS
+                            + " horas de antecedência");
         }
     }
 }

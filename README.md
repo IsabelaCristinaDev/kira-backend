@@ -236,7 +236,7 @@ O código fica em `br.com.kira.kirabackend`, organizado em camadas:
 
 ### Padrões de projeto
 
-- **Strategy:** o cancelamento segue regras diferentes para cada lado. A cliente precisa de no mínimo 2 horas de antecedência, e a empresa não tem prazo. Cada regra fica em uma classe, então uma regra nova não altera as existentes.
+- **Strategy:** o cancelamento segue regras diferentes para cada lado. A cliente precisa de no mínimo 24 horas de antecedência para cancelar ou remarcar, e a empresa não tem prazo. Cada regra fica em uma classe, então uma regra nova não altera as existentes.
 - **Observer:** efeitos colaterais de um agendamento ficam em listeners de eventos, separados do fluxo principal. A comissão, por exemplo, é gerada ao tratar o evento `AtendimentoConcluidoEvent`.
 - **DTO:** nenhuma entidade JPA sai do controller. Assim, a API não expõe dados internos, e a entrada é validada com Bean Validation.
 
