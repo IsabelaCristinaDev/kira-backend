@@ -45,10 +45,14 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID> 
             LocalDateTime inicio,
             LocalDateTime fim);
 
-    List<Agendamento> findByFuncionariaIdAndDataHoraInicioBetweenOrderByDataHoraInicio(
-            UUID funcionariaId,
-            LocalDateTime inicio,
-            LocalDateTime fim);
+    /**
+     * Agendamentos da funcionária que começam em [inicio, fim), em ordem de horário. O fim é exclusivo
+     * (meia-noite do dia seguinte): o "último instante do dia" com nanossegundos é arredondado para
+     * microssegundos no Postgres e vira a meia-noite seguinte.
+     */
+    @Query("select a from Agendamento a where a.funcionaria.id = :funcionariaId"
+            + " and a.dataHoraInicio >= :inicio and a.dataHoraInicio < :fim order by a.dataHoraInicio")
+    List<Agendamento> listarDaFuncionariaNoPeriodo(UUID funcionariaId, LocalDateTime inicio, LocalDateTime fim);
 
     List<Agendamento> findByStatusNotInAndLembreteEnviadoFalseAndDataHoraInicioBetween(
             List<StatusAgendamento> statusExcluidos,
@@ -65,17 +69,17 @@ public interface AgendamentoRepository extends JpaRepository<Agendamento, UUID> 
             LocalDateTime fim,
             LocalDateTime inicio);
 
-    List<Agendamento> findByEmpresaIdAndStatusAndDataHoraInicioBetween(
-            UUID empresaId,
-            StatusAgendamento status,
-            LocalDateTime inicio,
-            LocalDateTime fim);
+    /** Agendamentos da empresa no status informado que começam em [inicio, fim), com o fim exclusivo. */
+    @Query("select a from Agendamento a where a.empresa.id = :empresaId and a.status = :status"
+            + " and a.dataHoraInicio >= :inicio and a.dataHoraInicio < :fim")
+    List<Agendamento> listarDaEmpresaNoPeriodo(
+            UUID empresaId, StatusAgendamento status, LocalDateTime inicio, LocalDateTime fim);
 
-    long countByEmpresaIdAndStatusAndDataHoraInicioBetween(
-            UUID empresaId,
-            StatusAgendamento status,
-            LocalDateTime inicio,
-            LocalDateTime fim);
+    /** Contagem de {@link #listarDaEmpresaNoPeriodo}, com o mesmo período [inicio, fim). */
+    @Query("select count(a) from Agendamento a where a.empresa.id = :empresaId and a.status = :status"
+            + " and a.dataHoraInicio >= :inicio and a.dataHoraInicio < :fim")
+    long contarDaEmpresaNoPeriodo(
+            UUID empresaId, StatusAgendamento status, LocalDateTime inicio, LocalDateTime fim);
 
     // Atendimentos que ainda vão acontecer: usados para cancelar os de uma conta excluída
     List<Agendamento> findByClienteIdAndStatusInAndDataHoraInicioAfter(

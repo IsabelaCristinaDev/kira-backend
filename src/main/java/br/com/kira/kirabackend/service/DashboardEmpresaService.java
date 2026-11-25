@@ -24,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -116,8 +115,8 @@ public class DashboardEmpresaService {
                 .sorted(Comparator.comparing((MovimentoPorDiaSemanaResponse r) -> r.diaSemana().getValue()))
                 .toList();
 
-        long totalCancelados = agendamentoRepository.countByEmpresaIdAndStatusAndDataHoraInicioBetween(
-                empresaId, StatusAgendamento.CANCELADO, inicio.atStartOfDay(), fim.atTime(LocalTime.MAX));
+        long totalCancelados = agendamentoRepository.contarDaEmpresaNoPeriodo(
+                empresaId, StatusAgendamento.CANCELADO, inicio.atStartOfDay(), fim.plusDays(1).atStartOfDay());
         double taxaConclusao = agendamentos.isEmpty() && totalCancelados == 0 ? 0.0
                 : (agendamentos.size() * 100.0) / (agendamentos.size() + totalCancelados);
 
@@ -147,11 +146,12 @@ public class DashboardEmpresaService {
     }
 
     private List<Agendamento> concluidos(UUID empresaId, LocalDate inicio, LocalDate fim) {
-        return agendamentoRepository.findByEmpresaIdAndStatusAndDataHoraInicioBetween(
+        // A meia-noite seguinte ao último dia fica de fora: ela é do dia seguinte
+        return agendamentoRepository.listarDaEmpresaNoPeriodo(
                 empresaId,
                 StatusAgendamento.CONCLUIDO,
                 inicio.atStartOfDay(),
-                fim.atTime(LocalTime.MAX));
+                fim.plusDays(1).atStartOfDay());
     }
 
     private static BigDecimal ticketMedio(BigDecimal faturamento, int atendimentos) {

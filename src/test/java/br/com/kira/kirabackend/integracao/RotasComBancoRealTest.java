@@ -32,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -361,6 +362,73 @@ class RotasComBancoRealTest {
         chamar("PATCH", "/api/agendamentos/" + remarcado + "/cancelar", null, ana.token(), 200);
         String canceladoPeloEstudio = agendar(ana.id(), ana.token(), estudio.id(), servicoDoEstudio, null, adiante + "T15:00:00");
         chamar("PATCH", "/api/agendamentos/" + canceladoPeloEstudio + "/cancelar/empresa", null, estudio.token(), 200);
+    }
+
+    @Test
+    @DisplayName("Agenda da funcionária: dia e semana trazem só os agendamentos dela, no período e na ordem certos")
+    void agendaDaFuncionaria() throws IOException, InterruptedException {
+        String iara = novaFuncionaria("Iara");
+        String jade = novaFuncionaria("Jade");
+        String agenda = "/api/funcionarias/" + iara + "/agenda";
+        LocalDate dia = hoje.plusDays(10);
+
+        String tarde = agendar(bia.id(), bia.token(), estudio.id(), servicoDoEstudio, iara, dia + "T14:00:00");
+        String manha = agendar(ana.id(), ana.token(), estudio.id(), servicoDoEstudio, iara, dia + "T09:00:00");
+        agendar(ana.id(), ana.token(), estudio.id(), servicoDoEstudio, jade, dia + "T10:00:00");
+        String diaSeguinte = agendar(ana.id(), ana.token(), estudio.id(), servicoDoEstudio, iara,
+                dia.plusDays(1) + "T10:00:00");
+        String ultimoDiaDaSemana = agendar(bia.id(), bia.token(), estudio.id(), servicoDoEstudio, iara,
+                dia.plusDays(6) + "T19:00:00");
+        agendar(bia.id(), bia.token(), estudio.id(), servicoDoEstudio, iara, dia.plusDays(7) + "T08:00:00");
+
+        JsonNode doDia = get(agenda + "/dia?data=" + dia, estudio.token());
+        assertEquals(List.of(manha, tarde), ids(doDia));
+        assertEquals("Iara", doDia.get(0).get("nomeFuncionaria").asText());
+        assertEquals(List.of(manha, tarde, diaSeguinte, ultimoDiaDaSemana),
+                ids(get(agenda + "/semana?dataInicio=" + dia, estudio.token())));
+
+        // Limites do dia no banco: o último segundo entra, a meia-noite seguinte fica para o outro dia
+        moverPara(tarde, dia + " 23:59:59");
+        moverPara(diaSeguinte, dia.plusDays(1) + " 00:00:00");
+        assertEquals(List.of(manha, tarde), ids(get(agenda + "/dia?data=" + dia, estudio.token())));
+        assertEquals(List.of(diaSeguinte), ids(get(agenda + "/dia?data=" + dia.plusDays(1), estudio.token())));
+
+        chamar("GET", agenda + "/dia?data=" + dia, null, outroEstudio.token(), 403);
+        chamar("GET", agenda + "/semana?dataInicio=" + dia, null, outroEstudio.token(), 403);
+        chamar("GET", agenda + "/dia?data=" + dia, null, ana.token(), 403);
+    }
+
+    @Test
+    @DisplayName("Painel: atendimento à meia-noite conta só no dia em que começa")
+    void painelNaVirada() throws IOException, InterruptedException {
+        LocalDate dia = hoje.minusDays(30);
+        String meiaNoite = dia.plusDays(1) + " 00:00:00";
+        // Com a bia: o teste do painel conta o histórico da ana, e a data fica fora do período dele
+        moverPara(atendimentoConcluido(bia, novaFuncionaria("Lia"), dia), meiaNoite);
+        String cancelado = agendar(bia.id(), bia.token(), estudio.id(), servicoDoEstudio, null, adiante + "T18:00:00");
+        chamar("PATCH", "/api/agendamentos/" + cancelado + "/cancelar/empresa", null, estudio.token(), 200);
+        moverPara(cancelado, meiaNoite);
+        String painel = "/api/empresas/" + estudio.id() + "/dashboard";
+
+        JsonNode doDia = get(painel + "?dataInicio=" + dia + "&dataFim=" + dia, estudio.token());
+        assertEquals(0, doDia.get("totalAtendimentos").asInt());
+        assertEquals(0, doDia.get("totalCancelados").asInt());
+
+        JsonNode doDiaSeguinte = get(painel + "?dataInicio=" + dia.plusDays(1) + "&dataFim=" + dia.plusDays(1),
+                estudio.token());
+        assertEquals(1, doDiaSeguinte.get("totalAtendimentos").asInt());
+        assertEquals(1, doDiaSeguinte.get("totalCancelados").asInt());
+    }
+
+    private void moverPara(String agendamentoId, String inicio) {
+        jdbc.update("update agendamento set data_hora_inicio = ?::timestamp,"
+                + " data_hora_fim = ?::timestamp + interval '1 hour' where id = ?::uuid", inicio, inicio, agendamentoId);
+    }
+
+    private static List<String> ids(JsonNode agendamentos) {
+        List<String> ids = new ArrayList<>();
+        agendamentos.forEach(agendamento -> ids.add(agendamento.get("id").asText()));
+        return ids;
     }
 
     @Test
