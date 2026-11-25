@@ -926,11 +926,11 @@ class AgendamentoServiceTest {
         }
 
         @Test
-        @DisplayName("Cliente não remarca com menos de 2 horas de antecedência")
+        @DisplayName("Cliente não remarca com menos de 24 horas de antecedência")
         void clienteNaoRemarcaEmCimaDaHora() {
             Agendamento agendamento = agendamentoExistente(StatusAgendamento.CONFIRMADO);
-            LocalDateTime daquiAUmaHora = LocalDateTime.now(KiraTimeZone.DEFAULT).plusHours(1);
-            agendamento.setDataHoraInicio(daquiAUmaHora);
+            LocalDateTime daqui23Horas = LocalDateTime.now(KiraTimeZone.DEFAULT).plusHours(23);
+            agendamento.setDataHoraInicio(daqui23Horas);
             UUID agendamentoId = agendamento.getId();
             UUID clienteId = cliente.getId();
             var request = new ReagendamentoRequest(inicioValido.withHour(14), null);
@@ -939,9 +939,9 @@ class AgendamentoServiceTest {
             RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
                     () -> service.reagendarPeloCliente(agendamentoId, clienteId, request));
 
-            assertEquals("Remarcação pelo cliente deve ser feita com no mínimo 2 horas de antecedência",
+            assertEquals("Remarcação pelo cliente deve ser feita com no mínimo 24 horas de antecedência",
                     ex.getMessage());
-            assertEquals(daquiAUmaHora, agendamento.getDataHoraInicio());
+            assertEquals(daqui23Horas, agendamento.getDataHoraInicio());
             verify(agendamentoRepository, never()).save(any());
         }
 
