@@ -1,11 +1,11 @@
-FROM maven:3.9.6-eclipse-temurin-21 AS build
+FROM maven:3.10.2-eclipse-temurin-21 AS build
 WORKDIR /app
 COPY pom.xml .
 RUN mvn dependency:go-offline
 COPY src ./src
 RUN mvn clean package -DskipTests
 
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:21.0.13.1_2-jre-alpine
 WORKDIR /app
 RUN addgroup -S kira && adduser -S kira -G kira
 # Pasta das fotos enviadas. O usuário kira não pode criar pastas em /app (é do root), então ela já
