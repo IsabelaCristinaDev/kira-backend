@@ -1,5 +1,6 @@
 package br.com.kira.kirabackend.dto.request;
 
+import br.com.kira.kirabackend.security.SenhaCabeNoBcrypt;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -10,5 +11,6 @@ public record RedefinicaoSenhaRequest(
 
         @NotBlank(message = "Nova senha é obrigatória")
         @Size(min = 8, message = "Senha deve ter no mínimo 8 caracteres")
+        @SenhaCabeNoBcrypt
         String novaSenha
 ) {}
