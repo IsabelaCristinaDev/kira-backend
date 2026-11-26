@@ -85,7 +85,7 @@ docker exec -it kira_postgres psql -U <DB_USERNAME> -d <DB_NAME> -c '\password k
 
 - Rode o script depois de a API ter subido ao menos uma vez, para as tabelas existirem. Ele pode ser rodado de novo sem erro. A senha do `kira_rag` não fica em nenhum arquivo.
 - Sem a tabela de suspensão de perfil (canal de segurança), a view de estúdios é criada sem esse filtro e o script avisa. Rode-o de novo quando a tabela existir.
-- As views dependem de colunas das tabelas de estúdio, serviço, horário e suspensão de perfil. Se uma entidade mudar uma dessas colunas, o Hibernate não consegue alterá-la enquanto as views existirem: apague-as (`DROP SCHEMA kira_leitura CASCADE`), suba a API e rode o script de novo.
+- As views leem de funções, e não direto das tabelas, para deixar livres as colunas que o Hibernate ajusta quando a API sobe. Se uma entidade renomear ou remover uma coluna usada pelo script, a leitura do RAG dá erro até o `rag.sql` ser ajustado e rodado de novo.
 
 ### Rodar num servidor
 
