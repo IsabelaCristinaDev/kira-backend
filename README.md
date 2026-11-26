@@ -74,6 +74,19 @@ docker compose --profile ia up -d
 - Na primeira vez, a imagem (cerca de 12 GB) é montada. Para montar de novo depois de atualizar o kira-ai, acrescente `--build`.
 - Sem o kira-ai, a API continua no ar: o Provador usa a própria ordem e a verificação responde que está indisponível.
 
+### Banco para o RAG do kira-ai
+
+O PostgreSQL do `docker-compose.yml` é montado com a extensão pgvector (`docker/postgres/Dockerfile`). O script `docker/postgres/rag.sql` prepara o acesso do kira-ai: cria o usuário `kira_rag`, o schema `rag` (dele) e as views de leitura em `kira_leitura` (estúdios, horários e serviços).
+
+```bash
+docker exec -i kira_postgres psql -U <DB_USERNAME> -d <DB_NAME> -v ON_ERROR_STOP=1 -1 < docker/postgres/rag.sql
+docker exec -it kira_postgres psql -U <DB_USERNAME> -d <DB_NAME> -c '\password kira_rag'
+```
+
+- Rode o script depois de a API ter subido ao menos uma vez, para as tabelas existirem. Ele pode ser rodado de novo sem erro. A senha do `kira_rag` não fica em nenhum arquivo.
+- Sem a tabela de suspensão de perfil (canal de segurança), a view de estúdios é criada sem esse filtro e o script avisa. Rode-o de novo quando a tabela existir.
+- As views leem de funções, e não direto das tabelas, para deixar livres as colunas que o Hibernate ajusta quando a API sobe. Se uma entidade renomear ou remover uma coluna usada pelo script, a leitura do RAG dá erro até o `rag.sql` ser ajustado e rodado de novo.
+
 ### Rodar num servidor
 
 O arquivo `docker-compose.servidor.yml` sobe a API, o banco e o MinIO (fotos) juntos, cada um no seu container:
@@ -236,7 +249,7 @@ O código fica em `br.com.kira.kirabackend`, organizado em camadas:
 
 ### Padrões de projeto
 
-- **Strategy:** o cancelamento segue regras diferentes para cada lado. A cliente precisa de no mínimo 2 horas de antecedência, e a empresa não tem prazo. Cada regra fica em uma classe, então uma regra nova não altera as existentes.
+- **Strategy:** o cancelamento segue regras diferentes para cada lado. A cliente precisa de no mínimo 24 horas de antecedência para cancelar ou remarcar, e a empresa não tem prazo. Cada regra fica em uma classe, então uma regra nova não altera as existentes.
 - **Observer:** efeitos colaterais de um agendamento ficam em listeners de eventos, separados do fluxo principal. A comissão, por exemplo, é gerada ao tratar o evento `AtendimentoConcluidoEvent`.
 - **DTO:** nenhuma entidade JPA sai do controller. Assim, a API não expõe dados internos, e a entrada é validada com Bean Validation.
 
