@@ -36,9 +36,12 @@ public class FuncionariaController {
                 .body(funcionariaService.cadastrar(empresaId, request));
     }
 
+    // Área do estúdio (com a comissão). A vitrine usa /api/studios/{id}/funcionarias.
     @GetMapping
     public ResponseEntity<List<FuncionariaResponse>> listar(
-            @PathVariable UUID empresaId) {
+            @PathVariable UUID empresaId,
+            @AuthenticationPrincipal Usuario usuario) {
+        acessoEmpresa.exigirEmpresa(empresaId, usuario);
         return ResponseEntity.ok(funcionariaService.listarPorEmpresa(empresaId));
     }
 
