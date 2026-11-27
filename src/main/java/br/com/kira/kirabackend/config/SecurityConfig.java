@@ -72,6 +72,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/empresas/*/dashboard").authenticated()
                         // O perfil tem e-mail e documentos: também exige login
                         .requestMatchers(HttpMethod.GET, "/api/empresas/*/perfil").authenticated()
+                        // A equipe da área do estúdio tem a comissão: exige login (a vitrine usa /api/studios)
+                        .requestMatchers(HttpMethod.GET, "/api/empresas/*/funcionarias", "/api/empresas/*/funcionarias/**")
+                        .authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/empresas/**").permitAll()
                         // A foto de perfil aparece na vitrine, sem login. O nome do arquivo é aleatório
                         .requestMatchers(HttpMethod.GET, "/api/arquivos/*").permitAll()
