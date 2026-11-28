@@ -19,7 +19,7 @@ public final class HashDeToken {
             byte[] hash = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
         } catch (NoSuchAlgorithmException e) {
-            // Todo Java tem SHA-256 por especificação: não acontece
+            // A especificação do Java garante SHA-256 em qualquer JVM: não acontece
             throw new IllegalStateException("SHA-256 indisponível", e);
         }
     }
