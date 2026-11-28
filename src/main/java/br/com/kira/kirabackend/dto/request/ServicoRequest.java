@@ -2,6 +2,8 @@ package br.com.kira.kirabackend.dto.request;
 
 import br.com.kira.kirabackend.domain.enums.CategoriaServico;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -24,6 +26,9 @@ public record ServicoRequest(
 
         @NotNull(message = "Preço é obrigatório")
         @Positive(message = "Preço deve ser maior que zero")
+        // Teto de negócio; @Digits evita que o banco arredonde os centavos em silêncio
+        @DecimalMax(value = "10000.00", message = "Preço deve ser de no máximo R$ 10.000,00")
+        @Digits(integer = 5, fraction = 2, message = "Preço deve ter no máximo 2 casas decimais")
         BigDecimal preco,
         // Opcional: sem ela, a categoria é deduzida pelo nome
         CategoriaServico categoria

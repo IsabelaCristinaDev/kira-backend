@@ -254,12 +254,20 @@ public class AuthService {
             normalizado = numeros;
         }
 
+        BigDecimal preco;
         try {
-            return new BigDecimal(normalizado).setScale(2, RoundingMode.HALF_UP);
+            preco = new BigDecimal(normalizado).setScale(2, RoundingMode.HALF_UP);
         } catch (NumberFormatException e) {
             return BigDecimal.ZERO;
         }
+        if (preco.compareTo(PRECO_MAXIMO) > 0) {
+            throw new RegraDeNegocioException("Preço deve ser de no máximo R$ 10.000,00");
+        }
+        return preco;
     }
+
+    // Mesmo teto do ServicoRequest, para o cadastro do estúdio seguir a mesma regra
+    private static final BigDecimal PRECO_MAXIMO = new BigDecimal("10000.00");
 
     private static final Pattern DURACAO_COM_HORAS =
             Pattern.compile("(?<!\\d)(\\d++)\\s*+h(?:oras?)?\\s*+(\\d++)?", Pattern.CASE_INSENSITIVE);

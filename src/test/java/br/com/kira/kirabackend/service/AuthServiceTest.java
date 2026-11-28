@@ -545,7 +545,9 @@ class AuthServiceTest {
                 "'1.234,56',    1234.56",
                 "'R$ 1.234,56', 1234.56",
                 "'50.00',       50.00",
-                "'1.234.567',   1234567.00",
+                "'1.234',       1.23",
+                "'9.999,99',    9999.99",
+                "'10.000,00',   10000.00",
                 "'R$ 0,99',     0.99"
         })
         @DisplayName("Converte o preço digitado")
@@ -554,6 +556,20 @@ class AuthServiceTest {
 
             assertEquals(0, new BigDecimal(esperado).compareTo(servico.getPreco()),
                     () -> "esperado " + esperado + " mas foi " + servico.getPreco());
+        }
+
+        @ParameterizedTest(name = "\"{0}\" é recusado")
+        @ValueSource(strings = {"10.000,01", "1.234.567", "R$ 99999"})
+        @DisplayName("Preço acima de R$ 10.000,00 é recusado")
+        void precoAcimaDoTetoERecusado(String bruto) {
+            when(usuarioRepository.existsByEmailIgnoreCase("estudio@teste.com")).thenReturn(false);
+
+            RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
+                    () -> service.registrarEmpresa(registroEmpresa(null,
+                            List.of(new ServicoRegistroRequest("Corte", bruto, "30 min", null)))));
+
+            assertEquals("Preço deve ser de no máximo R$ 10.000,00", ex.getMessage());
+            verify(servicoRepository, never()).save(any());
         }
 
         @ParameterizedTest(name = "\"{0}\" = R$ 0")
