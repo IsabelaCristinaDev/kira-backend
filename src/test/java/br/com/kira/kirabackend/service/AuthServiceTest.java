@@ -24,6 +24,7 @@ import br.com.kira.kirabackend.repository.RefreshTokenRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import br.com.kira.kirabackend.security.JwtTokenProvider;
+import br.com.kira.kirabackend.util.HashDeToken;
 import br.com.kira.kirabackend.util.KiraTimeZone;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -133,7 +134,7 @@ class AuthServiceTest {
 
     private RefreshToken refreshToken(Usuario usuario, LocalDateTime expiracao, boolean revogado) {
         RefreshToken refreshToken = new RefreshToken();
-        refreshToken.setToken("refresh-antigo");
+        refreshToken.setTokenHash(HashDeToken.sha256("refresh-antigo"));
         refreshToken.setUsuario(usuario);
         refreshToken.setDataExpiracao(expiracao);
         refreshToken.setRevogado(revogado);
@@ -224,7 +225,9 @@ class AuthServiceTest {
             ordem.verify(refreshTokenRepository).save(captor.capture());
 
             RefreshToken salvo = captor.getValue();
-            assertEquals(response.refreshToken(), salvo.getToken());
+            // O banco guarda só o hash: o token que o app recebe não fica gravado
+            assertEquals(HashDeToken.sha256(response.refreshToken()), salvo.getTokenHash());
+            assertNotEquals(response.refreshToken(), salvo.getTokenHash());
             assertSame(cliente, salvo.getUsuario());
             assertFalse(salvo.getRevogado());
             assertTrue(salvo.getDataExpiracao().isAfter(agora().plusDays(6)));
@@ -241,7 +244,7 @@ class AuthServiceTest {
         @DisplayName("Refresh válido gera um novo token e troca o refresh token")
         void refreshValido() {
             Cliente cliente = cliente();
-            when(refreshTokenRepository.findByToken("refresh-antigo"))
+            when(refreshTokenRepository.findByTokenHash(HashDeToken.sha256("refresh-antigo")))
                     .thenReturn(Optional.of(refreshToken(cliente, agora().plusDays(1), false)));
             when(jwtTokenProvider.gerarToken(cliente, "CLIENTE")).thenReturn("jwt-novo");
 
@@ -256,7 +259,7 @@ class AuthServiceTest {
         @Test
         @DisplayName("Refresh com token inexistente dá erro")
         void refreshInexistente() {
-            when(refreshTokenRepository.findByToken("nao-existe")).thenReturn(Optional.empty());
+            when(refreshTokenRepository.findByTokenHash(HashDeToken.sha256("nao-existe"))).thenReturn(Optional.empty());
 
             RefreshTokenRequest req = new RefreshTokenRequest("nao-existe");
 
@@ -268,7 +271,7 @@ class AuthServiceTest {
         @Test
         @DisplayName("Refresh com token expirado dá erro")
         void refreshExpirado() {
-            when(refreshTokenRepository.findByToken("refresh-antigo"))
+            when(refreshTokenRepository.findByTokenHash(HashDeToken.sha256("refresh-antigo")))
                     .thenReturn(Optional.of(refreshToken(cliente(), agora().minusMinutes(1), false)));
 
             RefreshTokenRequest req = new RefreshTokenRequest("refresh-antigo");
@@ -284,7 +287,7 @@ class AuthServiceTest {
         void refreshDeContaDesativada() {
             Cliente cliente = cliente();
             cliente.setAtivo(false);
-            when(refreshTokenRepository.findByToken("refresh-antigo"))
+            when(refreshTokenRepository.findByTokenHash(HashDeToken.sha256("refresh-antigo")))
                     .thenReturn(Optional.of(refreshToken(cliente, agora().plusDays(1), false)));
 
             RefreshTokenRequest req = new RefreshTokenRequest("refresh-antigo");
@@ -298,7 +301,7 @@ class AuthServiceTest {
         @Test
         @DisplayName("Refresh com token revogado dá erro")
         void refreshRevogado() {
-            when(refreshTokenRepository.findByToken("refresh-antigo"))
+            when(refreshTokenRepository.findByTokenHash(HashDeToken.sha256("refresh-antigo")))
                     .thenReturn(Optional.of(refreshToken(cliente(), agora().plusDays(1), true)));
 
             RefreshTokenRequest req = new RefreshTokenRequest("refresh-antigo");
@@ -320,7 +323,7 @@ class AuthServiceTest {
         @DisplayName("Logout revoga o refresh token")
         void logoutRevogaToken() {
             RefreshToken refreshToken = refreshToken(cliente(), agora().plusDays(1), false);
-            when(refreshTokenRepository.findByToken("refresh-antigo")).thenReturn(Optional.of(refreshToken));
+            when(refreshTokenRepository.findByTokenHash(HashDeToken.sha256("refresh-antigo"))).thenReturn(Optional.of(refreshToken));
 
             service.logout(new RefreshTokenRequest("refresh-antigo"));
 
@@ -331,7 +334,7 @@ class AuthServiceTest {
         @Test
         @DisplayName("Logout com token inexistente não faz nada nem dá erro")
         void logoutTokenInexistente() {
-            when(refreshTokenRepository.findByToken("nao-existe")).thenReturn(Optional.empty());
+            when(refreshTokenRepository.findByTokenHash(HashDeToken.sha256("nao-existe"))).thenReturn(Optional.empty());
 
             assertDoesNotThrow(() -> service.logout(new RefreshTokenRequest("nao-existe")));
             verify(refreshTokenRepository, never()).save(any());
