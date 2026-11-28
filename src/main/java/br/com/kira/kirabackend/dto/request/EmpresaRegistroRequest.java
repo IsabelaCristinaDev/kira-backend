@@ -47,7 +47,9 @@ public record EmpresaRegistroRequest(
 
         List<String> especialidades,
 
-        List<ServicoRegistroRequest> servicos,
+        // @Valid confere cada serviço; o teto evita uma lista sem fim num único cadastro
+        @Size(max = 50, message = "Cadastre no máximo 50 serviços")
+        List<@Valid ServicoRegistroRequest> servicos,
 
         @NotNull(message = "Tipo de estabelecimento é obrigatório")
         TipoEstabelecimento tipoEstabelecimento

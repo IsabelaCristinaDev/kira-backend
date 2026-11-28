@@ -201,4 +201,22 @@ class AuthControllerLimiteTentativasTest {
 
         cadastrar("10.0.8.2", "empresa", EMPRESA).andExpect(status().isCreated());
     }
+
+    // ---------- cadastro: serviços da lista também são validados ----------
+
+    @Test
+    @DisplayName("Cadastro de estúdio com serviço sem nome: 400 com o campo do serviço e nada é cadastrado")
+    void servicoInvalidoNoCadastro400() throws Exception {
+        String corpo = """
+                {"nome":"Estúdio","email":"estudio-servico@teste.com","senha":"Senha1234","telefone":"62999990000",
+                 "tipoEstabelecimento":"ESTABELECIMENTO",
+                 "servicos":[{"nome":"","preco":"R$ 50,00","duracao":"45 min"}]}""";
+
+        cadastrar("10.0.9.1", "empresa", corpo)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.erro").value("VALIDACAO"))
+                .andExpect(jsonPath("$.erros['servicos[0].nome']").value("Nome do serviço é obrigatório"));
+
+        verify(authService, never()).registrarEmpresa(any());
+    }
 }
