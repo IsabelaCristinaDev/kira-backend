@@ -115,20 +115,20 @@ class DashboardEmpresaServiceTest {
     }
 
     private void mockarPeriodo(Agendamento... agendamentos) {
-        when(agendamentoRepository.findByEmpresaIdAndStatusAndDataHoraInicioBetween(
-                empresaId, StatusAgendamento.CONCLUIDO, INICIO.atStartOfDay(), FIM.atTime(LocalTime.MAX)))
+        when(agendamentoRepository.listarDaEmpresaNoPeriodo(
+                empresaId, StatusAgendamento.CONCLUIDO, INICIO.atStartOfDay(), FIM.plusDays(1).atStartOfDay()))
                 .thenReturn(Arrays.asList(agendamentos));
     }
 
     private void mockarAnterior(Agendamento... agendamentos) {
-        lenient().when(agendamentoRepository.findByEmpresaIdAndStatusAndDataHoraInicioBetween(
+        lenient().when(agendamentoRepository.listarDaEmpresaNoPeriodo(
                 empresaId, StatusAgendamento.CONCLUIDO,
-                LocalDate.of(2026, 9, 22).atStartOfDay(), LocalDate.of(2026, 9, 28).atTime(LocalTime.MAX)))
+                LocalDate.of(2026, 9, 22).atStartOfDay(), LocalDate.of(2026, 9, 29).atStartOfDay()))
                 .thenReturn(Arrays.asList(agendamentos));
     }
 
     private void mockarCancelados(long total) {
-        when(agendamentoRepository.countByEmpresaIdAndStatusAndDataHoraInicioBetween(
+        when(agendamentoRepository.contarDaEmpresaNoPeriodo(
                 eq(empresaId), eq(StatusAgendamento.CANCELADO), any(LocalDateTime.class), any(LocalDateTime.class)))
                 .thenReturn(total);
     }
@@ -346,7 +346,7 @@ class DashboardEmpresaServiceTest {
 
         @BeforeEach
         void periodoQualquerSemAtendimentos() {
-            when(agendamentoRepository.findByEmpresaIdAndStatusAndDataHoraInicioBetween(
+            when(agendamentoRepository.listarDaEmpresaNoPeriodo(
                     eq(empresaId), eq(StatusAgendamento.CONCLUIDO), any(LocalDateTime.class), any(LocalDateTime.class)))
                     .thenReturn(List.of());
             mockarCancelados(0);
@@ -356,7 +356,7 @@ class DashboardEmpresaServiceTest {
         private LocalDateTime[] periodoConsultado() {
             ArgumentCaptor<LocalDateTime> de = ArgumentCaptor.forClass(LocalDateTime.class);
             ArgumentCaptor<LocalDateTime> ate = ArgumentCaptor.forClass(LocalDateTime.class);
-            verify(agendamentoRepository, times(2)).findByEmpresaIdAndStatusAndDataHoraInicioBetween(
+            verify(agendamentoRepository, times(2)).listarDaEmpresaNoPeriodo(
                     eq(empresaId), eq(StatusAgendamento.CONCLUIDO), de.capture(), ate.capture());
             return new LocalDateTime[]{de.getAllValues().get(0), ate.getAllValues().get(0)};
         }
@@ -373,9 +373,10 @@ class DashboardEmpresaServiceTest {
             // Assert
             LocalDate hojeDepois = LocalDate.now(KiraTimeZone.DEFAULT);
             LocalDateTime[] periodo = periodoConsultado();
-            LocalDate fim = periodo[1].toLocalDate();
-            assertTrue(fim.equals(hojeAntes) || fim.equals(hojeDepois), "o fim deve ser hoje");
-            assertEquals(LocalTime.MAX, periodo[1].toLocalTime());
+            // Fim exclusivo: a meia-noite seguinte ao último dia, que é hoje
+            LocalDate fim = periodo[1].toLocalDate().minusDays(1);
+            assertTrue(fim.equals(hojeAntes) || fim.equals(hojeDepois), "o último dia deve ser hoje");
+            assertEquals(LocalTime.MIDNIGHT, periodo[1].toLocalTime());
             assertEquals(fim.withDayOfMonth(1).atStartOfDay(), periodo[0]);
         }
 
@@ -393,9 +394,10 @@ class DashboardEmpresaServiceTest {
             LocalDate hojeDepois = LocalDate.now(KiraTimeZone.DEFAULT);
             LocalDateTime[] periodo = periodoConsultado();
             assertEquals(inicio.atStartOfDay(), periodo[0]);
-            LocalDate fim = periodo[1].toLocalDate();
-            assertTrue(fim.equals(hojeAntes) || fim.equals(hojeDepois), "o fim deve ser hoje");
-            assertEquals(LocalTime.MAX, periodo[1].toLocalTime());
+            // Fim exclusivo: a meia-noite seguinte ao último dia, que é hoje
+            LocalDate fim = periodo[1].toLocalDate().minusDays(1);
+            assertTrue(fim.equals(hojeAntes) || fim.equals(hojeDepois), "o último dia deve ser hoje");
+            assertEquals(LocalTime.MIDNIGHT, periodo[1].toLocalTime());
         }
 
         @Test
@@ -410,7 +412,7 @@ class DashboardEmpresaServiceTest {
             // Assert
             LocalDateTime[] periodo = periodoConsultado();
             assertEquals(hoje.withDayOfMonth(1).atStartOfDay(), periodo[0]);
-            assertEquals(hoje.atTime(LocalTime.MAX), periodo[1]);
+            assertEquals(hoje.plusDays(1).atStartOfDay(), periodo[1]);
         }
     }
 }

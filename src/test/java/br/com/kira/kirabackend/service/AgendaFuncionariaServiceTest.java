@@ -18,7 +18,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -31,9 +30,6 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AgendaFuncionariaServiceTest {
-
-    /** Último instante do dia: 23:59:59.999999999. */
-    private static final LocalTime FIM_DO_DIA = LocalTime.MAX;
 
     @Mock
     private AgendamentoRepository agendamentoRepository;
@@ -83,7 +79,7 @@ class AgendaFuncionariaServiceTest {
     }
 
     private void mockarIntervalo(LocalDateTime inicio, LocalDateTime fim, List<Agendamento> agendamentos) {
-        when(agendamentoRepository.findByFuncionariaIdAndDataHoraInicioBetweenOrderByDataHoraInicio(
+        when(agendamentoRepository.listarDaFuncionariaNoPeriodo(
                 funcionaria.getId(), inicio, fim)).thenReturn(agendamentos);
     }
 
@@ -92,12 +88,12 @@ class AgendaFuncionariaServiceTest {
     class ListarPorDia {
 
         @Test
-        @DisplayName("Busca do primeiro ao último instante do dia e devolve os agendamentos convertidos, na ordem do banco")
+        @DisplayName("Busca de 00:00 até a meia-noite seguinte e devolve os agendamentos convertidos, na ordem do banco")
         void deveListarODiaInteiro() {
             LocalDate dia = LocalDate.of(2026, 11, 16);
             Agendamento manha = agendamento(dia.atTime(9, 0));
             Agendamento noite = agendamento(dia.atTime(19, 30));
-            mockarIntervalo(dia.atStartOfDay(), dia.atTime(FIM_DO_DIA), List.of(manha, noite));
+            mockarIntervalo(dia.atStartOfDay(), dia.plusDays(1).atStartOfDay(), List.of(manha, noite));
 
             List<AgendamentoResponse> agenda = service.listarPorDia(funcionaria.getId(), dia);
 
@@ -114,23 +110,23 @@ class AgendaFuncionariaServiceTest {
         }
 
         @Test
-        @DisplayName("O intervalo do dia vai de 00:00 até 23:59:59.999999999, sem invadir o dia seguinte")
+        @DisplayName("O intervalo do dia vai de 00:00 até a meia-noite seguinte, que fica de fora")
         void intervaloNaoInvadeODiaSeguinte() {
             LocalDate dia = LocalDate.of(2026, 11, 16);
 
             service.listarPorDia(funcionaria.getId(), dia);
 
-            verify(agendamentoRepository).findByFuncionariaIdAndDataHoraInicioBetweenOrderByDataHoraInicio(
+            verify(agendamentoRepository).listarDaFuncionariaNoPeriodo(
                     funcionaria.getId(),
                     LocalDateTime.of(2026, 11, 16, 0, 0),
-                    LocalDateTime.of(2026, 11, 16, 23, 59, 59, 999_999_999));
+                    LocalDateTime.of(2026, 11, 17, 0, 0));
         }
 
         @Test
         @DisplayName("Dia sem atendimentos devolve lista vazia")
         void diaSemAtendimentos() {
             LocalDate dia = LocalDate.of(2026, 11, 16);
-            mockarIntervalo(dia.atStartOfDay(), dia.atTime(FIM_DO_DIA), List.of());
+            mockarIntervalo(dia.atStartOfDay(), dia.plusDays(1).atStartOfDay(), List.of());
 
             assertTrue(service.listarPorDia(funcionaria.getId(), dia).isEmpty());
         }
@@ -141,17 +137,17 @@ class AgendaFuncionariaServiceTest {
     class ListarPorSemana {
 
         @Test
-        @DisplayName("A semana tem 7 dias: do início do primeiro dia até o fim do sexto dia seguinte")
+        @DisplayName("A semana tem 7 dias: do início do primeiro dia até a meia-noite do oitavo, que fica de fora")
         void semanaTemSeteDias() {
             LocalDate inicio = LocalDate.of(2026, 11, 16);
 
             service.listarPorSemana(funcionaria.getId(), inicio);
 
-            // Fim no dia 22, não no 23: senão a semana teria 8 dias
-            verify(agendamentoRepository).findByFuncionariaIdAndDataHoraInicioBetweenOrderByDataHoraInicio(
+            // Fim às 00:00 do dia 23, exclusivo: a semana vai do dia 16 ao 22
+            verify(agendamentoRepository).listarDaFuncionariaNoPeriodo(
                     funcionaria.getId(),
                     LocalDateTime.of(2026, 11, 16, 0, 0),
-                    LocalDateTime.of(2026, 11, 22, 23, 59, 59, 999_999_999));
+                    LocalDateTime.of(2026, 11, 23, 0, 0));
         }
 
         @Test
@@ -160,7 +156,7 @@ class AgendaFuncionariaServiceTest {
             LocalDate inicio = LocalDate.of(2026, 11, 16);
             Agendamento primeiroDia = agendamento(inicio.atTime(10, 0));
             Agendamento ultimoDia = agendamento(inicio.plusDays(6).atTime(17, 0));
-            mockarIntervalo(inicio.atStartOfDay(), inicio.plusDays(6).atTime(FIM_DO_DIA),
+            mockarIntervalo(inicio.atStartOfDay(), inicio.plusDays(7).atStartOfDay(),
                     List.of(primeiroDia, ultimoDia));
 
             List<AgendamentoResponse> agenda = service.listarPorSemana(funcionaria.getId(), inicio);
@@ -177,16 +173,16 @@ class AgendaFuncionariaServiceTest {
 
             service.listarPorSemana(funcionaria.getId(), inicio);
 
-            verify(agendamentoRepository).findByFuncionariaIdAndDataHoraInicioBetweenOrderByDataHoraInicio(
+            verify(agendamentoRepository).listarDaFuncionariaNoPeriodo(
                     eq(funcionaria.getId()),
                     eq(LocalDateTime.of(2026, 12, 28, 0, 0)),
-                    eq(LocalDateTime.of(2027, 1, 3, 23, 59, 59, 999_999_999)));
+                    eq(LocalDateTime.of(2027, 1, 4, 0, 0)));
         }
 
         @Test
         @DisplayName("Semana sem atendimentos devolve lista vazia")
         void semanaSemAtendimentos() {
-            when(agendamentoRepository.findByFuncionariaIdAndDataHoraInicioBetweenOrderByDataHoraInicio(
+            when(agendamentoRepository.listarDaFuncionariaNoPeriodo(
                     eq(funcionaria.getId()), any(LocalDateTime.class), any(LocalDateTime.class)))
                     .thenReturn(List.of());
 

@@ -8,7 +8,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 @RequiredArgsConstructor
@@ -19,25 +18,19 @@ public class AgendaFuncionariaService {
     private final AgendamentoRepository agendamentoRepository;
 
     public List<AgendamentoResponse> listarPorDia(UUID funcionariaId, LocalDate data) {
-        LocalDateTime inicio = data.atStartOfDay();
-        LocalDateTime fim = data.atTime(LocalTime.MAX);
-
-        return agendamentoRepository
-                .findByFuncionariaIdAndDataHoraInicioBetweenOrderByDataHoraInicio(
-                        funcionariaId, inicio, fim)
-                .stream()
-                .map(AgendamentoResponse::from)
-                .toList();
+        return listar(funcionariaId, data, 1);
     }
 
-    public List<AgendamentoResponse> listarPorSemana(UUID funcionariaId,
-                                                     LocalDate dataInicio) {
-        LocalDateTime inicio = dataInicio.atStartOfDay();
-        LocalDateTime fim = dataInicio.plusDays(6).atTime(LocalTime.MAX);
+    public List<AgendamentoResponse> listarPorSemana(UUID funcionariaId, LocalDate dataInicio) {
+        return listar(funcionariaId, dataInicio, 7);
+    }
 
-        return agendamentoRepository
-                .findByFuncionariaIdAndDataHoraInicioBetweenOrderByDataHoraInicio(
-                        funcionariaId, inicio, fim)
+    // Do início do primeiro dia até a meia-noite seguinte ao último, que fica de fora
+    private List<AgendamentoResponse> listar(UUID funcionariaId, LocalDate primeiroDia, int dias) {
+        LocalDateTime inicio = primeiroDia.atStartOfDay();
+        LocalDateTime fim = primeiroDia.plusDays(dias).atStartOfDay();
+
+        return agendamentoRepository.listarDaFuncionariaNoPeriodo(funcionariaId, inicio, fim)
                 .stream()
                 .map(AgendamentoResponse::from)
                 .toList();
