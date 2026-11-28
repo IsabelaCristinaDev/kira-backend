@@ -19,7 +19,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -95,8 +94,8 @@ class AdminVerificacaoControllerAcessoTest extends BaseAcessoWeb {
         mockMvc.perform(post(BASE + "/" + id + "/aprovar").with(token(admin))).andExpect(status().isNoContent());
         mockMvc.perform(post(BASE + "/" + id + "/reprovar").with(token(admin))).andExpect(status().isNoContent());
 
-        verify(revisaoService).aprovar(eq(id), eq(admin));
-        verify(revisaoService).reprovar(eq(id), eq(admin));
+        verify(revisaoService).aprovar(id, admin);
+        verify(revisaoService).reprovar(id, admin);
     }
 
     @Test

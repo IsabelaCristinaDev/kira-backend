@@ -126,12 +126,13 @@ class RevisaoVerificacaoServiceTest {
     @DisplayName("Só verificação em análise pode ser aprovada ou reprovada")
     void soEmAnalise(StatusVerificacao status) {
         verificacao.setStatus(status);
-        when(repository.travarParaRevisao(verificacao.getId())).thenReturn(Optional.of(verificacao));
+        UUID id = verificacao.getId();
+        when(repository.travarParaRevisao(id)).thenReturn(Optional.of(verificacao));
 
         RegraDeNegocioException aprovar = assertThrows(RegraDeNegocioException.class,
-                () -> service.aprovar(verificacao.getId(), admin));
+                () -> service.aprovar(id, admin));
         RegraDeNegocioException reprovar = assertThrows(RegraDeNegocioException.class,
-                () -> service.reprovar(verificacao.getId(), admin));
+                () -> service.reprovar(id, admin));
 
         assertEquals("Esta verificação não está em análise", aprovar.getMessage());
         assertEquals("Esta verificação não está em análise", reprovar.getMessage());

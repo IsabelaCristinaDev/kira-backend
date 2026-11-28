@@ -60,6 +60,7 @@ public class RevisaoVerificacaoService {
         verificacao.setRevisadoPor(admin);
         verificacao.setRevisadoEm(LocalDateTime.now(KiraTimeZone.DEFAULT));
         repository.save(verificacao);
-        log.info("Verificação {} revisada: {} (admin {})", verificacao.getId(), decisao, admin.getId());
+        // Quem decidiu e quando ficam na própria linha (revisado_por_id e revisado_em)
+        log.info("Verificação revisada: {} (admin {})", decisao, admin.getId());
     }
 }
