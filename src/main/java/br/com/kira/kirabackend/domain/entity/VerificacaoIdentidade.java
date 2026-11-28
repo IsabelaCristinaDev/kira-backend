@@ -74,6 +74,14 @@ public class VerificacaoIdentidade {
     @Column(name = "consentimento_aceito_em", nullable = false)
     private LocalDateTime consentimentoAceitoEm;
 
+    /** Admin que decidiu a verificação em análise; nulo quando o próprio serviço decidiu. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "revisado_por_id")
+    private Usuario revisadoPor;
+
+    @Column(name = "revisado_em")
+    private LocalDateTime revisadoEm;
+
     @Column(name = "data_criacao", nullable = false, updatable = false)
     private LocalDateTime dataCriacao;
 
