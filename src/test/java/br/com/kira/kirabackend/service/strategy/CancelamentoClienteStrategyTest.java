@@ -24,24 +24,26 @@ class CancelamentoClienteStrategyTest {
     }
 
     @Test
-    @DisplayName("Deve cancelar agendamento com mais de 2 horas de antecedência")
+    @DisplayName("Deve cancelar agendamento com mais de 24 horas de antecedência")
     void deveCancelarComAntecedenciaSuficiente() {
         Agendamento agendamento = new Agendamento();
         agendamento.setStatus(StatusAgendamento.PENDENTE);
-        agendamento.setDataHoraInicio(LocalDateTime.now(KiraTimeZone.DEFAULT).plusHours(3));
+        agendamento.setDataHoraInicio(LocalDateTime.now(KiraTimeZone.DEFAULT).plusHours(25));
 
         assertDoesNotThrow(() -> strategy.validarCancelamento(agendamento));
     }
 
     @Test
-    @DisplayName("Não deve cancelar agendamento com menos de 2 horas de antecedência")
+    @DisplayName("Não deve cancelar agendamento com menos de 24 horas de antecedência")
     void naoDeveCancelarComAntecedenciaInsuficiente() {
         Agendamento agendamento = new Agendamento();
         agendamento.setStatus(StatusAgendamento.PENDENTE);
-        agendamento.setDataHoraInicio(LocalDateTime.now(KiraTimeZone.DEFAULT).plusHours(1));
+        agendamento.setDataHoraInicio(LocalDateTime.now(KiraTimeZone.DEFAULT).plusHours(23));
 
-        assertThrows(RegraDeNegocioException.class,
+        RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
                 () -> strategy.validarCancelamento(agendamento));
+        assertEquals("Cancelamento pelo cliente deve ser feito com no mínimo 24 horas de antecedência",
+                ex.getMessage());
     }
 
     @Test

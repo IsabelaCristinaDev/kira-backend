@@ -296,7 +296,12 @@ class RotasComBancoRealTest {
         String funcionariaId = novaFuncionaria("Elis");
         chamar("PUT", funcionarias + "/" + funcionariaId,
                 Map.of("nome", "Elis Souza", "comissaoPercentual", 10), estudio.token(), 200);
-        get(funcionarias, estudio.token());
+        assertTrue(get(funcionarias, estudio.token()).findParents("id").stream()
+                .anyMatch(f -> f.get("id").asText().equals(funcionariaId) && f.has("comissaoPercentual")));
+        // A lista da área do estúdio só responde para a dona
+        chamar("GET", funcionarias, null, null, 401);
+        assertEquals("ACESSO_NEGADO", chamar("GET", funcionarias, null, outroEstudio.token(), 403).get("erro").asText());
+        chamar("GET", funcionarias, null, cliente.token(), 403);
         // Outra conta: 403 com a mensagem genérica, diferente do 403 da verificação obrigatória
         JsonNode negado = chamar("PUT", funcionarias + "/" + funcionariaId,
                 Map.of("nome", "Outra", "comissaoPercentual", 50), outroEstudio.token(), 403);
