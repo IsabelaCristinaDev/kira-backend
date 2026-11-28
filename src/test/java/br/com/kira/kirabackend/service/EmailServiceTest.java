@@ -16,6 +16,14 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import br.com.kira.kirabackend.domain.entity.Agendamento;
+import br.com.kira.kirabackend.domain.entity.Cliente;
+import br.com.kira.kirabackend.domain.entity.Empresa;
+import br.com.kira.kirabackend.domain.entity.Servico;
+import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
+
+import java.time.LocalDateTime;
+
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -144,5 +152,46 @@ class EmailServiceTest {
         doThrow(new MailSendException("SMTP fora do ar")).when(mailSender).send(any(SimpleMailMessage.class));
 
         assertDoesNotThrow(() -> service.enviarEmailRecuperacaoSenha("ana@teste.com", "abc-123"));
+    }
+
+    @Test
+    @DisplayName("Lembrete de agendamento pendente avisa que o estúdio ainda não confirmou")
+    void lembretePendenteAvisaFaltaDeConfirmacao() {
+        service.enviarLembreteAgendamento("ana@teste.com", agendamento(StatusAgendamento.PENDENTE));
+
+        String texto = textoEnviado();
+        assertTrue(texto.contains("ainda aguarda a confirmação do estúdio"), texto);
+    }
+
+    @Test
+    @DisplayName("Lembrete de agendamento confirmado não fala em confirmação pendente")
+    void lembreteConfirmadoSemAvisoDeConfirmacao() {
+        service.enviarLembreteAgendamento("ana@teste.com", agendamento(StatusAgendamento.CONFIRMADO));
+
+        String texto = textoEnviado();
+        assertFalse(texto.contains("aguarda a confirmação"), texto);
+        assertTrue(texto.contains("Serviço: Corte"), texto);
+    }
+
+    private Agendamento agendamento(StatusAgendamento status) {
+        Cliente cliente = new Cliente();
+        cliente.setNome("Ana");
+        Empresa empresa = new Empresa();
+        empresa.setNome("Studio Teste");
+        Servico servico = new Servico();
+        servico.setNome("Corte");
+        Agendamento agendamento = new Agendamento();
+        agendamento.setCliente(cliente);
+        agendamento.setEmpresa(empresa);
+        agendamento.setServico(servico);
+        agendamento.setDataHoraInicio(LocalDateTime.of(2026, 11, 24, 11, 0));
+        agendamento.setStatus(status);
+        return agendamento;
+    }
+
+    private String textoEnviado() {
+        ArgumentCaptor<SimpleMailMessage> captor = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender).send(captor.capture());
+        return captor.getValue().getText();
     }
 }

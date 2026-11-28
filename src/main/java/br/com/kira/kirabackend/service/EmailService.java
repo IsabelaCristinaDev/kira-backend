@@ -2,6 +2,7 @@ package br.com.kira.kirabackend.service;
 
 import jakarta.annotation.PostConstruct;
 import br.com.kira.kirabackend.domain.entity.Agendamento;
+import br.com.kira.kirabackend.domain.enums.StatusAgendamento;
 import br.com.kira.kirabackend.util.MascaraEmail;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -92,11 +93,21 @@ public class EmailService {
                         "Serviço: " + agendamento.getServico().getNome() + "\n" +
                         "Local: " + agendamento.getEmpresa().getNome() + "\n" +
                         "Data e hora: " + agendamento.getDataHoraInicio().format(FORMATO_DATA_HORA) + "\n\n" +
+                        avisoDeConfirmacao(agendamento) +
                         "Caso não possa comparecer, cancele ou reagende com antecedência.\n\n" +
                         "Equipe KIRA"
         );
         mailSender.send(message);
 
+    }
+
+    // Pendente ainda não foi aceito pelo estúdio: a cliente precisa saber antes de sair de casa
+    private static String avisoDeConfirmacao(Agendamento agendamento) {
+        if (agendamento.getStatus() != StatusAgendamento.PENDENTE) {
+            return "";
+        }
+        return "Atenção: seu agendamento ainda aguarda a confirmação do estúdio. "
+                + "Acompanhe pelo app antes de ir.\n\n";
     }
 
     // Avisa o dono quando a conta acumula falhas de login. Não traz IP nem horários do ataque:
