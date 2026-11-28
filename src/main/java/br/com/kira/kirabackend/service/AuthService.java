@@ -22,6 +22,7 @@ import br.com.kira.kirabackend.repository.RefreshTokenRepository;
 import br.com.kira.kirabackend.repository.ServicoRepository;
 import br.com.kira.kirabackend.repository.UsuarioRepository;
 import br.com.kira.kirabackend.security.JwtTokenProvider;
+import br.com.kira.kirabackend.util.HashDeToken;
 import br.com.kira.kirabackend.util.KiraTimeZone;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.Hibernate;
@@ -77,7 +78,7 @@ public class AuthService {
 
     @Transactional
     public LoginResponse refreshToken(RefreshTokenRequest data) {
-        var refreshTokenEntity = refreshTokenRepository.findByToken(data.refreshToken())
+        var refreshTokenEntity = refreshTokenRepository.findByTokenHash(HashDeToken.sha256(data.refreshToken()))
                 .orElseThrow(() -> new RegraDeNegocioException("Refresh token inválido"));
 
         if (!refreshTokenEntity.isValido()) {
@@ -98,7 +99,7 @@ public class AuthService {
 
     @Transactional
     public void logout(RefreshTokenRequest data) {
-        refreshTokenRepository.findByToken(data.refreshToken())
+        refreshTokenRepository.findByTokenHash(HashDeToken.sha256(data.refreshToken()))
                 .ifPresent(refreshTokenEntity -> {
                     refreshTokenEntity.setRevogado(true);
                     refreshTokenRepository.save(refreshTokenEntity);
@@ -138,7 +139,8 @@ public class AuthService {
         String token = UUID.randomUUID().toString();
 
         RefreshToken refreshToken = new RefreshToken();
-        refreshToken.setToken(token);
+        // O app recebe o token; o banco guarda só o hash
+        refreshToken.setTokenHash(HashDeToken.sha256(token));
         refreshToken.setUsuario(usuario);
         refreshToken.setDataExpiracao(LocalDateTime.now(KiraTimeZone.DEFAULT).plusSeconds(refreshExpiration / 1000));
         refreshToken.setRevogado(false);

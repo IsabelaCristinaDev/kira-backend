@@ -1,5 +1,6 @@
 package br.com.kira.kirabackend.domain.entity;
 
+import br.com.kira.kirabackend.util.HashDeToken;
 import br.com.kira.kirabackend.util.KiraTimeZone;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -7,11 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
-import java.util.HexFormat;
 import java.util.UUID;
 
 @Entity
@@ -43,13 +40,7 @@ public class TokenRecuperacaoSenha {
 
     /** SHA-256 em hexadecimal: o mesmo token sempre gera o mesmo hash, então dá para buscar por ele. */
     public static String hashDoToken(String token) {
-        try {
-            byte[] hash = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            // Todo Java tem SHA-256 por especificação: não acontece
-            throw new IllegalStateException("SHA-256 indisponível", e);
-        }
+        return HashDeToken.sha256(token);
     }
 
     public boolean isExpirado() {

@@ -22,8 +22,10 @@ public class RefreshToken {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(nullable = false, unique = true)
-    private String token;
+    // Só o SHA-256 do token: quem lê o banco não consegue renovar a sessão de ninguém.
+    // A coluna continua "token" para o Hibernate (ddl-auto: update) não criar uma coluna nova
+    @Column(name = "token", nullable = false, unique = true)
+    private String tokenHash;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_id", nullable = false)
