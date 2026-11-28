@@ -4,6 +4,7 @@ import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 
@@ -11,7 +12,7 @@ import java.math.BigDecimal;
 public record FuncionariaRequest(
 
     @NotBlank(message = "Nome é obrigatório" )
-
+    @Size(max = 150, message = "Nome deve ter no máximo 150 caracteres")
     String nome,
     String especialidades,
 
