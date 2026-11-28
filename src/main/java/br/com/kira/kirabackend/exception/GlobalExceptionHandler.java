@@ -21,6 +21,7 @@ import org.springframework.web.multipart.support.MissingServletRequestPartExcept
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -88,6 +89,14 @@ public class GlobalExceptionHandler {
             AcessoNegadoException ex,
             HttpServletRequest request) {
         return resposta(HttpStatus.FORBIDDEN, "ACESSO_NEGADO", ex.getMessage(), request);
+    }
+
+    // 403 do @PreAuthorize: sem este handler, a recusa cairia no genérico e viraria 500
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErroResponse> handleSemPermissao(
+            AccessDeniedException ex,
+            HttpServletRequest request) {
+        return resposta(HttpStatus.FORBIDDEN, "ACESSO_NEGADO", "Você não tem permissão para esta ação", request);
     }
 
     // 428: falta uma condição prévia (o consentimento). Não é 403, que o app trata como falta de permissão
