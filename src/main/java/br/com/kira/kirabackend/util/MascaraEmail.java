@@ -9,8 +9,10 @@ import java.util.regex.Pattern;
  */
 public final class MascaraEmail {
 
-    // Simples de propósito: serve para achar e-mails em mensagens de erro, não para validar
-    private static final Pattern EMAIL = Pattern.compile("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}");
+    // Simples de propósito: serve para achar e-mails em mensagens de erro, não para validar.
+    // Os tamanhos seguem os limites de e-mail (64 antes do @, 253 no domínio) e mantêm a busca rápida em texto longo
+    private static final Pattern EMAIL =
+            Pattern.compile("[A-Za-z0-9._%+-]{1,64}+@[A-Za-z0-9.-]{1,253}\\.[A-Za-z]{2,63}");
 
     private MascaraEmail() {
     }

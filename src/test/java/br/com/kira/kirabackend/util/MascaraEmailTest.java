@@ -3,8 +3,12 @@ package br.com.kira.kirabackend.util;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
+
 
 class MascaraEmailTest {
 
@@ -37,5 +41,23 @@ class MascaraEmailTest {
     void textoSemEmail() {
         assertEquals("Connection timed out", MascaraEmail.mascararNoTexto("Connection timed out"));
         assertNull(MascaraEmail.mascararNoTexto(null));
+    }
+
+    @Test
+    @DisplayName("Texto longo é processado rápido, com ou sem e-mail")
+    void textoLongoRapido() {
+        String longo = "a".repeat(50_000) + "@" + "b".repeat(50_000);
+
+        String resultado = assertTimeoutPreemptively(Duration.ofSeconds(1), () -> MascaraEmail.mascararNoTexto(longo));
+
+        assertEquals(longo, resultado);
+    }
+
+    @Test
+    @DisplayName("Continua achando e-mails com subdomínio e terminação composta")
+    void subdominios() {
+        assertEquals("erro para jo***@mail.empresa.com.br agora",
+                MascaraEmail.mascararNoTexto("erro para joana@mail.empresa.com.br agora"));
+        assertEquals("<an***@gmail.com>", MascaraEmail.mascararNoTexto("<ana@gmail.com>"));
     }
 }
