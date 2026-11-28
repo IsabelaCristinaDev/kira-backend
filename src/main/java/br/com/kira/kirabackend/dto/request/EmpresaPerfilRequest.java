@@ -18,6 +18,7 @@ public record EmpresaPerfilRequest(
         @NotBlank(message = "Telefone é obrigatório")
         @Size(max = 20, message = "Telefone deve ter no máximo 20 caracteres")
         String telefone,
+        @Size(max = 500, message = "Descrição deve ter no máximo 500 caracteres")
         String descricao,
         List<String> especialidades,
         @Past(message = "Data de nascimento deve estar no passado")

@@ -2,6 +2,7 @@ package br.com.kira.kirabackend.dto.request;
 
 import br.com.kira.kirabackend.domain.enums.FormaPagamento;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -21,5 +22,6 @@ public record AgendamentoRequest(
 
         FormaPagamento formaPagamento,
 
+        @Size(max = 500, message = "Observações devem ter no máximo 500 caracteres")
         String observacoes
 ) {}
