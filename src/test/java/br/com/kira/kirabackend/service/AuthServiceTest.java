@@ -564,9 +564,11 @@ class AuthServiceTest {
         void precoAcimaDoTetoERecusado(String bruto) {
             when(usuarioRepository.existsByEmailIgnoreCase("estudio@teste.com")).thenReturn(false);
 
+            EmpresaRegistroRequest registro = registroEmpresa(null,
+                    List.of(new ServicoRegistroRequest("Corte", bruto, "30 min", null)));
+
             RegraDeNegocioException ex = assertThrows(RegraDeNegocioException.class,
-                    () -> service.registrarEmpresa(registroEmpresa(null,
-                            List.of(new ServicoRegistroRequest("Corte", bruto, "30 min", null)))));
+                    () -> service.registrarEmpresa(registro));
 
             assertEquals("Preço deve ser de no máximo R$ 10.000,00", ex.getMessage());
             verify(servicoRepository, never()).save(any());
